@@ -1,0 +1,41 @@
+services:
+  server:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: file:/data/cmms.db
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 4001
+      NODE_ENV: production
+      CLIENT_ORIGIN: https://${CMMS_DOMAIN}
+    volumes:
+      - cmms_data:/data
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ../client
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8
+    depends_on:
+      - server
+      - client
+    environment:
+      CMMS_DOMAIN: ${CMMS_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports:
+      - "80:80"
+      - "443:443"
+    restart: unless-stopped
+
+volumes:
+  cmms_data:
+  caddy_data:
+  caddy_config:

@@ -1,18 +1,16 @@
 ﻿import React from 'react';
 import { ModuleType, HealthStatus, AppData } from '../types';
-import { MODULES, INITIAL_DATA, STORAGE_KEYS } from '../constants';
+import { MODULES } from '../constants';
 import { Factory, Route, LayoutGrid, ArrowRight } from 'lucide-react';
 import { calculateMotorHealth } from '../utils';
 
 interface DashboardProps {
+  data: AppData;
   onSelectModule: (module: ModuleType) => void;
   machineIds: number[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ onSelectModule, machineIds }) => {
-  const savedData = localStorage.getItem(STORAGE_KEYS.data);
-  const data: AppData = savedData ? JSON.parse(savedData) : INITIAL_DATA;
-
+const Dashboard: React.FC<DashboardProps> = ({ data, onSelectModule, machineIds }) => {
   const getModuleStats = (type: ModuleType) => {
     let critical = 0;
     let caution = 0;

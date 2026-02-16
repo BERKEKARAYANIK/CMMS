@@ -264,3 +264,13 @@ model TamamlananIsPersonel {
   @@index([sicilNo])
   @@map("tamamlanan_is_personeller")
 }
+
+model AppState {
+  id        Int      @id @default(autoincrement())
+  appKey    String   @unique @map("app_key")
+  jsonValue String   @map("json_value")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("app_state")
+}

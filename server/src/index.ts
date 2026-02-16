@@ -10,6 +10,7 @@ import { workOrdersRouter } from './routes/workOrders.js';
 import { preventiveMaintenanceRouter } from './routes/preventiveMaintenance.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { jobEntriesRouter } from './routes/jobEntries.js';
+import { appStateRouter } from './routes/appState.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { prisma } from './lib/prisma.js';
 import { CLIENT_ORIGIN } from './config.js';
@@ -32,6 +33,7 @@ app.use('/api/work-orders', workOrdersRouter);
 app.use('/api/preventive-maintenance', preventiveMaintenanceRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/job-entries', jobEntriesRouter);
+app.use('/api/app-state', appStateRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

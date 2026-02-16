@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { BarChart3, Edit2, Plus, Search, UserCheck, UserX } from 'lucide-react';
-import { usersApi } from '../services/api';
+import { appStateApi, jobEntriesApi, usersApi } from '../services/api';
 import type {
   Departman,
   PersonnelPerformanceData,
@@ -16,19 +16,10 @@ import {
   type Personel
 } from '../data/lists';
 import type { CompletedJob } from '../types/jobEntries';
-import { jobEntriesApi } from '../services/api';
+import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
 const departmanOptions: Departman[] = ['MEKANIK', 'ELEKTRIK', 'YARDIMCI_ISLETMELER', 'URETIM', 'YONETIM'];
 const roleOptions: Role[] = ['ADMIN', 'BAKIM_MUDURU', 'BAKIM_SEFI', 'TEKNISYEN', 'OPERATOR'];
-
-const LOCAL_KEYS = {
-  personelListesi: 'cmms_personel_listesi'
-};
-
-function getFromStorage<T>(key: string, defaultValue: T[]): T[] {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : defaultValue;
-}
 
 function mapBolumToDepartman(bolum: string): Departman {
   const upper = bolum.toUpperCase();
@@ -722,7 +713,17 @@ export default function Personnel() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    setLocalPersonelListesi(getFromStorage(LOCAL_KEYS.personelListesi, defaultPersonelListesi));
+    const loadSharedPersonnel = async () => {
+      try {
+        const response = await appStateApi.get(APP_STATE_KEYS.settingsLists);
+        const lists = normalizeSettingsLists(response.data?.data?.value);
+        setLocalPersonelListesi(lists.personelListesi);
+      } catch {
+        setLocalPersonelListesi(defaultPersonelListesi);
+      }
+    };
+
+    void loadSharedPersonnel();
   }, []);
 
   useEffect(() => {

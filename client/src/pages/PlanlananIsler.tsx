@@ -9,26 +9,12 @@ import {
 } from '../data/lists';
 import { useAuthStore } from '../store/authStore';
 import { isBerkeUser } from '../utils/access';
-import { jobEntriesApi } from '../services/api';
+import { appStateApi, jobEntriesApi } from '../services/api';
 import type { PlannedJob } from '../types/jobEntries';
+import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
-const LIST_KEYS = {
-  makinaListesi: 'cmms_makina_listesi'
-};
 const PLANLI_BAKIM_TURU = 'Planli Bakim';
 const CONVERT_KEY = 'cmms_planlanan_is_to_is_emri';
-
-function getFromStorage<T>(key: string, defaultValue: T[]): T[] {
-  const data = localStorage.getItem(key);
-  if (!data) return defaultValue;
-
-  try {
-    const parsed = JSON.parse(data) as T[];
-    return Array.isArray(parsed) ? parsed : defaultValue;
-  } catch {
-    return defaultValue;
-  }
-}
 
 function sortByCreatedAtDesc(items: PlannedJob[]): PlannedJob[] {
   return [...items].sort((a, b) => (
@@ -40,9 +26,7 @@ export default function PlanlananIsler() {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
   const canManagePlanlanan = isBerkeUser(currentUser);
-  const [makinaListesi] = useState<Makina[]>(() =>
-    getFromStorage(LIST_KEYS.makinaListesi, defaultMakinaListesi)
-  );
+  const [makinaListesi, setMakinaListesi] = useState<Makina[]>(defaultMakinaListesi);
   const [isler, setIsler] = useState<PlannedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -56,10 +40,17 @@ export default function PlanlananIsler() {
     const loadPlannedJobs = async () => {
       try {
         setIsLoading(true);
-        const response = await jobEntriesApi.getPlanned();
-        const data = response.data?.data as PlannedJob[] | undefined;
+        const [plannedResponse, listsResponse] = await Promise.all([
+          jobEntriesApi.getPlanned(),
+          appStateApi.get(APP_STATE_KEYS.settingsLists)
+        ]);
+        const data = plannedResponse.data?.data as PlannedJob[] | undefined;
         const list = Array.isArray(data) ? data : [];
         setIsler(sortByCreatedAtDesc(list));
+
+        const listsPayload = listsResponse.data?.data?.value;
+        const normalizedLists = normalizeSettingsLists(listsPayload);
+        setMakinaListesi(normalizedLists.makinaListesi);
       } catch {
         toast.error('Planlanan isler yuklenemedi');
       } finally {

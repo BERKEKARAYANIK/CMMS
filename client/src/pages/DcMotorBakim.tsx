@@ -1,50 +1,69 @@
 import React, { useEffect, useState } from 'react';
 import { ClipboardList } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { MaintenanceForm } from '../modules/dcMotorBakim/components/MaintenanceForm';
 import { AssetSelector } from '../modules/dcMotorBakim/components/AssetSelector';
 import { ReportHistory } from '../modules/dcMotorBakim/components/ReportHistory';
 import { ReportDetail } from '../modules/dcMotorBakim/components/ReportDetail';
-import { MOCK_INVENTORY, STORAGE_KEYS } from '../modules/dcMotorBakim/constants';
+import { MOCK_INVENTORY } from '../modules/dcMotorBakim/constants';
 import { MaintenanceTask, ChecklistData, Machine, MotorSpecs, CompletedReport } from '../modules/dcMotorBakim/types';
+import { appStateApi } from '../services/api';
+import { APP_STATE_KEYS } from '../constants/appState';
 
 type ViewState = 'selector' | 'form' | 'history' | 'report-detail';
-
-const loadReports = (): CompletedReport[] => {
-  const raw = localStorage.getItem(STORAGE_KEYS.reports);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as CompletedReport[]) : [];
-  } catch {
-    return [];
-  }
-};
-
-const loadInventory = (): Machine[] => {
-  const raw = localStorage.getItem(STORAGE_KEYS.inventory);
-  if (!raw) return MOCK_INVENTORY;
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as Machine[]) : MOCK_INVENTORY;
-  } catch {
-    return MOCK_INVENTORY;
-  }
-};
 
 const DcMotorBakim: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('selector');
   const [currentTask, setCurrentTask] = useState<MaintenanceTask | null>(null);
   const [selectedReport, setSelectedReport] = useState<CompletedReport | null>(null);
-  const [completedReports, setCompletedReports] = useState<CompletedReport[]>(() => loadReports());
-  const [inventory, setInventory] = useState<Machine[]>(() => loadInventory());
+  const [completedReports, setCompletedReports] = useState<CompletedReport[]>([]);
+  const [inventory, setInventory] = useState<Machine[]>(MOCK_INVENTORY);
+  const [isLoadingState, setIsLoadingState] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.reports, JSON.stringify(completedReports));
-  }, [completedReports]);
+    const loadState = async () => {
+      try {
+        setIsLoadingState(true);
+        const response = await appStateApi.getMany([
+          APP_STATE_KEYS.dcMotorReports,
+          APP_STATE_KEYS.dcMotorInventory
+        ]);
+        const payload = (response.data?.data || {}) as Record<string, unknown>;
+        const loadedReports = Array.isArray(payload[APP_STATE_KEYS.dcMotorReports])
+          ? payload[APP_STATE_KEYS.dcMotorReports] as CompletedReport[]
+          : [];
+        const loadedInventory = Array.isArray(payload[APP_STATE_KEYS.dcMotorInventory])
+          ? payload[APP_STATE_KEYS.dcMotorInventory] as Machine[]
+          : MOCK_INVENTORY;
+
+        setCompletedReports(loadedReports);
+        setInventory(loadedInventory);
+      } catch {
+        setCompletedReports([]);
+        setInventory(MOCK_INVENTORY);
+        toast.error('Dc motor verileri yuklenemedi');
+      } finally {
+        setIsLoadingState(false);
+        setIsHydrated(true);
+      }
+    };
+
+    void loadState();
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.inventory, JSON.stringify(inventory));
-  }, [inventory]);
+    if (!isHydrated) return;
+
+    const timeout = window.setTimeout(() => {
+      void Promise.all([
+        appStateApi.set(APP_STATE_KEYS.dcMotorReports, completedReports),
+        appStateApi.set(APP_STATE_KEYS.dcMotorInventory, inventory)
+      ]);
+    }, 400);
+
+    return () => window.clearTimeout(timeout);
+  }, [completedReports, inventory, isHydrated]);
 
   const handleAssetSelect = (machine: Machine, motor: MotorSpecs) => {
     const newTask: MaintenanceTask = {
@@ -127,6 +146,12 @@ const DcMotorBakim: React.FC = () => {
           </button>
         )}
       </div>
+
+      {isLoadingState && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+          Dc motor verileri yukleniyor...
+        </div>
+      )}
 
       {currentView === 'report-detail' && selectedReport ? (
         <ReportDetail

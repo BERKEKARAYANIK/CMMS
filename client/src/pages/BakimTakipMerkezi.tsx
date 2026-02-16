@@ -1,6 +1,6 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { ModuleType, AppData, MotorState, MachineConfigs, HistoryEntry } from '../modules/bakimTakipMerkezi/types';
-import { INITIAL_DATA, INITIAL_CONFIGS, STORAGE_KEYS, MACHINE_COUNT } from '../modules/bakimTakipMerkezi/constants';
+import { INITIAL_DATA, INITIAL_CONFIGS, MACHINE_COUNT } from '../modules/bakimTakipMerkezi/constants';
 import Dashboard from '../modules/bakimTakipMerkezi/components/Dashboard';
 import MatrixView from '../modules/bakimTakipMerkezi/components/MatrixView';
 import MachineDetail from '../modules/bakimTakipMerkezi/components/MachineDetail';
@@ -10,6 +10,8 @@ import { MaintenanceForm } from '../modules/dcMotorBakim/components/MaintenanceF
 import { MaintenanceTask, ChecklistData } from '../modules/dcMotorBakim/types';
 import { Settings } from 'lucide-react';
 import { calculateMotorHealth } from '../modules/bakimTakipMerkezi/utils';
+import { appStateApi } from '../services/api';
+import { APP_STATE_KEYS } from '../constants/appState';
 
 const LEGACY_MODULE_MAP: Record<string, ModuleType> = {
   'AK?M?LASYON': ModuleType.ACCUMULATION,
@@ -148,18 +150,6 @@ const normalizeData = (raw: unknown, configs: MachineConfigs): AppData => {
   return data;
 };
 
-const loadConfigs = (): MachineConfigs => {
-  const saved = localStorage.getItem(STORAGE_KEYS.configs);
-  const parsed = saved ? JSON.parse(saved) : null;
-  return normalizeConfigs(parsed);
-};
-
-const loadData = (configs: MachineConfigs): AppData => {
-  const saved = localStorage.getItem(STORAGE_KEYS.data);
-  const parsed = saved ? JSON.parse(saved) : null;
-  return normalizeData(parsed, configs);
-};
-
 const MONTH_LABELS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
 
 const getMonthLabel = (value?: string) => {
@@ -197,12 +187,11 @@ const buildDcMotorTask = (machineId: number, motor: MotorState, motorIndex: numb
 };
 
 const BakimTakipMerkezi: React.FC = () => {
-  const [configs, setConfigs] = useState<MachineConfigs>(() => loadConfigs());
-  const [data, setData] = useState<AppData>(() => loadData(loadConfigs()));
-  const [hiddenMachines, setHiddenMachines] = useState<number[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.hiddenMachines);
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [configs, setConfigs] = useState<MachineConfigs>(() => normalizeConfigs(INITIAL_CONFIGS));
+  const [data, setData] = useState<AppData>(() => buildDataFromConfigs(normalizeConfigs(INITIAL_CONFIGS)));
+  const [hiddenMachines, setHiddenMachines] = useState<number[]>([]);
+  const [isStateLoading, setIsStateLoading] = useState(true);
+  const [isStateHydrated, setIsStateHydrated] = useState(false);
 
   const [view, setView] = useState<'dashboard' | 'matrix' | 'machine' | 'settings'>('dashboard');
   const [activeModule, setActiveModule] = useState<ModuleType | null>(null);
@@ -210,16 +199,52 @@ const BakimTakipMerkezi: React.FC = () => {
   const [activeMotorIndex, setActiveMotorIndex] = useState<number | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.data, JSON.stringify(data));
-  }, [data]);
+    const loadState = async () => {
+      try {
+        setIsStateLoading(true);
+        const response = await appStateApi.getMany([
+          APP_STATE_KEYS.bakimTakipConfigs,
+          APP_STATE_KEYS.bakimTakipData,
+          APP_STATE_KEYS.bakimTakipHiddenMachines
+        ]);
+        const payload = (response.data?.data || {}) as Record<string, unknown>;
+        const loadedConfigs = normalizeConfigs(payload[APP_STATE_KEYS.bakimTakipConfigs] ?? INITIAL_CONFIGS);
+        const loadedData = normalizeData(payload[APP_STATE_KEYS.bakimTakipData], loadedConfigs);
+        const loadedHidden = Array.isArray(payload[APP_STATE_KEYS.bakimTakipHiddenMachines])
+          ? (payload[APP_STATE_KEYS.bakimTakipHiddenMachines] as unknown[])
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value))
+          : [];
+
+        setConfigs(loadedConfigs);
+        setData(loadedData);
+        setHiddenMachines(loadedHidden);
+      } catch {
+        setConfigs(normalizeConfigs(INITIAL_CONFIGS));
+        setData(buildDataFromConfigs(normalizeConfigs(INITIAL_CONFIGS)));
+        setHiddenMachines([]);
+      } finally {
+        setIsStateLoading(false);
+        setIsStateHydrated(true);
+      }
+    };
+
+    void loadState();
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.configs, JSON.stringify(configs));
-  }, [configs]);
+    if (!isStateHydrated) return;
 
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.hiddenMachines, JSON.stringify(hiddenMachines));
-  }, [hiddenMachines]);
+    const timeout = window.setTimeout(() => {
+      void Promise.all([
+        appStateApi.set(APP_STATE_KEYS.bakimTakipConfigs, configs),
+        appStateApi.set(APP_STATE_KEYS.bakimTakipData, data),
+        appStateApi.set(APP_STATE_KEYS.bakimTakipHiddenMachines, hiddenMachines)
+      ]);
+    }, 400);
+
+    return () => window.clearTimeout(timeout);
+  }, [configs, data, hiddenMachines, isStateHydrated]);
 
   const visibleMachineIds = Array.from({ length: MACHINE_COUNT }, (_, i) => i + 1)
     .filter((id) => !hiddenMachines.includes(id));
@@ -442,8 +467,13 @@ const BakimTakipMerkezi: React.FC = () => {
       </div>
 
       <div className="card p-4">
+        {isStateLoading && (
+          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+            Bakim takip verileri yukleniyor...
+          </div>
+        )}
         {view === 'dashboard' && (
-          <Dashboard onSelectModule={handleModuleSelect} machineIds={visibleMachineIds} />
+          <Dashboard data={data} onSelectModule={handleModuleSelect} machineIds={visibleMachineIds} />
         )}
         {view === 'matrix' && activeModule && (
           <MatrixView

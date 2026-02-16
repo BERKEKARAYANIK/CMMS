@@ -12,28 +12,11 @@ import {
   type MudahaleTuru,
   type Makina
 } from '../data/lists';
-import { jobEntriesApi } from '../services/api';
+import { appStateApi, jobEntriesApi } from '../services/api';
 import type { CompletedJob, PlannedJob } from '../types/jobEntries';
+import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
 const PLANLANAN_TO_IS_EMRI_KEY = 'cmms_planlanan_is_to_is_emri';
-const KEYS = {
-  vardiyalar: 'cmms_vardiyalar',
-  mudahaleTurleri: 'cmms_mudahale_turleri',
-  personelListesi: 'cmms_personel_listesi',
-  makinaListesi: 'cmms_makina_listesi'
-};
-
-function getFromStorage<T>(key: string, defaultValue: T[]): T[] {
-  const data = localStorage.getItem(key);
-  if (!data) return defaultValue;
-
-  try {
-    const parsed = JSON.parse(data) as T[];
-    return Array.isArray(parsed) ? parsed : defaultValue;
-  } catch {
-    return defaultValue;
-  }
-}
 
 type TimeInterval = {
   start: number;
@@ -64,18 +47,10 @@ function hasTimeOverlap(a: TimeInterval, b: TimeInterval): boolean {
 }
 
 export default function IsEmriGirisi() {
-  const [vardiyalar] = useState<Vardiya[]>(() =>
-    getFromStorage(KEYS.vardiyalar, defaultVardiyalar)
-  );
-  const [mudahaleTurleri] = useState<MudahaleTuru[]>(() =>
-    getFromStorage(KEYS.mudahaleTurleri, defaultMudahaleTurleri)
-  );
-  const [personelListesi] = useState<Personel[]>(() =>
-    getFromStorage(KEYS.personelListesi, defaultPersonelListesi)
-  );
-  const [makinaListesi] = useState<Makina[]>(() =>
-    getFromStorage(KEYS.makinaListesi, defaultMakinaListesi)
-  );
+  const [vardiyalar, setVardiyalar] = useState<Vardiya[]>(defaultVardiyalar);
+  const [mudahaleTurleri, setMudahaleTurleri] = useState<MudahaleTuru[]>(defaultMudahaleTurleri);
+  const [personelListesi, setPersonelListesi] = useState<Personel[]>(defaultPersonelListesi);
+  const [makinaListesi, setMakinaListesi] = useState<Makina[]>(defaultMakinaListesi);
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -95,7 +70,10 @@ export default function IsEmriGirisi() {
   const [selectedPersonel, setSelectedPersonel] = useState('');
   const [eklenenPersoneller, setEklenenPersoneller] = useState<Personel[]>([]);
 
-  const applyPlanlananToForm = (planned: PlannedJob) => {
+  const applyPlanlananToForm = (
+    planned: PlannedJob,
+    personnelSource: Personel[] = personelListesi
+  ) => {
     setPlanlananId(planned.id);
     setMakina(planned.makina || '');
     setMudahaleTuru(planned.mudahaleTuru || '');
@@ -103,7 +81,7 @@ export default function IsEmriGirisi() {
     setMalzeme(planned.malzeme || '');
 
     if (planned.atananSicilNo) {
-      const atananPersonel = personelListesi.find((p) => p.sicilNo === planned.atananSicilNo);
+      const atananPersonel = personnelSource.find((p) => p.sicilNo === planned.atananSicilNo);
       if (atananPersonel) {
         setEklenenPersoneller((prev) => {
           if (prev.some((p) => p.sicilNo === atananPersonel.sicilNo)) {
@@ -119,9 +97,10 @@ export default function IsEmriGirisi() {
     const bootstrap = async () => {
       try {
         setIsBootstrapping(true);
-        const [completedResponse, plannedResponse] = await Promise.all([
+        const [completedResponse, plannedResponse, listsResponse] = await Promise.all([
           jobEntriesApi.getCompleted(),
-          jobEntriesApi.getPlanned()
+          jobEntriesApi.getPlanned(),
+          appStateApi.get(APP_STATE_KEYS.settingsLists)
         ]);
 
         const completed = completedResponse.data?.data as CompletedJob[] | undefined;
@@ -129,12 +108,17 @@ export default function IsEmriGirisi() {
 
         const plannedJobs = plannedResponse.data?.data as PlannedJob[] | undefined;
         const plannedList = Array.isArray(plannedJobs) ? plannedJobs : [];
+        const normalizedLists = normalizeSettingsLists(listsResponse.data?.data?.value);
+        setVardiyalar(normalizedLists.vardiyalar);
+        setMudahaleTurleri(normalizedLists.mudahaleTurleri);
+        setPersonelListesi(normalizedLists.personelListesi);
+        setMakinaListesi(normalizedLists.makinaListesi);
 
         const transferRaw = sessionStorage.getItem(PLANLANAN_TO_IS_EMRI_KEY);
         if (transferRaw) {
           try {
             const selected = JSON.parse(transferRaw) as PlannedJob;
-            applyPlanlananToForm(selected);
+            applyPlanlananToForm(selected, normalizedLists.personelListesi);
           } catch {
             // ignore invalid transfer payload
           } finally {
@@ -145,7 +129,7 @@ export default function IsEmriGirisi() {
 
         const firstPlanned = plannedList.find((item) => item.gorevTipi !== 'DURUS_RAPOR_ANALIZ');
         if (firstPlanned) {
-          applyPlanlananToForm(firstPlanned);
+          applyPlanlananToForm(firstPlanned, normalizedLists.personelListesi);
         }
       } catch {
         toast.error('Baslangic verileri yuklenemedi');

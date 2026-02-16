@@ -107,6 +107,13 @@ export const dashboardApi = {
   getKPIs: (period?: string) => api.get('/dashboard/kpis', { params: { period } })
 };
 
+export const appStateApi = {
+  get: (key: string) => api.get(`/app-state/${encodeURIComponent(key)}`),
+  getMany: (keys: string[]) => api.get('/app-state', { params: { keys: keys.join(',') } }),
+  set: <T>(key: string, value: T) =>
+    api.put(`/app-state/${encodeURIComponent(key)}`, { value })
+};
+
 export const jobEntriesApi = {
   getPlanned: () => api.get('/job-entries/planned'),
   createPlanned: <T extends object>(data: T) => api.post('/job-entries/planned', data),

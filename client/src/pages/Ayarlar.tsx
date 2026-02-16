@@ -3,14 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Edit2, Save, X, Upload, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { authApi, usersApi } from '../services/api';
+import { appStateApi, authApi, usersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types';
 import {
-  vardiyalar as defaultVardiyalar,
-  mudahaleTurleri as defaultMudahaleTurleri,
-  personelListesi as defaultPersonelListesi,
-  makinaListesi as defaultMakinaListesi,
   bolumler,
   type Vardiya,
   type MudahaleTuru,
@@ -18,28 +14,16 @@ import {
   type Makina
 } from '../data/lists';
 import {
+  APP_STATE_KEYS,
+  buildDefaultSettingsLists,
+  normalizeSettingsLists,
+  type SettingsListsState
+} from '../constants/appState';
+import {
   buildCompactLoginName,
   buildDefaultPasswordPreview,
   isSystemAdminUser
 } from '../utils/access';
-
-// LocalStorage keys
-const KEYS = {
-  vardiyalar: 'cmms_vardiyalar',
-  mudahaleTurleri: 'cmms_mudahale_turleri',
-  personelListesi: 'cmms_personel_listesi',
-  makinaListesi: 'cmms_makina_listesi'
-};
-
-// LocalStorage helpers
-function getFromStorage<T>(key: string, defaultValue: T[]): T[] {
-  const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : defaultValue;
-}
-
-function saveToStorage<T>(key: string, data: T[]): void {
-  localStorage.setItem(key, JSON.stringify(data));
-}
 
 type BulkParseResult<T> = { items: T[]; skipped: number };
 
@@ -365,17 +349,32 @@ export default function Ayarlar() {
   const canManagePasswords = isSystemAdminUser(currentUser);
   const queryClient = useQueryClient();
 
+  const defaultLists = buildDefaultSettingsLists();
+
   // Data states
-  const [vardiyalar, setVardiyalar] = useState<Vardiya[]>([]);
-  const [mudahaleTurleri, setMudahaleTurleri] = useState<MudahaleTuru[]>([]);
-  const [personelListesi, setPersonelListesi] = useState<Personel[]>([]);
-  const [makinaListesi, setMakinaListesi] = useState<Makina[]>([]);
+  const [vardiyalar, setVardiyalar] = useState<Vardiya[]>(defaultLists.vardiyalar);
+  const [mudahaleTurleri, setMudahaleTurleri] = useState<MudahaleTuru[]>(defaultLists.mudahaleTurleri);
+  const [personelListesi, setPersonelListesi] = useState<Personel[]>(defaultLists.personelListesi);
+  const [makinaListesi, setMakinaListesi] = useState<Makina[]>(defaultLists.makinaListesi);
+  const [isListsLoading, setIsListsLoading] = useState(true);
+  const [isListsSaving, setIsListsSaving] = useState(false);
   const [templateBusy, setTemplateBusy] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedUserPassword, setSelectedUserPassword] = useState('');
+
+  const persistLists = async (nextLists: SettingsListsState) => {
+    try {
+      setIsListsSaving(true);
+      await appStateApi.set(APP_STATE_KEYS.settingsLists, nextLists);
+    } catch {
+      toast.error('Liste degisiklikleri kaydedilemedi');
+    } finally {
+      setIsListsSaving(false);
+    }
+  };
 
   const { data: users } = useQuery({
     queryKey: ['settings-users'],
@@ -484,10 +483,12 @@ export default function Ayarlar() {
       setPersonelListesi(mergedPersonel);
       setMakinaListesi(mergedMakina);
 
-      saveToStorage(KEYS.vardiyalar, mergedVardiyalar);
-      saveToStorage(KEYS.mudahaleTurleri, mergedMudahaleTurleri);
-      saveToStorage(KEYS.personelListesi, mergedPersonel);
-      saveToStorage(KEYS.makinaListesi, mergedMakina);
+      void persistLists({
+        vardiyalar: mergedVardiyalar,
+        mudahaleTurleri: mergedMudahaleTurleri,
+        personelListesi: mergedPersonel,
+        makinaListesi: mergedMakina
+      });
 
       if (addedCount === 0 && parsed.skipped === 0) {
         toast.error('Yeni kayit bulunamadi');
@@ -503,12 +504,31 @@ export default function Ayarlar() {
     }
   };
 
-  // Load data on mount
+  // Load shared lists from API
   useEffect(() => {
-    setVardiyalar(getFromStorage(KEYS.vardiyalar, defaultVardiyalar));
-    setMudahaleTurleri(getFromStorage(KEYS.mudahaleTurleri, defaultMudahaleTurleri));
-    setPersonelListesi(getFromStorage(KEYS.personelListesi, defaultPersonelListesi));
-    setMakinaListesi(getFromStorage(KEYS.makinaListesi, defaultMakinaListesi));
+    const loadLists = async () => {
+      try {
+        setIsListsLoading(true);
+        const response = await appStateApi.get(APP_STATE_KEYS.settingsLists);
+        const payload = response.data?.data?.value;
+        const normalized = normalizeSettingsLists(payload);
+        setVardiyalar(normalized.vardiyalar);
+        setMudahaleTurleri(normalized.mudahaleTurleri);
+        setPersonelListesi(normalized.personelListesi);
+        setMakinaListesi(normalized.makinaListesi);
+      } catch {
+        const fallback = buildDefaultSettingsLists();
+        setVardiyalar(fallback.vardiyalar);
+        setMudahaleTurleri(fallback.mudahaleTurleri);
+        setPersonelListesi(fallback.personelListesi);
+        setMakinaListesi(fallback.makinaListesi);
+        toast.error('Merkezi listeler yuklenemedi, varsayilan liste kullanildi');
+      } finally {
+        setIsListsLoading(false);
+      }
+    };
+
+    void loadLists();
   }, []);
 
   const tabs = [
@@ -553,6 +573,11 @@ export default function Ayarlar() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Ayarlar - Liste Yonetimi</h1>
+      {(isListsLoading || isListsSaving) && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+          {isListsLoading ? 'Merkezi listeler yukleniyor...' : 'Liste degisiklikleri kaydediliyor...'}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="card p-6 space-y-4">
@@ -731,7 +756,12 @@ export default function Ayarlar() {
             data={vardiyalar}
             setData={(data) => {
               setVardiyalar(data);
-              saveToStorage(KEYS.vardiyalar, data);
+              void persistLists({
+                vardiyalar: data,
+                mudahaleTurleri,
+                personelListesi,
+                makinaListesi
+              });
             }}
           />
         )}
@@ -740,7 +770,12 @@ export default function Ayarlar() {
             data={mudahaleTurleri}
             setData={(data) => {
               setMudahaleTurleri(data);
-              saveToStorage(KEYS.mudahaleTurleri, data);
+              void persistLists({
+                vardiyalar,
+                mudahaleTurleri: data,
+                personelListesi,
+                makinaListesi
+              });
             }}
           />
         )}
@@ -749,7 +784,12 @@ export default function Ayarlar() {
             data={personelListesi}
             setData={(data) => {
               setPersonelListesi(data);
-              saveToStorage(KEYS.personelListesi, data);
+              void persistLists({
+                vardiyalar,
+                mudahaleTurleri,
+                personelListesi: data,
+                makinaListesi
+              });
             }}
           />
         )}
@@ -758,7 +798,12 @@ export default function Ayarlar() {
             data={makinaListesi}
             setData={(data) => {
               setMakinaListesi(data);
-              saveToStorage(KEYS.makinaListesi, data);
+              void persistLists({
+                vardiyalar,
+                mudahaleTurleri,
+                personelListesi,
+                makinaListesi: data
+              });
             }}
           />
         )}

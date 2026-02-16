@@ -1,0 +1,7 @@
+{$CMMS_DOMAIN} {
+  encode gzip zstd
+
+  @api path /api/*
+  reverse_proxy @api server:4001
+  reverse_proxy client:80
+}
