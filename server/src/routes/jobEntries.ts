@@ -533,6 +533,186 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
   }
 });
 
+router.put('/completed/:recordId', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canManageEntries(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Duzenleme yetkisi sadece Berke Karayanik kullanicisinda'
+      });
+    }
+
+    const recordId = String(req.params.recordId || '').trim();
+    if (!recordId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gecersiz is ID'
+      });
+    }
+
+    const existing = await prisma.tamamlananIs.findUnique({
+      where: { recordId },
+      select: { id: true }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Is kaydi bulunamadi'
+      });
+    }
+
+    const tarih = parseDateKey(req.body?.tarih);
+    const vardiya = normalizeText(req.body?.vardiya);
+    const makina = normalizeText(req.body?.makina);
+    const mudahaleTuru = normalizeText(req.body?.mudahaleTuru);
+    const baslangicSaati = normalizeText(req.body?.baslangicSaati);
+    const bitisSaati = normalizeText(req.body?.bitisSaati);
+    const sureDakika = parseOptionalInt(req.body?.sureDakika);
+    const aciklama = normalizeText(req.body?.aciklama);
+    const malzeme = normalizeText(req.body?.malzeme);
+
+    if (
+      !tarih
+      || !vardiya
+      || !makina
+      || !mudahaleTuru
+      || !baslangicSaati
+      || !bitisSaati
+      || !aciklama
+      || sureDakika === undefined
+      || !Number.isFinite(sureDakika)
+      || sureDakika < 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'Tum zorunlu alanlari doldurun'
+      });
+    }
+
+    const updated = await prisma.tamamlananIs.update({
+      where: { recordId },
+      data: {
+        tarih,
+        vardiya,
+        makina,
+        mudahaleTuru,
+        baslangicSaati,
+        bitisSaati,
+        sureDakika,
+        aciklama,
+        malzeme: malzeme || null
+      },
+      include: {
+        personeller: {
+          orderBy: { id: 'asc' }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: mapCompletedJob(updated),
+      message: 'Tamamlanan is guncellendi'
+    });
+  } catch (error) {
+    console.error('Update completed job error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Tamamlanan is guncellenemedi'
+    });
+  }
+});
+
+router.patch('/completed/:recordId/analysis-assignment', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canManageEntries(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Is emri atamasi sadece Berke Karayanik kullanicisinda'
+      });
+    }
+
+    const recordId = String(req.params.recordId || '').trim();
+    if (!recordId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gecersiz is ID'
+      });
+    }
+
+    const existing = await prisma.tamamlananIs.findUnique({
+      where: { recordId },
+      select: {
+        id: true,
+        analizPlanlananIsId: true
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Is kaydi bulunamadi'
+      });
+    }
+
+    const analizAtamasi = (req.body?.analizAtamasi || req.body || {}) as {
+      planlananIsId?: unknown;
+      backendWorkOrderId?: unknown;
+      backendWorkOrderNo?: unknown;
+      atananSicilNo?: unknown;
+      atananAdSoyad?: unknown;
+      atananBolum?: unknown;
+      atamaTarihi?: unknown;
+    };
+
+    const backendWorkOrderId = parseOptionalInt(analizAtamasi.backendWorkOrderId);
+    const backendWorkOrderNo = normalizeText(analizAtamasi.backendWorkOrderNo);
+    const atananSicilNo = normalizeText(analizAtamasi.atananSicilNo);
+    const atananAdSoyad = normalizeText(analizAtamasi.atananAdSoyad);
+    const atananBolum = normalizeText(analizAtamasi.atananBolum);
+    const planlananIsId = parseOptionalInt(analizAtamasi.planlananIsId);
+    const atamaTarihi = parseOptionalDate(analizAtamasi.atamaTarihi) ?? new Date();
+
+    if ((!backendWorkOrderId && !backendWorkOrderNo) || !atananSicilNo || !atananAdSoyad || !atananBolum) {
+      return res.status(400).json({
+        success: false,
+        message: 'Analiz atamasi icin is emri ve atanan bilgileri zorunludur'
+      });
+    }
+
+    const updated = await prisma.tamamlananIs.update({
+      where: { recordId },
+      data: {
+        analizPlanlananIsId: planlananIsId ?? existing.analizPlanlananIsId ?? null,
+        analizBackendWorkOrderId: backendWorkOrderId ?? null,
+        analizBackendWorkOrderNo: backendWorkOrderNo || null,
+        analizAtananSicilNo: atananSicilNo,
+        analizAtananAdSoyad: atananAdSoyad,
+        analizAtananBolum: atananBolum,
+        analizAtamaTarihi: atamaTarihi
+      },
+      include: {
+        personeller: {
+          orderBy: { id: 'asc' }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: mapCompletedJob(updated),
+      message: 'Analiz atamasi kaydedildi'
+    });
+  } catch (error) {
+    console.error('Update completed analysis assignment error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Analiz atamasi kaydedilemedi'
+    });
+  }
+});
+
 router.delete('/completed/:recordId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     if (!canManageEntries(req.user)) {

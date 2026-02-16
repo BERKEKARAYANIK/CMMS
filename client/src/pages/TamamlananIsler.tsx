@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { Search, Download, Trash2 } from 'lucide-react';
+import { Search, Download, Edit2, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types';
 import { isBerkeUser } from '../utils/access';
-import { jobEntriesApi } from '../services/api';
+import { jobEntriesApi, usersApi, workOrdersApi } from '../services/api';
 import type { CompletedJob } from '../types/jobEntries';
 
 const MIN_DURUS_DAKIKASI = 45;
@@ -41,6 +42,28 @@ function parseDateKey(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
+function formatDateTime(value: string | undefined): string {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+  return format(parsed, 'dd.MM.yyyy HH:mm');
+}
+
+function calculateDurationMinutes(startText: string, endText: string): number | null {
+  const startMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(startText);
+  const endMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(endText);
+  if (!startMatch || !endMatch) return null;
+
+  const startMinutes = (Number.parseInt(startMatch[1], 10) * 60) + Number.parseInt(startMatch[2], 10);
+  let endMinutes = (Number.parseInt(endMatch[1], 10) * 60) + Number.parseInt(endMatch[2], 10);
+
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60;
+  }
+
+  return endMinutes - startMinutes;
+}
+
 function canManageCompletedJobs(user: User | null): boolean {
   if (!user) return false;
   if (isBerkeUser(user)) return true;
@@ -70,11 +93,37 @@ type CompletedRow = {
 export default function TamamlananIsler() {
   const currentUser = useAuthStore((state) => state.user);
   const canManage = canManageCompletedJobs(currentUser);
+  const canAssignWorkOrders = Boolean(currentUser && isBerkeUser(currentUser));
   const [isLoading, setIsLoading] = useState(true);
   const [isler, setIsler] = useState<CompletedJob[]>([]);
   const [search, setSearch] = useState('');
   const [filterTarih, setFilterTarih] = useState('');
   const [filterVardiya, setFilterVardiya] = useState('');
+  const [isAnalizModalOpen, setIsAnalizModalOpen] = useState(false);
+  const [selectedIsId, setSelectedIsId] = useState<string | null>(null);
+  const [atananSicilNo, setAtananSicilNo] = useState('');
+  const [analizNotu, setAnalizNotu] = useState('');
+  const [isAtamaKaydediliyor, setIsAtamaKaydediliyor] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editIsId, setEditIsId] = useState<string | null>(null);
+  const [editTarih, setEditTarih] = useState('');
+  const [editVardiya, setEditVardiya] = useState('');
+  const [editMakina, setEditMakina] = useState('');
+  const [editMudahaleTuru, setEditMudahaleTuru] = useState('');
+  const [editBaslangicSaati, setEditBaslangicSaati] = useState('');
+  const [editBitisSaati, setEditBitisSaati] = useState('');
+  const [editAciklama, setEditAciklama] = useState('');
+  const [editMalzeme, setEditMalzeme] = useState('');
+  const [isEditKaydediliyor, setIsEditKaydediliyor] = useState(false);
+
+  const { data: aktifKullanicilar, isLoading: kullanicilarYukleniyor } = useQuery({
+    queryKey: ['tamamlanan-analiz-users-list', currentUser?.id ?? 'anon'],
+    enabled: canAssignWorkOrders,
+    queryFn: async () => {
+      const response = await usersApi.getAll({ aktif: 'true' });
+      return response.data.data as User[];
+    }
+  });
 
   useEffect(() => {
     const loadCompletedJobs = async () => {
@@ -92,6 +141,266 @@ export default function TamamlananIsler() {
 
     void loadCompletedJobs();
   }, []);
+
+  const selectedIs = selectedIsId
+    ? isler.find((is) => is.id === selectedIsId) || null
+    : null;
+  const selectedEditIs = editIsId
+    ? isler.find((is) => is.id === editIsId) || null
+    : null;
+  const editSureDakika = useMemo(
+    () => calculateDurationMinutes(editBaslangicSaati, editBitisSaati),
+    [editBaslangicSaati, editBitisSaati]
+  );
+
+  const resetEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditIsId(null);
+    setEditTarih('');
+    setEditVardiya('');
+    setEditMakina('');
+    setEditMudahaleTuru('');
+    setEditBaslangicSaati('');
+    setEditBitisSaati('');
+    setEditAciklama('');
+    setEditMalzeme('');
+  };
+
+  const closeEditModal = () => {
+    if (isEditKaydediliyor) return;
+    resetEditModal();
+  };
+
+  const forceCloseEditModal = () => {
+    resetEditModal();
+  };
+
+  const openEditModal = (is: CompletedJob) => {
+    if (!canManage) {
+      toast.error('Duzenleme yetkisi sadece Berke Karayanik kullanicisinda');
+      return;
+    }
+
+    setEditIsId(is.id);
+    setEditTarih(is.tarih);
+    setEditVardiya(is.vardiya);
+    setEditMakina(is.makina);
+    setEditMudahaleTuru(is.mudahaleTuru);
+    setEditBaslangicSaati(is.baslangicSaati);
+    setEditBitisSaati(is.bitisSaati);
+    setEditAciklama(is.aciklama || '');
+    setEditMalzeme(is.malzeme || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditKaydet = async () => {
+    if (!canManage) {
+      toast.error('Duzenleme yetkisi sadece Berke Karayanik kullanicisinda');
+      return;
+    }
+
+    if (!editIsId) {
+      toast.error('Duzenlenecek kayit bulunamadi');
+      return;
+    }
+
+    const vardiya = editVardiya.trim();
+    const makina = editMakina.trim();
+    const mudahaleTuru = editMudahaleTuru.trim();
+    const aciklama = editAciklama.trim();
+    const malzeme = editMalzeme.trim();
+
+    if (!editTarih || !vardiya || !makina || !mudahaleTuru || !editBaslangicSaati || !editBitisSaati || !aciklama) {
+      toast.error('Tum zorunlu alanlari doldurun');
+      return;
+    }
+
+    if (editSureDakika === null || editSureDakika < 0) {
+      toast.error('Saat araligi gecersiz');
+      return;
+    }
+
+    try {
+      setIsEditKaydediliyor(true);
+      const response = await jobEntriesApi.updateCompleted(editIsId, {
+        tarih: editTarih,
+        vardiya,
+        makina,
+        mudahaleTuru,
+        baslangicSaati: editBaslangicSaati,
+        bitisSaati: editBitisSaati,
+        sureDakika: editSureDakika,
+        aciklama,
+        malzeme
+      });
+
+      const updated = response.data?.data as CompletedJob | undefined;
+      if (!updated) {
+        throw new Error('Invalid response');
+      }
+
+      setIsler((prev) => prev.map((is) => (is.id === updated.id ? updated : is)));
+      toast.success('Tamamlanan is guncellendi');
+      forceCloseEditModal();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Tamamlanan is guncellenemedi');
+    } finally {
+      setIsEditKaydediliyor(false);
+    }
+  };
+
+  const openAnalizModal = (is: CompletedJob) => {
+    if (!canAssignWorkOrders) {
+      toast.error('Is emri atamasi sadece Berke Karayanik tarafindan yapilabilir');
+      return;
+    }
+
+    if ((Number(is.sureDakika) || 0) <= MIN_DURUS_DAKIKASI) {
+      toast.error(`Sadece ${MIN_DURUS_DAKIKASI} dk ustu duruslar icin is emri olusturulabilir`);
+      return;
+    }
+
+    const hasBackendWorkOrder = Boolean(
+      is.analizAtamasi?.backendWorkOrderId || is.analizAtamasi?.backendWorkOrderNo
+    );
+    if (hasBackendWorkOrder) {
+      toast.error('Bu durus icin analiz is emri zaten olusturuldu');
+      return;
+    }
+
+    setSelectedIsId(is.id);
+    setAtananSicilNo(is.analizAtamasi?.atananSicilNo || '');
+    setAnalizNotu('');
+    setIsAnalizModalOpen(true);
+  };
+
+  const closeAnalizModal = () => {
+    setIsAnalizModalOpen(false);
+    setSelectedIsId(null);
+    setAtananSicilNo('');
+    setAnalizNotu('');
+  };
+
+  const handleAnalizAtamaKaydet = async () => {
+    if (!canAssignWorkOrders) {
+      toast.error('Is emri atamasi sadece Berke Karayanik tarafindan yapilabilir');
+      return;
+    }
+
+    if (!selectedIs) {
+      toast.error('Durus kaydi bulunamadi');
+      return;
+    }
+
+    if ((Number(selectedIs.sureDakika) || 0) <= MIN_DURUS_DAKIKASI) {
+      toast.error(`Bu kayit ${MIN_DURUS_DAKIKASI} dk ustu degil`);
+      return;
+    }
+
+    const hasBackendWorkOrder = Boolean(
+      selectedIs.analizAtamasi?.backendWorkOrderId || selectedIs.analizAtamasi?.backendWorkOrderNo
+    );
+    if (hasBackendWorkOrder) {
+      toast.error('Bu durus icin analiz is emri zaten olusturuldu');
+      return;
+    }
+
+    if (!atananSicilNo) {
+      toast.error('Lutfen atayacagin kisiyi sec');
+      return;
+    }
+
+    const atananKullanici = aktifKullanicilar?.find((user) => user.sicilNo === atananSicilNo);
+    if (!atananKullanici) {
+      toast.error('Secilen kisi aktif sistem kullanicilarinda bulunamadi');
+      return;
+    }
+
+    const secilenPersonel = {
+      sicilNo: atananKullanici.sicilNo,
+      adSoyad: `${atananKullanici.ad} ${atananKullanici.soyad}`.trim(),
+      bolum: atananKullanici.departman
+    };
+
+    setIsAtamaKaydediliyor(true);
+    let createdWorkOrderId: number | null = null;
+    try {
+      const notText = analizNotu.trim();
+      const aciklama = [
+        `${selectedIs.id} numarali durusta durus suresi ${selectedIs.sureDakika} dk olarak kaydedildi.`,
+        `${selectedIs.makina} / ${selectedIs.vardiya}.`,
+        `Saat: ${selectedIs.baslangicSaati} - ${selectedIs.bitisSaati}.`,
+        'Talep: Durus raporu cikar ve kok neden analizi yap.',
+        notText ? `Ek not: ${notText}` : ''
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      const createResponse = await workOrdersApi.create({
+        baslik: `[UDR] Uzayan Durus Analizi - ${selectedIs.makina}`,
+        aciklama,
+        oncelik: 'YUKSEK',
+        atananId: String(atananKullanici.id),
+        tahminiSure: Number(selectedIs.sureDakika) || 120
+      });
+
+      const createdWorkOrder = createResponse.data?.data as { id?: number; isEmriNo?: string } | undefined;
+      if (!createdWorkOrder?.id && !createdWorkOrder?.isEmriNo) {
+        throw new Error('Is emri olusturuldu fakat cevap verisi okunamadi');
+      }
+      createdWorkOrderId = createdWorkOrder?.id ?? null;
+
+      const nowIso = new Date().toISOString();
+      const localAnalizAtamasi = {
+        backendWorkOrderId: createdWorkOrder?.id,
+        backendWorkOrderNo: createdWorkOrder?.isEmriNo,
+        atananSicilNo: secilenPersonel.sicilNo,
+        atananAdSoyad: secilenPersonel.adSoyad,
+        atananBolum: secilenPersonel.bolum,
+        atamaTarihi: nowIso
+      };
+      const successText = createdWorkOrder?.isEmriNo
+        ? `${secilenPersonel.adSoyad} icin ${createdWorkOrder.isEmriNo} olusturuldu`
+        : `${secilenPersonel.adSoyad} icin analiz is emri olusturuldu`;
+      const updateResponse = await jobEntriesApi.updateCompletedAnalysis(selectedIs.id, {
+        analizAtamasi: localAnalizAtamasi
+      });
+
+      const updated = updateResponse.data?.data as CompletedJob | undefined;
+      if (updated) {
+        setIsler((prev) => prev.map((is) => (is.id === updated.id ? updated : is)));
+      } else {
+        setIsler((prev) => prev.map((is) => (
+          is.id === selectedIs.id
+            ? { ...is, analizAtamasi: localAnalizAtamasi }
+            : is
+        )));
+      }
+
+      toast.success(successText);
+      closeAnalizModal();
+    } catch (error: any) {
+      const backendMessage = error?.response?.data?.message as string | undefined;
+      if (createdWorkOrderId) {
+        let rolledBack = false;
+        try {
+          await workOrdersApi.delete(createdWorkOrderId);
+          rolledBack = true;
+        } catch {
+          // best effort rollback
+        }
+        if (rolledBack) {
+          toast.error(backendMessage || 'Aktarim kaydi yazilamadigi icin is emri olusturma islemi geri alindi');
+          return;
+        }
+        toast.error(backendMessage || 'Is emri olusturuldu ancak aktarim kaydi kalici yazilamadi');
+        return;
+      }
+      toast.error(backendMessage || 'Is emri olusturulamadi');
+    } finally {
+      setIsAtamaKaydediliyor(false);
+    }
+  };
 
   const handleSil = async (id: string) => {
     if (!canManage) {
@@ -154,7 +463,7 @@ export default function TamamlananIsler() {
       const analizDurumu = (Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI
         ? (is.analizAtamasi
           ? `${is.analizAtamasi.atananAdSoyad} (${is.analizAtamasi.atananSicilNo})${is.analizAtamasi.backendWorkOrderNo ? ` - ${is.analizAtamasi.backendWorkOrderNo}` : ''}`
-          : 'Devre disi')
+          : 'Atama bekliyor')
         : 'Gerekli degil';
 
       excelData.push({
@@ -246,10 +555,6 @@ export default function TamamlananIsler() {
         </div>
       </div>
 
-      <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-2 text-xs text-gray-600">
-        Tamamlanan Isler ekranindan Is Emri Takibi'ne gonderim devre disi.
-      </div>
-
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -305,7 +610,7 @@ export default function TamamlananIsler() {
                     <td className="px-3 py-2 max-w-xs truncate" title={is.malzeme}>{is.malzeme || '-'}</td>
                     <td className="px-3 py-2">
                       {(Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI ? (
-                        is.analizAtamasi ? (
+                        is.analizAtamasi && (is.analizAtamasi.backendWorkOrderId || is.analizAtamasi.backendWorkOrderNo) ? (
                           <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800">
                             <p className="font-semibold">Atandi</p>
                             <p>{is.analizAtamasi.atananAdSoyad}</p>
@@ -313,9 +618,20 @@ export default function TamamlananIsler() {
                             {is.analizAtamasi.backendWorkOrderNo && (
                               <p className="text-[11px]">Is Emri: {is.analizAtamasi.backendWorkOrderNo}</p>
                             )}
+                            <p className="text-[11px] text-emerald-900/55">
+                              Aktarim: {is.analizAtamasi.atananAdSoyad} / {formatDateTime(is.analizAtamasi.atamaTarihi)}
+                            </p>
                           </div>
+                        ) : canAssignWorkOrders ? (
+                          <button
+                            type="button"
+                            onClick={() => openAnalizModal(is)}
+                            className="rounded bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600"
+                          >
+                            Is Emrine Aktar
+                          </button>
                         ) : (
-                          <span className="text-xs text-gray-400">Devre disi</span>
+                          <span className="text-xs text-gray-400">Sadece Berke</span>
                         )
                       ) : (
                         <span className="text-xs text-gray-400">Gerekli degil</span>
@@ -324,6 +640,13 @@ export default function TamamlananIsler() {
                     <td className="px-3 py-2 text-center">
                       {canManage ? (
                         <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openEditModal(is)}
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                            title="Duzenle"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
                           <button
                             onClick={() => void handleSil(is.id)}
                             className="text-red-500 hover:text-red-700 p-1"
@@ -372,6 +695,213 @@ export default function TamamlananIsler() {
       {!canManage && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           Bu hesapta tamamlanan isler icin sadece goruntuleme yetkisi var.
+        </div>
+      )}
+
+      {isEditModalOpen && canManage && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={closeEditModal} />
+            <div className="relative w-full max-w-2xl rounded-xl border border-gray-200 bg-white shadow-xl">
+              <div className="border-b px-5 py-4">
+                <h2 className="text-lg font-bold text-gray-900">Tamamlanan Isi Duzenle</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  Kayit ID: {editIsId || '-'}
+                </p>
+                {selectedEditIs && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Personeller: {selectedEditIs.personeller.map((personel) => personel.adSoyad).join(', ') || '-'}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-4 px-5 py-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="label">Tarih</label>
+                    <input
+                      type="date"
+                      value={editTarih}
+                      onChange={(event) => setEditTarih(event.target.value)}
+                      className="input"
+                      disabled={isEditKaydediliyor}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Vardiya</label>
+                    <input
+                      type="text"
+                      value={editVardiya}
+                      onChange={(event) => setEditVardiya(event.target.value)}
+                      className="input"
+                      placeholder="VARDIYA 1 (07:00-15:00)"
+                      disabled={isEditKaydediliyor}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Makina</label>
+                    <input
+                      type="text"
+                      value={editMakina}
+                      onChange={(event) => setEditMakina(event.target.value)}
+                      className="input"
+                      disabled={isEditKaydediliyor}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Mudahale Turu</label>
+                    <input
+                      type="text"
+                      value={editMudahaleTuru}
+                      onChange={(event) => setEditMudahaleTuru(event.target.value)}
+                      className="input"
+                      disabled={isEditKaydediliyor}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Baslangic Saati</label>
+                    <input
+                      type="time"
+                      value={editBaslangicSaati}
+                      onChange={(event) => setEditBaslangicSaati(event.target.value)}
+                      className="input"
+                      disabled={isEditKaydediliyor}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Bitis Saati</label>
+                    <input
+                      type="time"
+                      value={editBitisSaati}
+                      onChange={(event) => setEditBitisSaati(event.target.value)}
+                      className="input"
+                      disabled={isEditKaydediliyor}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Sure (dk)</label>
+                    <input
+                      type="number"
+                      value={editSureDakika ?? ''}
+                      readOnly
+                      className="input bg-gray-100"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label">Aciklama</label>
+                  <textarea
+                    value={editAciklama}
+                    onChange={(event) => setEditAciklama(event.target.value)}
+                    rows={4}
+                    className="input resize-none"
+                    disabled={isEditKaydediliyor}
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Malzeme</label>
+                  <textarea
+                    value={editMalzeme}
+                    onChange={(event) => setEditMalzeme(event.target.value)}
+                    rows={2}
+                    className="input resize-none"
+                    disabled={isEditKaydediliyor}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t px-5 py-4">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeEditModal}
+                  disabled={isEditKaydediliyor}
+                >
+                  Iptal
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void handleEditKaydet()}
+                  disabled={isEditKaydediliyor || editSureDakika === null}
+                >
+                  {isEditKaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAnalizModalOpen && selectedIs && canAssignWorkOrders && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={closeAnalizModal} />
+            <div className="relative w-full max-w-xl rounded-xl border border-gray-200 bg-white shadow-xl">
+              <div className="border-b px-5 py-4">
+                <h2 className="text-lg font-bold text-gray-900">Uzayan Durus Is Emri Ac</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  {selectedIs.id} - {selectedIs.makina} ({selectedIs.sureDakika} dk)
+                </p>
+              </div>
+
+              <div className="space-y-4 px-5 py-4">
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  Bu kayit {MIN_DURUS_DAKIKASI} dakika ustu oldugu icin uzayan durus analizi is emri acilabilir.
+                </div>
+
+                <div>
+                  <label className="label">Atanacak Kisi</label>
+                  <select
+                    value={atananSicilNo}
+                    onChange={(event) => setAtananSicilNo(event.target.value)}
+                    className="input"
+                    disabled={isAtamaKaydediliyor || kullanicilarYukleniyor}
+                  >
+                    <option value="">Seciniz...</option>
+                    {(aktifKullanicilar || []).map((user) => (
+                      <option key={user.id} value={user.sicilNo}>
+                        {user.ad} {user.soyad} ({user.sicilNo}) - {user.departman}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="label">Ek Not (Opsiyonel)</label>
+                  <textarea
+                    value={analizNotu}
+                    onChange={(event) => setAnalizNotu(event.target.value)}
+                    rows={3}
+                    className="input resize-none"
+                    placeholder="Analiz icin ek not yazabilirsiniz..."
+                    disabled={isAtamaKaydediliyor}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 border-t px-5 py-4">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={closeAnalizModal}
+                  disabled={isAtamaKaydediliyor}
+                >
+                  Iptal
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void handleAnalizAtamaKaydet()}
+                  disabled={isAtamaKaydediliyor || !atananSicilNo}
+                >
+                  {isAtamaKaydediliyor ? 'Olusturuluyor...' : 'Is Emri Ac'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

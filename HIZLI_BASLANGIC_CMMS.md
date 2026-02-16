@@ -9,6 +9,11 @@ Ana klasor: `C:\Users\YAPAY_ZEKA\Desktop\CMMS FULL\cmms`
 
 Bu guncellemede tek tik kurulum yapisi eklendi.
 
+Bu turda eklenen ek guncelleme:
+- Tamamlanan Isler ekraninda Berke Karayanik icin satir bazli duzenleme (edit) aktif edildi.
+- Tamamlanan is kaydi guncelleme endpoint'i eklendi: `PUT /api/job-entries/completed/:recordId`
+- 45 dk ustu kayitlar icin "Is Emrine Aktar" akisi Berke yetkisi ile aktif tutuldu.
+
 Yeni dosyalar:
 - `CMMS_ILK_KURULUM_VE_BASLAT.bat`
 - `scripts/bootstrap-new-pc.ps1`
@@ -56,7 +61,7 @@ Uygulanan is kurallari:
 - Is girisinde ayni is ayni ID mantigi korunur
 - Personel bazli satirlar ayri gorunur (arama/personel takibi icin)
 - Planlanan isler, Is Girisi akisina yonlenir
-- Tamamlanan isler Is Emri Takibi'ne geri atilmaz (devre disi)
+- Tamamlanan islerde 45 dk ustu duruslar icin Berke tarafindan Is Emrine Aktar islemi yapilabilir
 
 ### 2.3 Yetki kurallari (Berke)
 Berke kullanicisi icin ozel yetki setleri eklendi:
@@ -67,6 +72,20 @@ Temel kontrol dosyalari:
 - `server/src/middleware/auth.ts`
 - `server/src/routes/jobEntries.ts`
 - `server/src/routes/workOrders.ts`
+
+### 2.8 Tamamlanan Isler - son edit guncellemesi
+Uygulanan:
+- Tamamlanan Isler tablosuna Duzenle ikonu eklendi (sadece Berke)
+- Duzenleme modalinda su alanlar guncellenebilir:
+  - Tarih, Vardiya, Makina, Mudahale Turu
+  - Baslangic/Bitis saati (sure otomatik hesaplanir)
+  - Aciklama, Malzeme
+- Personel listesi korunur; sadece is kaydi bilgileri guncellenir
+
+Teknik dosyalar:
+- `client/src/pages/TamamlananIsler.tsx`
+- `client/src/services/api.ts`
+- `server/src/routes/jobEntries.ts`
 
 ### 2.4 Isimlendirme ve menu duzenleri
 Uygulanan ad degisiklikleri:
