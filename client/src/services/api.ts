@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import type { BackupSettings } from '../types/backups';
 
 type QueryParams = Record<string, string | number | boolean | undefined>;
 
@@ -112,6 +113,12 @@ export const appStateApi = {
   getMany: (keys: string[]) => api.get('/app-state', { params: { keys: keys.join(',') } }),
   set: <T>(key: string, value: T) =>
     api.put(`/app-state/${encodeURIComponent(key)}`, { value })
+};
+
+export const backupsApi = {
+  getSettings: () => api.get('/backups/settings'),
+  updateSettings: (data: Partial<BackupSettings>) => api.put('/backups/settings', data),
+  runNow: () => api.post('/backups/run')
 };
 
 export const jobEntriesApi = {

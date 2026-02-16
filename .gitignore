@@ -30,6 +30,7 @@ tmp_cookie.txt
 **/*.db
 **/*.sqlite
 **/*.sqlite3
+server/backups/
 
 # OS / editor files
 .DS_Store

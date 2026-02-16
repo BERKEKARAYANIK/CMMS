@@ -3,9 +3,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Edit2, Save, X, Upload, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
-import { appStateApi, authApi, usersApi } from '../services/api';
+import { appStateApi, authApi, backupsApi, usersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types';
+import type {
+  BackupSettings,
+  BackupSettingsResponse,
+  BackupStatus
+} from '../types/backups';
 import {
   bolumler,
   type Vardiya,
@@ -343,6 +348,26 @@ function BulkImport<T>({ title, columnsHint, parseRows, onAdd }: BulkImportProps
 
 type TabType = 'vardiyalar' | 'mudahaleTurleri' | 'personel' | 'makinalar';
 
+const MIN_BACKUP_INTERVAL_MINUTES = 5;
+const MAX_BACKUP_INTERVAL_MINUTES = 24 * 60;
+
+const DEFAULT_BACKUP_SETTINGS: BackupSettings = {
+  enabled: true,
+  intervalMinutes: 120,
+  backupDir: '',
+  includeDatabase: true,
+  includeCompletedExcel: true
+};
+
+function formatStatusDate(value: string | null | undefined): string {
+  if (!value) return '-';
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '-';
+
+  return parsed.toLocaleString('tr-TR');
+}
+
 export default function Ayarlar() {
   const [activeTab, setActiveTab] = useState<TabType>('vardiyalar');
   const currentUser = useAuthStore((state) => state.user);
@@ -364,6 +389,9 @@ export default function Ayarlar() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedUserPassword, setSelectedUserPassword] = useState('');
+  const [backupSettings, setBackupSettings] = useState<BackupSettings>(DEFAULT_BACKUP_SETTINGS);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [isBackupLoading, setIsBackupLoading] = useState(true);
 
   const persistLists = async (nextLists: SettingsListsState) => {
     try {
@@ -392,6 +420,12 @@ export default function Ayarlar() {
   const selectedUserDefaultPassword = selectedUser
     ? buildDefaultPasswordPreview(selectedUser.ad, selectedUser.soyad)
     : '';
+
+  const applyBackupPayload = (payload: BackupSettingsResponse | undefined) => {
+    if (!payload) return;
+    setBackupSettings(payload.settings);
+    setBackupStatus(payload.status);
+  };
 
   const changeOwnPasswordMutation = useMutation({
     mutationFn: () => authApi.changePassword(currentPassword, newPassword),
@@ -427,6 +461,35 @@ export default function Ayarlar() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Toplu sifre guncellenemedi');
+    }
+  });
+
+  const saveBackupSettingsMutation = useMutation({
+    mutationFn: () => backupsApi.updateSettings(backupSettings),
+    onSuccess: (response: any) => {
+      applyBackupPayload(response?.data?.data as BackupSettingsResponse | undefined);
+      toast.success(response?.data?.message || 'Yedekleme ayarlari kaydedildi');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Yedekleme ayarlari kaydedilemedi');
+    }
+  });
+
+  const runBackupNowMutation = useMutation({
+    mutationFn: () => backupsApi.runNow(),
+    onSuccess: (response: any) => {
+      const payload = response?.data?.data as { status?: BackupStatus } | undefined;
+      if (payload?.status) {
+        setBackupStatus(payload.status);
+      }
+      toast.success(response?.data?.message || 'Yedekleme tamamlandi');
+    },
+    onError: (error: any) => {
+      const payload = error?.response?.data?.data as { status?: BackupStatus } | undefined;
+      if (payload?.status) {
+        setBackupStatus(payload.status);
+      }
+      toast.error(error?.response?.data?.message || 'Yedekleme baslatilamadi');
     }
   });
 
@@ -531,6 +594,27 @@ export default function Ayarlar() {
     void loadLists();
   }, []);
 
+  useEffect(() => {
+    const loadBackupSettings = async () => {
+      if (!canManagePasswords) {
+        setIsBackupLoading(false);
+        return;
+      }
+
+      try {
+        setIsBackupLoading(true);
+        const response = await backupsApi.getSettings();
+        applyBackupPayload(response?.data?.data as BackupSettingsResponse | undefined);
+      } catch (error: any) {
+        toast.error(error?.response?.data?.message || 'Yedekleme ayarlari yuklenemedi');
+      } finally {
+        setIsBackupLoading(false);
+      }
+    };
+
+    void loadBackupSettings();
+  }, [canManagePasswords]);
+
   const tabs = [
     { id: 'vardiyalar' as TabType, label: 'Vardiyalar' },
     { id: 'mudahaleTurleri' as TabType, label: 'Mudahale Turleri' },
@@ -570,6 +654,48 @@ export default function Ayarlar() {
     if (!confirm('Tum kullanicilarin sifresi varsayilan kurala gore guncellensin mi?')) return;
     resetAllPasswordsMutation.mutate();
   };
+
+  const handleSaveBackupSettings = () => {
+    if (!canManagePasswords) {
+      toast.error('Bu alan icin yetkiniz yok');
+      return;
+    }
+
+    const intervalMinutes = Number.parseInt(String(backupSettings.intervalMinutes), 10);
+    if (Number.isNaN(intervalMinutes)) {
+      toast.error('Yedekleme araligi gecersiz');
+      return;
+    }
+    if (intervalMinutes < MIN_BACKUP_INTERVAL_MINUTES || intervalMinutes > MAX_BACKUP_INTERVAL_MINUTES) {
+      toast.error(`Yedekleme araligi ${MIN_BACKUP_INTERVAL_MINUTES}-${MAX_BACKUP_INTERVAL_MINUTES} dakika arasinda olmalidir`);
+      return;
+    }
+    if (!backupSettings.backupDir.trim()) {
+      toast.error('Yedek klasoru bos olamaz');
+      return;
+    }
+    if (!backupSettings.includeDatabase && !backupSettings.includeCompletedExcel) {
+      toast.error('En az bir yedekleme icerigi secilmelidir');
+      return;
+    }
+
+    saveBackupSettingsMutation.mutate();
+  };
+
+  const handleRunBackupNow = () => {
+    if (!canManagePasswords) {
+      toast.error('Bu alan icin yetkiniz yok');
+      return;
+    }
+    runBackupNowMutation.mutate();
+  };
+
+  const backupLastResultLabel = backupStatus?.lastResult === 'success'
+    ? 'Basarili'
+    : backupStatus?.lastResult === 'error'
+      ? 'Hatali'
+      : 'Henuz calismadi';
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">Ayarlar - Liste Yonetimi</h1>
@@ -698,6 +824,135 @@ export default function Ayarlar() {
           </p>
         </div>
       </div>
+
+      {canManagePasswords && (
+        <div className="card p-6 space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Otomatik Yedekleme</h2>
+              <p className="text-xs text-gray-500">
+                Yedek hedef klasoru secip otomatik yedekleme araligini buradan yonetin.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleRunBackupNow}
+                disabled={isBackupLoading || runBackupNowMutation.isPending || backupStatus?.isRunning}
+              >
+                {runBackupNowMutation.isPending || backupStatus?.isRunning ? 'Yedekleniyor...' : 'Simdi Yedek Al'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveBackupSettings}
+                disabled={isBackupLoading || saveBackupSettingsMutation.isPending}
+              >
+                {saveBackupSettingsMutation.isPending ? 'Kaydediliyor...' : 'Yedek Ayarlarini Kaydet'}
+              </button>
+            </div>
+          </div>
+
+          {isBackupLoading ? (
+            <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+              Yedekleme ayarlari yukleniyor...
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={backupSettings.enabled}
+                    onChange={(event) => setBackupSettings((prev) => ({
+                      ...prev,
+                      enabled: event.target.checked
+                    }))}
+                  />
+                  Otomatik yedekleme aktif
+                </label>
+
+                <label className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={backupSettings.includeDatabase}
+                    onChange={(event) => setBackupSettings((prev) => ({
+                      ...prev,
+                      includeDatabase: event.target.checked
+                    }))}
+                  />
+                  Veritabani yedegi al
+                </label>
+
+                <div>
+                  <label className="label">Yedek Klasoru</label>
+                  <input
+                    type="text"
+                    value={backupSettings.backupDir}
+                    onChange={(event) => setBackupSettings((prev) => ({
+                      ...prev,
+                      backupDir: event.target.value
+                    }))}
+                    className="input"
+                    placeholder="Orn: D:\\CMMS_BACKUP"
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Yedekleme Araligi (dk)</label>
+                  <input
+                    type="number"
+                    min={MIN_BACKUP_INTERVAL_MINUTES}
+                    max={MAX_BACKUP_INTERVAL_MINUTES}
+                    value={backupSettings.intervalMinutes}
+                    onChange={(event) => setBackupSettings((prev) => {
+                      const next = Number.parseInt(event.target.value, 10);
+                      return {
+                        ...prev,
+                        intervalMinutes: Number.isNaN(next) ? prev.intervalMinutes : next
+                      };
+                    })}
+                    className="input"
+                  />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={backupSettings.includeCompletedExcel}
+                  onChange={(event) => setBackupSettings((prev) => ({
+                    ...prev,
+                    includeCompletedExcel: event.target.checked
+                  }))}
+                />
+                Tamamlanan isleri ayri Excel dosyasi olarak yedekle
+              </label>
+
+              <div className="rounded-md border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-700 space-y-1">
+                <p><span className="font-semibold">Son Durum:</span> {backupLastResultLabel}</p>
+                <p><span className="font-semibold">Son Calisma:</span> {formatStatusDate(backupStatus?.lastRunAt)}</p>
+                <p><span className="font-semibold">Son Basarili Calisma:</span> {formatStatusDate(backupStatus?.lastSuccessAt)}</p>
+                <p><span className="font-semibold">Son Tetikleme:</span> {backupStatus?.lastTrigger || '-'}</p>
+                <p><span className="font-semibold">Sonraki Calisma:</span> {formatStatusDate(backupStatus?.nextRunAt)}</p>
+                <p><span className="font-semibold">Son Hedef Klasor:</span> {backupStatus?.lastOutputDir || '-'}</p>
+                <p><span className="font-semibold">Son Hata:</span> {backupStatus?.lastError || '-'}</p>
+                <p><span className="font-semibold">Son Uretilen Dosyalar:</span></p>
+                {backupStatus?.lastFiles?.length ? (
+                  <ul className="list-disc pl-4 space-y-1">
+                    {backupStatus.lastFiles.map((filePath) => (
+                      <li key={filePath} className="break-all">{filePath}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>-</p>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="card p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

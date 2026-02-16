@@ -11,12 +11,14 @@ import { preventiveMaintenanceRouter } from './routes/preventiveMaintenance.js';
 import { dashboardRouter } from './routes/dashboard.js';
 import { jobEntriesRouter } from './routes/jobEntries.js';
 import { appStateRouter } from './routes/appState.js';
+import { backupsRouter } from './routes/backups.js';
+import { initializeBackupScheduler } from './services/backupService.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { prisma } from './lib/prisma.js';
 import { CLIENT_ORIGIN } from './config.js';
 
 const app = express();
-const PORT = process.env.PORT || 4001;
+const PORT = Number.parseInt(String(process.env.PORT || '4001'), 10) || 4001;
 
 app.use(cors({
   origin: CLIENT_ORIGIN,
@@ -34,6 +36,7 @@ app.use('/api/preventive-maintenance', preventiveMaintenanceRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/job-entries', jobEntriesRouter);
 app.use('/api/app-state', appStateRouter);
+app.use('/api/backups', backupsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -100,8 +103,9 @@ async function ensureBootstrapAdmin() {
 
 async function start() {
   await ensureBootstrapAdmin();
+  await initializeBackupScheduler();
 
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`CMMS Server running on http://localhost:${PORT}`);
   });
 }
