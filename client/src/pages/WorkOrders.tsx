@@ -999,12 +999,12 @@ function WorkOrderCard({
   onOpenReport,
   onViewReport,
   onApprove,
+  onDeleteReport,
   onReopenFromCompleted,
-  onDeleteFromCompleted,
   approvingId,
   reportPendingId,
-  reopeningId,
-  deletingId
+  reportDeletingId,
+  reopeningId
 }: {
   workOrder: WorkOrder;
   currentUser: User | null;
@@ -1012,12 +1012,12 @@ function WorkOrderCard({
   onOpenReport: (workOrder: WorkOrder) => void;
   onViewReport: (workOrder: WorkOrder) => void;
   onApprove: (id: number) => void;
+  onDeleteReport: (workOrder: WorkOrder) => void;
   onReopenFromCompleted: (workOrder: WorkOrder) => void;
-  onDeleteFromCompleted: (workOrder: WorkOrder) => void;
   approvingId: number | null;
   reportPendingId: number | null;
+  reportDeletingId: number | null;
   reopeningId: number | null;
-  deletingId: number | null;
 }) {
   const Icon = durumIcons[workOrder.durum];
   const isExtended = isExtendedDowntimeWorkOrder(workOrder);
@@ -1132,16 +1132,19 @@ function WorkOrderCard({
             </button>
           )}
 
-          {canManageCompleted && (
-            <button
-              onClick={() => onDeleteFromCompleted(workOrder)}
-              className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-900 hover:bg-red-100 disabled:opacity-60"
-              disabled={deletingId === workOrder.id}
-            >
-              <Trash2 className="mr-1 h-3.5 w-3.5" />
-              {deletingId === workOrder.id ? 'Siliniyor...' : 'Sil'}
-            </button>
-          )}
+        </div>
+      )}
+
+      {canAssign && isExtended && (
+        <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
+          <button
+            onClick={() => onDeleteReport(workOrder)}
+            className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-900 hover:bg-red-100 disabled:opacity-60"
+            disabled={reportDeletingId === workOrder.id}
+          >
+            <Trash2 className="mr-1 h-3.5 w-3.5" />
+            {reportDeletingId === workOrder.id ? 'Siliniyor...' : 'Formu Sil'}
+          </button>
         </div>
       )}
     </div>
@@ -1249,6 +1252,17 @@ export default function WorkOrders() {
     }
   });
 
+  const deleteReportMutation = useMutation({
+    mutationFn: (id: number) => workOrdersApi.update(id, { tamamlanmaNotlari: null }),
+    onSuccess: () => {
+      toast.success('Rapor silindi');
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Rapor silinemedi');
+    }
+  });
+
   const reopenMutation = useMutation({
     mutationFn: (id: number) => workOrdersApi.updateStatus(
       id,
@@ -1264,25 +1278,14 @@ export default function WorkOrders() {
     }
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => workOrdersApi.delete(id),
-    onSuccess: () => {
-      toast.success('Is emri silindi');
-      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Is emri silinemedi');
-    }
-  });
-
   const handleReopenFromCompleted = (workOrder: WorkOrder) => {
     if (!confirm(`${workOrder.isEmriNo} kaydi DEVAM_EDIYOR durumuna geri yollansin mi?`)) return;
     reopenMutation.mutate(workOrder.id);
   };
 
-  const handleDeleteFromCompleted = (workOrder: WorkOrder) => {
-    if (!confirm(`${workOrder.isEmriNo} kalici olarak silinsin mi?`)) return;
-    deleteMutation.mutate(workOrder.id);
+  const handleDeleteReport = (workOrder: WorkOrder) => {
+    if (!confirm(`${workOrder.isEmriNo} formu silinsin mi?`)) return;
+    deleteReportMutation.mutate(workOrder.id);
   };
 
   const kanbanColumns: { key: IsEmriDurum; label: string; color: string }[] = [
@@ -1366,12 +1369,12 @@ export default function WorkOrders() {
                       setReportWorkOrder(selectedWorkOrder);
                     }}
                     onApprove={(id) => approveMutation.mutate(id)}
+                    onDeleteReport={handleDeleteReport}
                     onReopenFromCompleted={handleReopenFromCompleted}
-                    onDeleteFromCompleted={handleDeleteFromCompleted}
                     approvingId={approveMutation.isPending ? (approveMutation.variables ?? null) : null}
                     reportPendingId={submitReportMutation.isPending ? (submitReportMutation.variables?.id ?? null) : null}
+                    reportDeletingId={deleteReportMutation.isPending ? (deleteReportMutation.variables ?? null) : null}
                     reopeningId={reopenMutation.isPending ? (reopenMutation.variables ?? null) : null}
-                    deletingId={deleteMutation.isPending ? (deleteMutation.variables ?? null) : null}
                   />
                 ))}
                 {groupedOrders[column.key].length === 0 && (

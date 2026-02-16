@@ -14,6 +14,7 @@ import DisabledPage from './pages/DisabledPage';
 import SifreDegistir from './pages/SifreDegistir';
 import PreventiveMaintenancePage from './pages/PreventiveMaintenance';
 import DcMotorBakim from './pages/DcMotorBakim';
+import Equipment from './pages/Equipment';
 import GunlukPerformansGenelBakis from './pages/GunlukPerformansGenelBakis';
 import TekrarlayanArizaAnalizi from './pages/TekrarlayanArizaAnalizi';
 import WorkOrders from './pages/WorkOrders';
@@ -84,11 +85,7 @@ function App() {
         />
         <Route
           path="sifre-degistir"
-          element={(
-            <SettingsRoute>
-              <SifreDegistir />
-            </SettingsRoute>
-          )}
+          element={<SifreDegistir />}
         />
         <Route
           path="personnel"
@@ -108,8 +105,8 @@ function App() {
         />
         <Route path="tekrarlayan-ariza-analizi" element={<TekrarlayanArizaAnalizi />} />
         <Route path="shifts" element={<DisabledPage title="Vardiyalar" />} />
-        <Route path="demirbas" element={<DisabledPage title="Demirbas" />} />
-        <Route path="equipment" element={<DisabledPage title="Ekipmanlar" />} />
+        <Route path="demirbas" element={<Equipment />} />
+        <Route path="equipment" element={<Navigate to="/demirbas" replace />} />
         <Route path="work-orders" element={<WorkOrders />} />
         <Route path="preventive-maintenance" element={<PreventiveMaintenancePage />} />
         <Route path="reports" element={<DisabledPage title="Raporlar" />} />

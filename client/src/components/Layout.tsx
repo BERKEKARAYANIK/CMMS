@@ -34,7 +34,7 @@ const navigation = [
   { name: 'Gunluk Performans Genel Bakis', href: '/gunluk-performans-genel-bakis', icon: BarChart3, enabled: true },
   { name: 'Tekrarlayan Ariza Analizi', href: '/tekrarlayan-ariza-analizi', icon: BarChart3, enabled: true },
   { name: 'Vardiyalar', href: '/shifts', icon: Calendar, enabled: false },
-  { name: 'Demirbas', href: '/demirbas', icon: Package, enabled: false },
+  { name: 'Demirbaş Formları', href: '/demirbas', icon: Package, enabled: true },
   { name: 'Ekipmanlar', href: '/equipment', icon: Settings, enabled: false },
   { name: 'Is Emri Takibi', href: '/work-orders', icon: ClipboardList, enabled: true },
   { name: 'Periyodik Bakim', href: '/preventive-maintenance', icon: Wrench, enabled: true },
@@ -269,15 +269,13 @@ export default function Layout() {
                       </p>
                       <p className="text-xs text-gray-500">{user?.email}</p>
                     </div>
-                    {isSystemAdmin && (
-                      <button
-                        onClick={handleChangePassword}
-                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                      >
-                        <Cog className="w-4 h-4 mr-2" />
-                        Sifre Degistir
-                      </button>
-                    )}
+                    <button
+                      onClick={handleChangePassword}
+                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                      <Cog className="w-4 h-4 mr-2" />
+                      Sifre Degistir
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50"

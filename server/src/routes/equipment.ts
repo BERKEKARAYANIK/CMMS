@@ -39,6 +39,28 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+// Get equipment categories
+router.get('/meta/categories', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const categories = await prisma.makina.findMany({
+      select: { kategori: true },
+      distinct: ['kategori']
+    });
+
+    res.json({
+      success: true,
+      data: categories
+        .map((c) => c.kategori)
+        .filter((kategori): kategori is string => Boolean(kategori))
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Kategoriler alınamadı'
+    });
+  }
+});
+
 // Get equipment by ID
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
@@ -197,26 +219,6 @@ router.put('/:id', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req:
     res.status(500).json({
       success: false,
       message: 'Ekipman güncellenemedi'
-    });
-  }
-});
-
-// Get equipment categories
-router.get('/meta/categories', authenticate, async (req: AuthRequest, res: Response) => {
-  try {
-    const categories = await prisma.makina.findMany({
-      select: { kategori: true },
-      distinct: ['kategori']
-    });
-
-    res.json({
-      success: true,
-      data: categories.map(c => c.kategori)
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Kategoriler alınamadı'
     });
   }
 });

@@ -160,12 +160,6 @@ router.post('/logout', (req, res) => {
 
 router.post('/change-password', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    if (!isSystemAdminUser(req.user)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Bu islem sadece sistem yoneticisi icin kullanilabilir'
-      });
-    }
     if (!req.user) {
       return res.status(401).json({
         success: false,
