@@ -1,7 +1,7 @@
 # CMMS - Hizli Baslangic ve Devam Notlari
 
 Olusturma tarihi: 16.02.2026
-Son guncelleme commit'i: `42955c0`
+Son guncelleme commit'i: `ab3a137`
 Repo: `https://github.com/BERKEKARAYANIK/CMMS`
 Ana klasor: `C:\Users\YAPAY_ZEKA\Desktop\CMMS FULL\cmms`
 
