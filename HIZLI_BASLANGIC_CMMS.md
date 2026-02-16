@@ -1,7 +1,7 @@
 # CMMS - Hizli Baslangic ve Devam Notlari
 
 Olusturma tarihi: 16.02.2026
-Son guncelleme commit'i: `569047b`
+Son guncelleme commit'i: `42955c0`
 Repo: `https://github.com/BERKEKARAYANIK/CMMS`
 Ana klasor: `C:\Users\YAPAY_ZEKA\Desktop\CMMS FULL\cmms`
 
@@ -227,6 +227,7 @@ Remote:
 - `origin -> https://github.com/BERKEKARAYANIK/CMMS.git`
 
 Son commitler:
+- `42955c0 feat: add one-click new PC bootstrap and service automation`
 - `569047b feat: add automated backups with completed jobs excel export`
 - `b6650a2 feat: centralize remaining module state and add https deploy stack`
 - `1ae6f2e feat: move job entry flow to API and enable PWA`
