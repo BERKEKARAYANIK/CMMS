@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { IsEmri } from '../data/lists';
+import toast from 'react-hot-toast';
+import { jobEntriesApi } from '../services/api';
+import type { CompletedJob } from '../types/jobEntries';
 
-const STORAGE_KEY = 'cmms_tamamlanan_isler';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface FaultRecord {
@@ -82,31 +83,19 @@ function parseDateValue(value: string): Date | null {
   return parsed;
 }
 
-function readCompletedWorks(): IsEmri[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as IsEmri[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function isArizaWork(work: IsEmri): boolean {
+function isArizaWork(work: CompletedJob): boolean {
   const normalized = normalizeText(work.mudahaleTuru || '');
   return normalized.includes('ariza');
 }
 
-function getFaultLabel(work: IsEmri): string {
+function getFaultLabel(work: CompletedJob): string {
   const aciklama = (work.aciklama || '').trim();
   if (aciklama) return aciklama;
   const mudahale = (work.mudahaleTuru || '').trim();
   return mudahale || 'Belirsiz Ariza';
 }
 
-function toFaultRecords(works: IsEmri[]): FaultRecord[] {
+function toFaultRecords(works: CompletedJob[]): FaultRecord[] {
   const records: FaultRecord[] = [];
 
   works.forEach((work) => {
@@ -279,9 +268,28 @@ function rateBadgeClass(rate: number): string {
 export default function TekrarlayanArizaAnalizi() {
   const [refDate, setRefDate] = useState(toDateValue(new Date()));
   const [selectedMachineKey, setSelectedMachineKey] = useState('');
+  const [completedWorks, setCompletedWorks] = useState<CompletedJob[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadCompletedWorks = async () => {
+      try {
+        setIsLoading(true);
+        const response = await jobEntriesApi.getCompleted();
+        const data = response.data?.data as CompletedJob[] | undefined;
+        setCompletedWorks(Array.isArray(data) ? data : []);
+      } catch {
+        toast.error('Tamamlanan is verileri yuklenemedi');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadCompletedWorks();
+  }, []);
 
   const analysis = useMemo(() => {
-    const records = toFaultRecords(readCompletedWorks());
+    const records = toFaultRecords(completedWorks);
     const window30 = analyzeWindow(records, refDate, 30);
     const window90 = analyzeWindow(records, refDate, 90);
     const rows = mergeMachineRows(window30, window90);
@@ -292,7 +300,7 @@ export default function TekrarlayanArizaAnalizi() {
       window90,
       rows
     };
-  }, [refDate]);
+  }, [completedWorks, refDate]);
 
   useEffect(() => {
     if (analysis.rows.length === 0) {
@@ -333,6 +341,9 @@ export default function TekrarlayanArizaAnalizi() {
             />
           </div>
         </div>
+        {isLoading && (
+          <p className="mt-3 text-xs text-blue-600">Veriler yukleniyor...</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">

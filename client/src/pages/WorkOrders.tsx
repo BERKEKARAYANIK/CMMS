@@ -355,7 +355,7 @@ function WorkOrderModal({
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Yeni Is Emri</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Is Girisi</h2>
 
           <form
             onSubmit={(e) => {
@@ -1304,7 +1304,7 @@ export default function WorkOrders() {
         <h1 className="text-2xl font-bold text-gray-900">Is Emirleri</h1>
         <button onClick={() => setIsModalOpen(true)} className="btn btn-primary inline-flex items-center">
           <Plus className="w-5 h-5 mr-2" />
-          Yeni Is Emri
+          Is Girisi
         </button>
       </div>
 

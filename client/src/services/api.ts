@@ -107,4 +107,17 @@ export const dashboardApi = {
   getKPIs: (period?: string) => api.get('/dashboard/kpis', { params: { period } })
 };
 
+export const jobEntriesApi = {
+  getPlanned: () => api.get('/job-entries/planned'),
+  createPlanned: <T extends object>(data: T) => api.post('/job-entries/planned', data),
+  updatePlanned: <T extends object>(recordId: string, data: T) =>
+    api.put(`/job-entries/planned/${encodeURIComponent(recordId)}`, data),
+  deletePlanned: (recordId: string) =>
+    api.delete(`/job-entries/planned/${encodeURIComponent(recordId)}`),
+  getCompleted: () => api.get('/job-entries/completed'),
+  createCompleted: <T extends object>(data: T) => api.post('/job-entries/completed', data),
+  deleteCompleted: (recordId: string) =>
+    api.delete(`/job-entries/completed/${encodeURIComponent(recordId)}`)
+};
+
 export default api;

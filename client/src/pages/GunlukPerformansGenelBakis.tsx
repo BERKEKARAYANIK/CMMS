@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { IsEmri as LocalCompletedWork } from '../data/lists';
-
-const STORAGE_KEY = 'cmms_tamamlanan_isler';
+import toast from 'react-hot-toast';
+import { jobEntriesApi } from '../services/api';
+import type { CompletedJob } from '../types/jobEntries';
 
 interface PersonOption {
   key: string;
@@ -204,18 +204,6 @@ function formatMinutes(totalMinutes: number): string {
   return `${hours} sa ${minutes} dk`;
 }
 
-function readCompletedWorks(): LocalCompletedWork[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as LocalCompletedWork[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 function createEmptyPersonDayStat(sicilNo = '-', adSoyad = '-'): PersonDayStat {
   return {
     sicilNo,
@@ -271,14 +259,14 @@ interface RawPersonDayAccumulator {
   shiftCapacityByKey: Map<string, number>;
 }
 
-function buildMonthData(selectedMonth: string): MonthData {
+function buildMonthData(selectedMonth: string, works: CompletedJob[]): MonthData {
   const monthDates = buildMonthDates(selectedMonth);
-  const works = readCompletedWorks().filter((work) => work.tarih.startsWith(`${selectedMonth}-`));
+  const worksInMonth = works.filter((work) => work.tarih.startsWith(`${selectedMonth}-`));
 
   const personInfoMap = new Map<string, PersonOption>();
   const dayPersonMap = new Map<string, Map<string, RawPersonDayAccumulator>>();
 
-  works.forEach((work) => {
+  worksInMonth.forEach((work) => {
     const dayKey = work.tarih;
     const personMap = dayPersonMap.get(dayKey) || new Map<string, RawPersonDayAccumulator>();
 
@@ -410,12 +398,34 @@ export default function GunlukPerformansGenelBakis() {
   const [selectedPersonKey, setSelectedPersonKey] = useState('ALL');
   const [selectedDate, setSelectedDate] = useState('');
   const [isDayWorksModalOpen, setIsDayWorksModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [completedWorks, setCompletedWorks] = useState<CompletedJob[]>([]);
   const todayDateKey = toDateValue(new Date());
 
-  const monthData = useMemo(() => buildMonthData(selectedMonth), [selectedMonth]);
+  useEffect(() => {
+    const loadCompletedWorks = async () => {
+      try {
+        setIsLoading(true);
+        const response = await jobEntriesApi.getCompleted();
+        const data = response.data?.data as CompletedJob[] | undefined;
+        setCompletedWorks(Array.isArray(data) ? data : []);
+      } catch {
+        toast.error('Performans verileri yuklenemedi');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadCompletedWorks();
+  }, []);
+
+  const monthData = useMemo(
+    () => buildMonthData(selectedMonth, completedWorks),
+    [completedWorks, selectedMonth]
+  );
   const monthWorks = useMemo(
-    () => readCompletedWorks().filter((work) => work.tarih.startsWith(`${selectedMonth}-`)),
-    [selectedMonth]
+    () => completedWorks.filter((work) => work.tarih.startsWith(`${selectedMonth}-`)),
+    [completedWorks, selectedMonth]
   );
 
   useEffect(() => {
@@ -541,6 +551,9 @@ export default function GunlukPerformansGenelBakis() {
             </p>
           </div>
         </div>
+        {isLoading && (
+          <p className="mt-3 text-xs text-blue-600">Veriler yukleniyor...</p>
+        )}
       </div>
 
       <div className="card overflow-hidden border-gray-400 bg-[#f3f4f6]">

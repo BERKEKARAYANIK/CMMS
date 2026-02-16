@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title>CMMS</title>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+  <g fill="#f8fafc">
+    <rect x="112" y="120" width="88" height="272" rx="16"/>
+    <rect x="212" y="120" width="88" height="272" rx="16"/>
+    <rect x="312" y="120" width="88" height="272" rx="16"/>
+  </g>
+  <circle cx="364" cy="364" r="86" fill="#22c55e"/>
+  <path d="M364 322a42 42 0 1 0 42 42h-24a18 18 0 1 1-18-18v18l34-28-34-28v14z" fill="#052e16"/>
+</svg>

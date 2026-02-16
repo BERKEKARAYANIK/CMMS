@@ -197,3 +197,70 @@ model PeriyodikBakim {
 
   @@map("periyodik_bakimlar")
 }
+
+model PlanlananIs {
+  id                  Int       @id @default(autoincrement())
+  recordId            String    @unique @map("record_id")
+  makina              String
+  mudahaleTuru        String    @map("mudahale_turu")
+  aciklama            String
+  malzeme             String?
+  gorevTipi           String    @default("PLANLI_BAKIM") @map("gorev_tipi")
+  atananSicilNo       String?   @map("atanan_sicil_no")
+  atananAdSoyad       String?   @map("atanan_ad_soyad")
+  atananBolum         String?   @map("atanan_bolum")
+  backendWorkOrderId  Int?      @map("backend_work_order_id")
+  backendWorkOrderNo  String?   @map("backend_work_order_no")
+  backendGonderimTarihi DateTime? @map("backend_gonderim_tarihi")
+  kaynakIsEmriId      String?   @map("kaynak_is_emri_id")
+  kaynakDurusDakika   Int?      @map("kaynak_durus_dakika")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  @@index([createdAt])
+  @@map("planlanan_isler")
+}
+
+model TamamlananIs {
+  id                      Int      @id @default(autoincrement())
+  recordId                String   @unique @map("record_id")
+  tarih                   DateTime
+  vardiya                 String
+  makina                  String
+  mudahaleTuru            String   @map("mudahale_turu")
+  baslangicSaati          String   @map("baslangic_saati")
+  bitisSaati              String   @map("bitis_saati")
+  sureDakika              Int      @map("sure_dakika")
+  aciklama                String
+  malzeme                 String?
+  analizPlanlananIsId     Int?     @map("analiz_planlanan_is_id")
+  analizBackendWorkOrderId Int?    @map("analiz_backend_work_order_id")
+  analizBackendWorkOrderNo String? @map("analiz_backend_work_order_no")
+  analizAtananSicilNo     String?  @map("analiz_atanan_sicil_no")
+  analizAtananAdSoyad     String?  @map("analiz_atanan_ad_soyad")
+  analizAtananBolum       String?  @map("analiz_atanan_bolum")
+  analizAtamaTarihi       DateTime? @map("analiz_atama_tarihi")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
+
+  personeller TamamlananIsPersonel[]
+
+  @@index([tarih])
+  @@index([createdAt])
+  @@map("tamamlanan_isler")
+}
+
+model TamamlananIsPersonel {
+  id             Int      @id @default(autoincrement())
+  tamamlananIsId Int      @map("tamamlanan_is_id")
+  sicilNo        String   @map("sicil_no")
+  adSoyad        String   @map("ad_soyad")
+  bolum          String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tamamlananIs TamamlananIs @relation(fields: [tamamlananIsId], references: [id], onDelete: Cascade)
+
+  @@unique([tamamlananIsId, sicilNo])
+  @@index([sicilNo])
+  @@map("tamamlanan_is_personeller")
+}

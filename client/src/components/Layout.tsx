@@ -25,18 +25,18 @@ import { queryClient } from '../queryClient';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, enabled: false },
-  { name: 'Is Emri Girisi', href: '/is-emri-girisi', icon: FilePlus, enabled: true },
+  { name: 'Is Girisi', href: '/is-emri-girisi', icon: FilePlus, enabled: true },
+  { name: 'Dc Motor Bakım İş Girişi', href: '/dc-motor-bakim', icon: ClipboardList, enabled: true },
   { name: 'Tamamlanan Isler', href: '/tamamlanan-isler', icon: CheckSquare, enabled: true },
   { name: 'Planlanan Isler', href: '/planlanan-isler', icon: ListChecks, enabled: true },
   { name: 'Bakim Takip Merkezi', href: '/bakim-takip-merkezi', icon: LayoutDashboard, enabled: true },
-  { name: 'DC Motor Bakim Modulu', href: '/dc-motor-bakim', icon: ClipboardList, enabled: true },
   { name: 'Personel', href: '/personnel', icon: Users, enabled: true },
   { name: 'Gunluk Performans Genel Bakis', href: '/gunluk-performans-genel-bakis', icon: BarChart3, enabled: true },
   { name: 'Tekrarlayan Ariza Analizi', href: '/tekrarlayan-ariza-analizi', icon: BarChart3, enabled: true },
   { name: 'Vardiyalar', href: '/shifts', icon: Calendar, enabled: false },
   { name: 'Demirbas', href: '/demirbas', icon: Package, enabled: false },
   { name: 'Ekipmanlar', href: '/equipment', icon: Settings, enabled: false },
-  { name: 'Is Emirleri', href: '/work-orders', icon: ClipboardList, enabled: true },
+  { name: 'Is Emri Takibi', href: '/work-orders', icon: ClipboardList, enabled: true },
   { name: 'Periyodik Bakim', href: '/preventive-maintenance', icon: Wrench, enabled: true },
   { name: 'Raporlar', href: '/reports', icon: BarChart3, enabled: false }
 ];

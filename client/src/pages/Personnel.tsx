@@ -13,16 +13,16 @@ import type {
 import { DepartmanLabels, RoleLabels } from '../types';
 import {
   personelListesi as defaultPersonelListesi,
-  type IsEmri as LocalCompletedWork,
   type Personel
 } from '../data/lists';
+import type { CompletedJob } from '../types/jobEntries';
+import { jobEntriesApi } from '../services/api';
 
 const departmanOptions: Departman[] = ['MEKANIK', 'ELEKTRIK', 'YARDIMCI_ISLETMELER', 'URETIM', 'YONETIM'];
 const roleOptions: Role[] = ['ADMIN', 'BAKIM_MUDURU', 'BAKIM_SEFI', 'TEKNISYEN', 'OPERATOR'];
 
 const LOCAL_KEYS = {
-  personelListesi: 'cmms_personel_listesi',
-  completedWorks: 'cmms_tamamlanan_isler'
+  personelListesi: 'cmms_personel_listesi'
 };
 
 function getFromStorage<T>(key: string, defaultValue: T[]): T[] {
@@ -158,20 +158,8 @@ function createEmptySummary(): PersonnelPerformanceSummary {
   };
 }
 
-function readLocalCompletedWorks(): LocalCompletedWork[] {
-  const raw = localStorage.getItem(LOCAL_KEYS.completedWorks);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw) as LocalCompletedWork[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 function summarizeFromLocalWorks(
-  works: LocalCompletedWork[],
+  works: CompletedJob[],
   includeDateInCapacityKey: boolean
 ): PersonnelPerformanceSummary {
   if (works.length === 0) return createEmptySummary();
@@ -210,13 +198,13 @@ interface LocalPerformanceAggregate {
 function buildLocalPerformance(
   user: User,
   selectedDate: string,
-  selectedMonth: string
+  selectedMonth: string,
+  completedWorks: CompletedJob[]
 ): LocalPerformanceAggregate {
-  const localWorks = readLocalCompletedWorks();
   const targetName = normalizeText(`${user.ad} ${user.soyad}`);
   const targetSicilNo = user.sicilNo.trim();
 
-  const personnelWorks = localWorks.filter((work) =>
+  const personnelWorks = completedWorks.filter((work) =>
     work.personeller.some((person) => {
       const sicilMatch = person.sicilNo?.trim() === targetSicilNo;
       const nameMatch = normalizeText(person.adSoyad || '') === targetName;
@@ -228,7 +216,7 @@ function buildLocalPerformance(
   const monthlyWorks = personnelWorks.filter((work) => work.tarih.startsWith(`${selectedMonth}-`));
 
   const shifts = new Map<string, PersonnelPerformanceSummary>();
-  const groupedByShift = new Map<string, LocalCompletedWork[]>();
+  const groupedByShift = new Map<string, CompletedJob[]>();
 
   dailyWorks.forEach((work) => {
     const keys = getShiftMatchKeys(work.vardiya);
@@ -283,9 +271,10 @@ function mergePerformanceWithLocal(
   apiData: PersonnelPerformanceData,
   user: User,
   selectedDate: string,
-  selectedMonth: string
+  selectedMonth: string,
+  completedWorks: CompletedJob[]
 ): PersonnelPerformanceData {
-  const local = buildLocalPerformance(user, selectedDate, selectedMonth);
+  const local = buildLocalPerformance(user, selectedDate, selectedMonth, completedWorks);
 
   return {
     ...apiData,
@@ -568,11 +557,13 @@ function SummaryCard({
 function PersonnelPerformanceModal({
   isOpen,
   onClose,
-  user
+  user,
+  completedWorks
 }: {
   isOpen: boolean;
   onClose: () => void;
   user: User | null;
+  completedWorks: CompletedJob[];
 }) {
   const [selectedDate, setSelectedDate] = useState(toDateValue(new Date()));
   const [selectedMonth, setSelectedMonth] = useState(toMonthValue(new Date()));
@@ -599,8 +590,8 @@ function PersonnelPerformanceModal({
 
   const performanceData = useMemo(() => {
     if (!data || !user) return data;
-    return mergePerformanceWithLocal(data, user, selectedDate, selectedMonth);
-  }, [data, user, selectedDate, selectedMonth]);
+    return mergePerformanceWithLocal(data, user, selectedDate, selectedMonth, completedWorks);
+  }, [completedWorks, data, user, selectedDate, selectedMonth]);
 
   if (!isOpen || !user) return null;
 
@@ -725,12 +716,27 @@ export default function Personnel() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [localPersonelListesi, setLocalPersonelListesi] = useState<Personel[]>([]);
+  const [completedWorks, setCompletedWorks] = useState<CompletedJob[]>([]);
   const [isPerformanceModalOpen, setIsPerformanceModalOpen] = useState(false);
   const [selectedPerformanceUser, setSelectedPerformanceUser] = useState<User | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     setLocalPersonelListesi(getFromStorage(LOCAL_KEYS.personelListesi, defaultPersonelListesi));
+  }, []);
+
+  useEffect(() => {
+    const loadCompletedWorks = async () => {
+      try {
+        const response = await jobEntriesApi.getCompleted();
+        const data = response.data?.data as CompletedJob[] | undefined;
+        setCompletedWorks(Array.isArray(data) ? data : []);
+      } catch {
+        toast.error('Tamamlanan is verileri yuklenemedi');
+      }
+    };
+
+    void loadCompletedWorks();
   }, []);
 
   const { data: users, isLoading } = useQuery({
@@ -991,6 +997,7 @@ export default function Personnel() {
           setSelectedPerformanceUser(null);
         }}
         user={selectedPerformanceUser}
+        completedWorks={completedWorks}
       />
     </div>
   );

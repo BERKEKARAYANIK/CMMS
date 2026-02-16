@@ -7,16 +7,15 @@ import {
   mudahaleTurleri as defaultMudahaleTurleri,
   personelListesi as defaultPersonelListesi,
   makinaListesi as defaultMakinaListesi,
-  type IsEmri,
   type Personel,
   type Vardiya,
   type MudahaleTuru,
   type Makina
 } from '../data/lists';
+import { jobEntriesApi } from '../services/api';
+import type { CompletedJob, PlannedJob } from '../types/jobEntries';
 
-// LocalStorage keys
-const STORAGE_KEY = 'cmms_tamamlanan_isler';
-const PLANLANAN_STORAGE_KEY = 'cmms_planlanan_isler';
+const PLANLANAN_TO_IS_EMRI_KEY = 'cmms_planlanan_is_to_is_emri';
 const KEYS = {
   vardiyalar: 'cmms_vardiyalar',
   mudahaleTurleri: 'cmms_mudahale_turleri',
@@ -24,39 +23,16 @@ const KEYS = {
   makinaListesi: 'cmms_makina_listesi'
 };
 
-// LocalStorage helper
 function getFromStorage<T>(key: string, defaultValue: T[]): T[] {
   const data = localStorage.getItem(key);
-  return data ? JSON.parse(data) : defaultValue;
-}
+  if (!data) return defaultValue;
 
-// Tamamlanan işleri localStorage'dan al
-function getTamamlananIsler(): IsEmri[] {
-  const data = localStorage.getItem(STORAGE_KEY);
-  return data ? JSON.parse(data) : [];
-}
-
-// Tamamlanan işleri localStorage'a kaydet
-function saveTamamlananIsler(isler: IsEmri[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(isler));
-}
-
-function getNextIsEmriId(tarih: string, isler: IsEmri[]): string {
-  const dateStr = tarih.replace(/-/g, '').slice(0, 8);
-  const prefix = `${dateStr}-`;
-  let maxSeq = 0;
-
-  isler.forEach((isEmri) => {
-    if (!isEmri.id.startsWith(prefix)) return;
-    const suffix = isEmri.id.slice(prefix.length);
-    const seq = parseInt(suffix, 10);
-    if (!Number.isNaN(seq)) {
-      maxSeq = Math.max(maxSeq, seq);
-    }
-  });
-
-  const nextSeq = String(maxSeq + 1).padStart(4, '0');
-  return `${dateStr}-${nextSeq}`;
+  try {
+    const parsed = JSON.parse(data) as T[];
+    return Array.isArray(parsed) ? parsed : defaultValue;
+  } catch {
+    return defaultValue;
+  }
 }
 
 type TimeInterval = {
@@ -101,7 +77,10 @@ export default function IsEmriGirisi() {
     getFromStorage(KEYS.makinaListesi, defaultMakinaListesi)
   );
 
-  // Form state
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [mevcutIsler, setMevcutIsler] = useState<CompletedJob[]>([]);
+
   const [makina, setMakina] = useState('');
   const [vardiya, setVardiya] = useState('');
   const [mudahaleTuru, setMudahaleTuru] = useState('');
@@ -113,48 +92,71 @@ export default function IsEmriGirisi() {
   const [malzeme, setMalzeme] = useState('');
   const [planlananId, setPlanlananId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const data = localStorage.getItem('cmms_planlanan_is_to_is_emri');
-    if (!data) return;
-
-    try {
-      const parsed = JSON.parse(data) as {
-        id?: string;
-        makina?: string;
-        mudahaleTuru?: string;
-        aciklama?: string;
-        malzeme?: string;
-        atananSicilNo?: string;
-      };
-
-      if (parsed.id) setPlanlananId(parsed.id);
-      if (parsed.makina) setMakina(parsed.makina);
-      if (parsed.mudahaleTuru) setMudahaleTuru(parsed.mudahaleTuru);
-      if (parsed.aciklama) setAciklama(parsed.aciklama);
-      if (parsed.malzeme) setMalzeme(parsed.malzeme);
-      if (parsed.atananSicilNo) {
-        const atananPersonel = personelListesi.find((p) => p.sicilNo === parsed.atananSicilNo);
-        if (atananPersonel) {
-          setEklenenPersoneller((prev) => {
-            if (prev.some((p) => p.sicilNo === atananPersonel.sicilNo)) {
-              return prev;
-            }
-            return [...prev, atananPersonel];
-          });
-        }
-      }
-    } catch {
-      // ignore parse errors
-    } finally {
-      localStorage.removeItem('cmms_planlanan_is_to_is_emri');
-    }
-  }, []);
-
-  // Personel state
   const [selectedPersonel, setSelectedPersonel] = useState('');
   const [eklenenPersoneller, setEklenenPersoneller] = useState<Personel[]>([]);
 
-  // Süre otomatik hesaplama
+  const applyPlanlananToForm = (planned: PlannedJob) => {
+    setPlanlananId(planned.id);
+    setMakina(planned.makina || '');
+    setMudahaleTuru(planned.mudahaleTuru || '');
+    setAciklama(planned.aciklama || '');
+    setMalzeme(planned.malzeme || '');
+
+    if (planned.atananSicilNo) {
+      const atananPersonel = personelListesi.find((p) => p.sicilNo === planned.atananSicilNo);
+      if (atananPersonel) {
+        setEklenenPersoneller((prev) => {
+          if (prev.some((p) => p.sicilNo === atananPersonel.sicilNo)) {
+            return prev;
+          }
+          return [...prev, atananPersonel];
+        });
+      }
+    }
+  };
+
+  useEffect(() => {
+    const bootstrap = async () => {
+      try {
+        setIsBootstrapping(true);
+        const [completedResponse, plannedResponse] = await Promise.all([
+          jobEntriesApi.getCompleted(),
+          jobEntriesApi.getPlanned()
+        ]);
+
+        const completed = completedResponse.data?.data as CompletedJob[] | undefined;
+        setMevcutIsler(Array.isArray(completed) ? completed : []);
+
+        const plannedJobs = plannedResponse.data?.data as PlannedJob[] | undefined;
+        const plannedList = Array.isArray(plannedJobs) ? plannedJobs : [];
+
+        const transferRaw = sessionStorage.getItem(PLANLANAN_TO_IS_EMRI_KEY);
+        if (transferRaw) {
+          try {
+            const selected = JSON.parse(transferRaw) as PlannedJob;
+            applyPlanlananToForm(selected);
+          } catch {
+            // ignore invalid transfer payload
+          } finally {
+            sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);
+          }
+          return;
+        }
+
+        const firstPlanned = plannedList.find((item) => item.gorevTipi !== 'DURUS_RAPOR_ANALIZ');
+        if (firstPlanned) {
+          applyPlanlananToForm(firstPlanned);
+        }
+      } catch {
+        toast.error('Baslangic verileri yuklenemedi');
+      } finally {
+        setIsBootstrapping(false);
+      }
+    };
+
+    void bootstrap();
+  }, []);
+
   useEffect(() => {
     if (baslangicSaati && bitisSaati) {
       const [basH, basM] = baslangicSaati.split(':').map(Number);
@@ -163,7 +165,6 @@ export default function IsEmriGirisi() {
       let basTotal = basH * 60 + basM;
       let bitTotal = bitH * 60 + bitM;
 
-      // Gece vardiyası için (bitiş < başlangıç ise bir sonraki güne geçmiş)
       if (bitTotal < basTotal) {
         bitTotal += 24 * 60;
       }
@@ -173,33 +174,29 @@ export default function IsEmriGirisi() {
     }
   }, [baslangicSaati, bitisSaati]);
 
-  // Personel ekle
   const handlePersonelEkle = () => {
     if (!selectedPersonel) {
-      toast.error('Lütfen personel seçiniz');
+      toast.error('Lutfen personel seciniz');
       return;
     }
 
-    const personel = personelListesi.find(p => p.sicilNo === selectedPersonel);
+    const personel = personelListesi.find((p) => p.sicilNo === selectedPersonel);
     if (!personel) return;
 
-    // Zaten eklenmişse uyar
-    if (eklenenPersoneller.some(p => p.sicilNo === personel.sicilNo)) {
-      toast.error('Bu personel zaten eklenmiş');
+    if (eklenenPersoneller.some((p) => p.sicilNo === personel.sicilNo)) {
+      toast.error('Bu personel zaten eklenmis');
       return;
     }
 
-    setEklenenPersoneller([...eklenenPersoneller, personel]);
+    setEklenenPersoneller((prev) => [...prev, personel]);
     setSelectedPersonel('');
     toast.success(`${personel.adSoyad} eklendi`);
   };
 
-  // Personel sil
   const handlePersonelSil = (sicilNo: string) => {
-    setEklenenPersoneller(eklenenPersoneller.filter(p => p.sicilNo !== sicilNo));
+    setEklenenPersoneller((prev) => prev.filter((p) => p.sicilNo !== sicilNo));
   };
 
-  // Formu temizle
   const handleTemizle = () => {
     setMakina('');
     setVardiya('');
@@ -215,19 +212,17 @@ export default function IsEmriGirisi() {
     toast.success('Form temizlendi');
   };
 
-  // Kaydet
-  const handleKaydet = () => {
-    // Validasyon
+  const handleKaydet = async () => {
     if (!makina) {
-      toast.error('Makine / Hat seçiniz');
+      toast.error('Makine / Hat seciniz');
       return;
     }
     if (!vardiya) {
-      toast.error('Vardiya seçiniz');
+      toast.error('Vardiya seciniz');
       return;
     }
     if (!mudahaleTuru) {
-      toast.error('Müdahale türü seçiniz');
+      toast.error('Mudahale turu seciniz');
       return;
     }
     if (!tarih) {
@@ -235,11 +230,11 @@ export default function IsEmriGirisi() {
       return;
     }
     if (!baslangicSaati) {
-      toast.error('Başlangıç saati giriniz');
+      toast.error('Baslangic saati giriniz');
       return;
     }
     if (!bitisSaati) {
-      toast.error('Bitiş saati giriniz');
+      toast.error('Bitis saati giriniz');
       return;
     }
     if (eklenenPersoneller.length === 0) {
@@ -247,12 +242,10 @@ export default function IsEmriGirisi() {
       return;
     }
     if (!aciklama.trim()) {
-      toast.error('Müdahale açıklaması giriniz');
+      toast.error('Mudahale aciklamasi giriniz');
       return;
     }
 
-    // Yeni iş emri oluştur
-    const mevcutIsler = getTamamlananIsler();
     const yeniIsAraligi = buildTimeInterval(tarih, baslangicSaati, bitisSaati);
     if (!yeniIsAraligi) {
       toast.error('Saat araligi gecersiz');
@@ -282,99 +275,111 @@ export default function IsEmriGirisi() {
       }
     }
 
-    const yeniIsEmri: IsEmri = {
-      id: getNextIsEmriId(tarih, mevcutIsler),
-      tarih,
-      vardiya,
-      makina,
-      mudahaleTuru,
-      baslangicSaati,
-      bitisSaati,
-      sureDakika,
-      aciklama,
-      malzeme,
-      personeller: eklenenPersoneller.map(p => ({
-        sicilNo: p.sicilNo,
-        adSoyad: p.adSoyad,
-        bolum: p.bolum
-      })),
-      createdAt: new Date().toISOString()
-    };
+    try {
+      setIsSaving(true);
+      const response = await jobEntriesApi.createCompleted({
+        tarih,
+        vardiya,
+        makina,
+        mudahaleTuru,
+        baslangicSaati,
+        bitisSaati,
+        sureDakika,
+        aciklama: aciklama.trim(),
+        malzeme: malzeme.trim(),
+        personeller: eklenenPersoneller.map((p) => ({
+          sicilNo: p.sicilNo,
+          adSoyad: p.adSoyad,
+          bolum: p.bolum
+        }))
+      });
 
-    // LocalStorage'a kaydet
-    saveTamamlananIsler([yeniIsEmri, ...mevcutIsler]);
-    if (planlananId) {
-      const planlananRaw = localStorage.getItem(PLANLANAN_STORAGE_KEY);
-      const planlananList = planlananRaw ? JSON.parse(planlananRaw) : [];
-      const yeniPlanlanan = planlananList.filter((is: { id: string }) => is.id !== planlananId);
-      localStorage.setItem(PLANLANAN_STORAGE_KEY, JSON.stringify(yeniPlanlanan));
-      setPlanlananId(null);
+      const created = response.data?.data as CompletedJob | undefined;
+      if (!created) {
+        throw new Error('Invalid response');
+      }
+
+      setMevcutIsler((prev) => [created, ...prev]);
+
+      if (planlananId) {
+        try {
+          await jobEntriesApi.deletePlanned(planlananId);
+        } catch {
+          // planned item cleanup best effort
+        }
+        setPlanlananId(null);
+      }
+
+      toast.success('Is girisi kaydedildi');
+      handleTemizle();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Is girisi kaydedilemedi');
+    } finally {
+      setIsSaving(false);
     }
-
-    toast.success('İş emri kaydedildi!');
-    handleTemizle();
   };
 
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Yeni İş Emri Girişi</h1>
-        <p className="text-red-500 text-sm mb-6">* Tüm alanlar zorunludur ve denetime tabidir.</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Is Girisi</h1>
+        <p className="text-red-500 text-sm mb-6">* Tum alanlar zorunludur ve denetime tabidir.</p>
+
+        {isBootstrapping && (
+          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
+            Veriler yukleniyor...
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Sol Kolon */}
           <div className="space-y-4">
-            {/* Makine / Hat Seçimi */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Makine / Hat Seçimi
+                Makine / Hat Secimi
               </label>
               <select
                 value={makina}
                 onChange={(e) => setMakina(e.target.value)}
-                className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">Seçiniz...</option>
+                <option value="">Seciniz...</option>
                 {makinaListesi.map((m) => (
                   <option key={m.id} value={m.ad}>{m.ad}</option>
                 ))}
               </select>
             </div>
 
-            {/* Müdahale Türü */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Müdahale Türü
+                Mudahale Turu
               </label>
               <select
                 value={mudahaleTuru}
                 onChange={(e) => setMudahaleTuru(e.target.value)}
-                className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">Seçiniz...</option>
+                <option value="">Seciniz...</option>
                 {mudahaleTurleri.map((m) => (
                   <option key={m.id} value={m.ad}>{m.ad}</option>
                 ))}
               </select>
             </div>
 
-            {/* Başlangıç Saati */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Başlangıç Saati
+                Baslangic Saati
               </label>
               <input
                 type="time"
                 value={baslangicSaati}
                 onChange={(e) => setBaslangicSaati(e.target.value)}
-                className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
-            {/* Müdahale Süresi */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Müdahale Süresi (dk)
+                Mudahale Suresi (dk)
               </label>
               <input
                 type="number"
@@ -384,24 +389,21 @@ export default function IsEmriGirisi() {
               />
             </div>
 
-            {/* Müdahale Açıklaması */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Müdahale Açıklaması
+                Mudahale Aciklamasi
               </label>
               <textarea
                 value={aciklama}
                 onChange={(e) => setAciklama(e.target.value)}
                 rows={6}
-                className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Yapılan işlem detaylarını yazınız..."
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+                placeholder="Yapilan islem detaylarini yaziniz..."
               />
             </div>
           </div>
 
-          {/* Sağ Kolon */}
           <div className="space-y-4">
-            {/* Vardiya */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Vardiya
@@ -409,9 +411,9 @@ export default function IsEmriGirisi() {
               <select
                 value={vardiya}
                 onChange={(e) => setVardiya(e.target.value)}
-                className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="">Seçiniz...</option>
+                <option value="">Seciniz...</option>
                 {vardiyalar.map((v) => (
                   <option key={v.id} value={`${v.ad} (${v.saat})`}>
                     {v.ad} ({v.saat})
@@ -420,7 +422,6 @@ export default function IsEmriGirisi() {
               </select>
             </div>
 
-            {/* Tarih */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Tarih
@@ -429,35 +430,33 @@ export default function IsEmriGirisi() {
                 type="date"
                 value={tarih}
                 onChange={(e) => setTarih(e.target.value)}
-                className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
-            {/* Bitiş Saati */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Bitiş Saati
+                Bitis Saati
               </label>
               <input
                 type="time"
                 value={bitisSaati}
                 onChange={(e) => setBitisSaati(e.target.value)}
-                className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
-            {/* Personel Seç */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Personel Seç
+                Personel Sec
               </label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   value={selectedPersonel}
                   onChange={(e) => setSelectedPersonel(e.target.value)}
-                  className="flex-1 px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
-                  <option value="">Seçiniz...</option>
+                  <option value="">Seciniz...</option>
                   {personelListesi.map((p) => (
                     <option key={p.sicilNo} value={p.sicilNo}>
                       {p.adSoyad} ({p.sicilNo}) - {p.bolum}
@@ -474,12 +473,11 @@ export default function IsEmriGirisi() {
               </div>
             </div>
 
-            {/* Personel Listesi */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 PERSONEL
               </label>
-              <div className="bg-yellow-50 border border-gray-300 rounded-md min-h-[180px] max-h-[180px] overflow-y-auto">
+              <div className="bg-white border border-gray-300 rounded-md min-h-[180px] max-h-[180px] overflow-y-auto">
                 {eklenenPersoneller.length === 0 ? (
                   <div className="flex items-center justify-center h-[180px] text-gray-400 text-sm">
                     Personel eklenmedi
@@ -487,7 +485,7 @@ export default function IsEmriGirisi() {
                 ) : (
                   <div className="divide-y divide-gray-200">
                     {eklenenPersoneller.map((p) => (
-                      <div key={p.sicilNo} className="flex items-center justify-between px-3 py-2 hover:bg-yellow-100">
+                      <div key={p.sicilNo} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
                         <span className="text-sm">
                           {p.adSoyad} ({p.sicilNo})
                         </span>
@@ -507,21 +505,19 @@ export default function IsEmriGirisi() {
           </div>
         </div>
 
-        {/* Kullanılan Malzeme - Tam Genişlik */}
         <div className="mt-6">
           <label className="block text-sm font-semibold text-gray-700 mb-1">
-            Kullanılan Malzeme
+            Kullanilan Malzeme
           </label>
           <textarea
             value={malzeme}
             onChange={(e) => setMalzeme(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 bg-yellow-50 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-            placeholder="Kullanılan malzemeleri yazınız..."
+            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            placeholder="Kullanilan malzemeleri yaziniz..."
           />
         </div>
 
-        {/* Butonlar */}
         <div className="flex justify-center gap-6 mt-8">
           <button
             type="button"
@@ -529,15 +525,16 @@ export default function IsEmriGirisi() {
             className="flex items-center gap-2 px-8 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-md transition-colors"
           >
             <RefreshCw className="w-5 h-5" />
-            TEMİZLE
+            TEMIZLE
           </button>
           <button
             type="button"
-            onClick={handleKaydet}
-            className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md transition-colors"
+            onClick={() => void handleKaydet()}
+            disabled={isSaving || isBootstrapping}
+            className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-md transition-colors"
           >
             <Save className="w-5 h-5" />
-            KAYDET
+            {isSaving ? 'KAYDEDILIYOR...' : 'KAYDET'}
           </button>
         </div>
       </div>

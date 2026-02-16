@@ -117,8 +117,8 @@ const DcMotorBakim: React.FC = () => {
             <ClipboardList className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">DC Motor Bakım Modülü</h1>
-            <p className="text-sm text-gray-600">DC motor bakım raporları ve kontrol formları.</p>
+            <h1 className="text-2xl font-bold text-gray-900">Dc Motor Bakım İş Girişi</h1>
+            <p className="text-sm text-gray-600">Dc motor bakım raporları ve kontrol formları.</p>
           </div>
         </div>
         {currentView !== 'selector' && (
