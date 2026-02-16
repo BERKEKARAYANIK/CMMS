@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int      @id @default(autoincrement())
+  sicilNo         String   @unique @map("sicil_no")
+  ad              String
+  soyad           String
+  adSoyad         String?  @map("ad_soyad")
+  email           String?  @unique
+  password        String?
+  telefon         String?
+  departman       String
+  unvan           String?
+  uzmanlikAlani   String?
+  role            String   @default("TEKNISYEN")
+  aktif           Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  isEmriPersoneller  IsEmriPersonel[]
+  talepEdilenIsEmirleri IsEmri[] @relation("WorkOrderRequestedBy")
+  atananIsEmirleri      IsEmri[] @relation("WorkOrderAssignedTo")
+  vardiyaPlanlamalari   VardiyaPlanlama[]
+  isEmriLoglari         IsEmriLog[]
+
+  @@map("users")
+}
+
+model Vardiya {
+  id             Int      @id @default(autoincrement())
+  vardiyaAdi     String   @unique @map("vardiya_adi")
+  baslangicSaati String   @map("baslangic_saati")
+  bitisSaati     String   @map("bitis_saati")
+  renk           String?  @default("#3B82F6")
+  sira           Int      @default(1)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  isEmirleri        IsEmri[]
+  vardiyaPlanlamalari VardiyaPlanlama[]
+
+  @@map("vardiyalar")
+}
+
+model MudahaleTuru {
+  id        Int      @id @default(autoincrement())
+  ad        String   @unique
+  sira      Int      @default(1)
+  aktif     Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  isEmirleri IsEmri[]
+
+  @@map("mudahale_turleri")
+}
+
+model Makina {
+  id                 Int      @id @default(autoincrement())
+  ekipmanAdi         String   @unique
+  ekipmanKodu        String   @unique
+  kategori           String?
+  altKategori        String?
+  marka              String?
+  model              String?
+  seriNo             String?
+  lokasyon           String?
+  kritiklikSeviyesi  String   @default("B")
+  durum              String   @default("AKTIF")
+  kurulumTarihi       DateTime?
+  garantiBitisTarihi  DateTime?
+  teknikOzellikler   String?
+  notlar             String?
+  sira               Int      @default(1)
+  aktif              Boolean  @default(true)
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  isEmirleri        IsEmri[]
+  periyodikBakimlar PeriyodikBakim[]
+
+  @@map("makinalar")
+}
+
+model IsEmri {
+  id                   Int      @id @default(autoincrement())
+  isEmriNo             String   @unique @map("is_emri_no")
+  baslik               String?
+  aciklama             String?
+  equipmentId          Int?
+  oncelik              String   @default("NORMAL")
+  talepEdenId          Int?
+  atananId             Int?
+  shiftId              Int?
+  planlananBaslangic   DateTime?
+  planlananBitis       DateTime?
+  tahminiSure          Int?
+  gercekBaslangic      DateTime?
+  gercekBitis          DateTime?
+  gerceklesenSure      Int?
+  tamamlanmaNotlari    String?
+  maliyetIscilik       Float?
+  maliyetMalzeme       Float?
+  durum                String   @default("BEKLEMEDE")
+  tarih                DateTime?
+  baslangicSaati        String?
+  bitisSaati            String?
+  mudahaleSuresi        Int?
+  mudahaleTuruId         Int?
+  kullanilanMalzeme     String?
+  onaylayanId           Int?
+  onayTarihi            DateTime?
+  preventiveMaintenanceId Int?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  equipment          Makina? @relation(fields: [equipmentId], references: [id])
+  shift              Vardiya? @relation(fields: [shiftId], references: [id])
+  talepEden          User? @relation("WorkOrderRequestedBy", fields: [talepEdenId], references: [id])
+  atanan             User? @relation("WorkOrderAssignedTo", fields: [atananId], references: [id])
+  mudahaleTuru       MudahaleTuru? @relation(fields: [mudahaleTuruId], references: [id])
+  personeller        IsEmriPersonel[]
+  loglar             IsEmriLog[]
+  preventiveMaintenance PeriyodikBakim? @relation(fields: [preventiveMaintenanceId], references: [id])
+
+  @@map("is_emirleri")
+}
+
+model IsEmriPersonel {
+  id        Int      @id @default(autoincrement())
+  isEmriId  Int      @map("is_emri_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  isEmri    IsEmri   @relation(fields: [isEmriId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([isEmriId, userId])
+  @@map("is_emri_personel")
+}
+
+model IsEmriLog {
+  id          Int      @id @default(autoincrement())
+  workOrderId Int      @map("work_order_id")
+  userId      Int      @map("user_id")
+  islem       String
+  eskiDurum   String?
+  yeniDurum   String?
+  aciklama    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  workOrder IsEmri @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  user      User   @relation(fields: [userId], references: [id])
+
+  @@map("is_emri_loglar")
+}
+
+model VardiyaPlanlama {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  shiftId   Int
+  tarih     DateTime
+  durum     String   @default("AKTIF")
+  notlar    String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user  User    @relation(fields: [userId], references: [id])
+  shift Vardiya @relation(fields: [shiftId], references: [id])
+
+  @@unique([userId, tarih])
+  @@map("vardiya_planlamalari")
+}
+
+model PeriyodikBakim {
+  id               Int      @id @default(autoincrement())
+  planAdi          String
+  equipmentId      Int
+  periyotTipi      String
+  periyotDegeri    Int      @default(1)
+  sonrakiTarih     DateTime
+  sonYapilanTarih  DateTime?
+  kontrolListesi   String?
+  talimatlar       String?
+  tahminiSure      Int?
+  sorumluDepartman String?
+  aktif            Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  equipment  Makina @relation(fields: [equipmentId], references: [id])
+  isEmirleri IsEmri[]
+
+  @@map("periyodik_bakimlar")
+}

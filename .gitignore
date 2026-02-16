@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Environment / secrets
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+
+# Build outputs / caches
+dist/
+**/dist/
+.vite/
+**/.vite/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Logs / runtime files
+*.log
+*.err
+*.out
+tmp_cookie.txt
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+.vscode/
