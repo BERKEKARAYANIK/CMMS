@@ -1,7 +1,7 @@
 # CMMS - Hizli Baslangic ve Devam Notlari
 
 Olusturma tarihi: 16.02.2026
-Son guncelleme commit'i: `ab3a137`
+Son guncelleme commit'i: `a6245a8`
 Repo: `https://github.com/BERKEKARAYANIK/CMMS`
 Ana klasor: `C:\Users\YAPAY_ZEKA\Desktop\CMMS FULL\cmms`
 
@@ -13,6 +13,19 @@ Bu turda eklenen ek guncelleme:
 - Tamamlanan Isler ekraninda Berke Karayanik icin satir bazli duzenleme (edit) aktif edildi.
 - Tamamlanan is kaydi guncelleme endpoint'i eklendi: `PUT /api/job-entries/completed/:recordId`
 - 45 dk ustu kayitlar icin "Is Emrine Aktar" akisi Berke yetkisi ile aktif tutuldu.
+- Personel bolum siniflandirmasi yeni yapiya alindi:
+  - `ELEKTRIK BAKIM ANA BINA`
+  - `ELEKTRIK BAKIM EK BINA`
+  - `MEKANIK BAKIM`
+  - `ISK ELEKTRIK BAKIM`
+  - `ISK MEKANIK BAKIM`
+  - `ISK YARDIMCI TESISLER`
+  - `YARDIMCI TESISLER`
+- `Ayarlar > Personel` ekraninda `BOLUM` + `BOLUM 2` tasarimi eklendi
+  (Excel gorunumu ile uyumlu veri girisi/import)
+- Tamamlanan Isler listelemesi bolum bazli yetkiye alindi:
+  - Normal kullanici: sadece kendi bolumu
+  - Berke: secmeli olarak tum bolumler veya tek bolum
 
 Yeni dosyalar:
 - `CMMS_ILK_KURULUM_VE_BASLAT.bat`
@@ -85,6 +98,25 @@ Uygulanan:
 Teknik dosyalar:
 - `client/src/pages/TamamlananIsler.tsx`
 - `client/src/services/api.ts`
+- `server/src/routes/jobEntries.ts`
+
+### 2.9 Personel Bolum/Bolum 2 Tasarimi ve Bolum Yetkisi
+Uygulanan:
+- Personel ekleme/import akisinda gorsele uygun alan yapisi:
+  - `SICIL NO`, `AD SOYAD`, `BOLUM`, `BOLUM 2`, `ROL`
+- `BOLUM + BOLUM 2` kombinasyonu otomatik olarak sistem bolum sinifina normalize edilir
+- Tamamlanan Isler endpoint'i bolum bazli filtre uygular:
+  - `GET /api/job-entries/completed`
+  - `GET /api/job-entries/completed?bolum=<BOLUM_ADI>` (Berke secimi)
+
+Teknik dosyalar:
+- `client/src/pages/Ayarlar.tsx`
+- `client/src/pages/Personnel.tsx`
+- `client/src/types/index.ts`
+- `client/src/pages/TamamlananIsler.tsx`
+- `client/src/services/api.ts`
+- `client/src/data/lists.ts`
+- `server/src/middleware/auth.ts`
 - `server/src/routes/jobEntries.ts`
 
 ### 2.4 Isimlendirme ve menu duzenleri
@@ -246,6 +278,9 @@ Remote:
 - `origin -> https://github.com/BERKEKARAYANIK/CMMS.git`
 
 Son commitler:
+- `a6245a8 feat: classify personnel by building and restrict completed view by department`
+- `10aa172 feat: sync pending ui and equipment/auth updates`
+- `e421d26 docs: update quick start latest commit hash`
 - `42955c0 feat: add one-click new PC bootstrap and service automation`
 - `569047b feat: add automated backups with completed jobs excel export`
 - `b6650a2 feat: centralize remaining module state and add https deploy stack`
