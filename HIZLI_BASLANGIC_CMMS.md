@@ -25,7 +25,7 @@ Bu turda eklenen ek guncelleme:
   (Excel gorunumu ile uyumlu veri girisi/import)
 - Tamamlanan Isler listelemesi bolum bazli yetkiye alindi:
   - Normal kullanici: sadece kendi bolumu
-  - Berke: secmeli olarak tum bolumler veya tek bolum
+  - Berke: tum bolumleri gorur; ekranda bolum + vardiya filtreleri ile bolum bolum / vardiya vardiya goruntuler
 
 Yeni dosyalar:
 - `CMMS_ILK_KURULUM_VE_BASLAT.bat`
@@ -107,7 +107,7 @@ Uygulanan:
 - `BOLUM + BOLUM 2` kombinasyonu otomatik olarak sistem bolum sinifina normalize edilir
 - Tamamlanan Isler endpoint'i bolum bazli filtre uygular:
   - `GET /api/job-entries/completed`
-  - `GET /api/job-entries/completed?bolum=<BOLUM_ADI>` (Berke secimi)
+  - `GET /api/job-entries/completed?bolum=<BOLUM_ADI>&vardiya=<VARDIYA>` (Berke secimi)
 
 Teknik dosyalar:
 - `client/src/pages/Ayarlar.tsx`

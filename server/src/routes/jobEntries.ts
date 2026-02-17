@@ -109,6 +109,13 @@ function normalizeText(value: unknown): string {
   return String(value || '').trim();
 }
 
+function normalizeShift(value: unknown): string {
+  return String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function normalizeDepartmentKey(value: unknown): string {
   return String(value || '')
     .toLocaleUpperCase('tr-TR')
@@ -140,9 +147,8 @@ function normalizeDepartment(value: unknown): string {
   return DEPARTMENT_ALIAS_MAP[key] || key;
 }
 
-function isAllDepartmentsSelection(value: unknown): boolean {
-  const normalized = normalizeDepartmentKey(value);
-  return normalized === 'ALL' || normalized === 'TUM BOLUMLER';
+function getAuthenticatedDepartment(req: AuthRequest): string {
+  return normalizeDepartment(req.user?.departman);
 }
 
 function normalizePlannedTaskType(value: unknown): PlannedTaskType {
@@ -446,19 +452,10 @@ router.delete('/planned/:recordId', authenticate, async (req: AuthRequest, res: 
 
 router.get('/completed', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const isBerke = isBerkeUser(req.user);
-    const requestedBolum = normalizeText(req.query?.bolum);
-    const requestedBolumNormalized = normalizeDepartment(requestedBolum);
-    const userBolumNormalized = normalizeDepartment(req.user?.departman);
-
-    const activeBolum = isBerke
-      ? (
-          requestedBolum
-            && !isAllDepartmentsSelection(requestedBolum)
-            ? requestedBolumNormalized
-            : ''
-        )
-      : userBolumNormalized;
+    const isBerke = canManageEntries(req.user);
+    const activeBolum = getAuthenticatedDepartment(req);
+    const requestedBolum = normalizeDepartment(req.query?.bolum);
+    const requestedVardiya = normalizeShift(req.query?.vardiya);
 
     if (!isBerke && !activeBolum) {
       return res.json({
@@ -478,15 +475,28 @@ router.get('/completed', authenticate, async (req: AuthRequest, res: Response) =
 
     const filteredCompleted = completed
       .map((job) => {
-        if (!activeBolum) return job;
+        let personeller = job.personeller;
+        if (isBerke) {
+          if (requestedBolum) {
+            personeller = personeller.filter(
+              (personel) => normalizeDepartment(personel.bolum) === requestedBolum
+            );
+          }
+        } else {
+          personeller = personeller.filter(
+            (personel) => normalizeDepartment(personel.bolum) === activeBolum
+          );
+        }
+
         return {
           ...job,
-          personeller: job.personeller.filter(
-            (personel) => normalizeDepartment(personel.bolum) === activeBolum
-          )
+          personeller
         };
       })
-      .filter((job) => job.personeller.length > 0);
+      .filter((job) => job.personeller.length > 0)
+      .filter((job) => (
+        !requestedVardiya || normalizeShift(job.vardiya).includes(requestedVardiya)
+      ));
 
     res.json({
       success: true,
@@ -503,6 +513,14 @@ router.get('/completed', authenticate, async (req: AuthRequest, res: Response) =
 
 router.post('/completed', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    const activeBolum = getAuthenticatedDepartment(req);
+    if (!activeBolum) {
+      return res.status(403).json({
+        success: false,
+        message: 'Kullanici bolumu tanimli degil'
+      });
+    }
+
     const tarih = parseDateKey(req.body?.tarih);
     const vardiya = normalizeText(req.body?.vardiya);
     const makina = normalizeText(req.body?.makina);
@@ -541,6 +559,16 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
       return res.status(400).json({
         success: false,
         message: 'En az bir personel seciniz'
+      });
+    }
+
+    const isBolumDisiPersonelVar = personeller.some(
+      (personel) => normalizeDepartment(personel.bolum) !== activeBolum
+    );
+    if (isBolumDisiPersonelVar) {
+      return res.status(403).json({
+        success: false,
+        message: 'Sadece kendi bolumunuzden personel secilebilir'
       });
     }
 

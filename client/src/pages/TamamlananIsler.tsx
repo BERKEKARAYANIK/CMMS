@@ -11,15 +11,6 @@ import { jobEntriesApi, usersApi, workOrdersApi } from '../services/api';
 import type { CompletedJob } from '../types/jobEntries';
 
 const MIN_DURUS_DAKIKASI = 45;
-const BERKE_BOLUM_SECENEKLERI = [
-  'ELEKTRIK BAKIM ANA BINA',
-  'ELEKTRIK BAKIM EK BINA',
-  'MEKANIK BAKIM',
-  'ISK ELEKTRIK BAKIM',
-  'ISK MEKANIK BAKIM',
-  'ISK YARDIMCI TESISLER',
-  'YARDIMCI TESISLER'
-] as const;
 
 function normalizeForAuth(value: string | undefined | null): string {
   return String(value || '')
@@ -101,14 +92,15 @@ type CompletedRow = {
 
 export default function TamamlananIsler() {
   const currentUser = useAuthStore((state) => state.user);
+  const isBerkeViewer = Boolean(currentUser && isBerkeUser(currentUser));
   const canManage = canManageCompletedJobs(currentUser);
-  const canAssignWorkOrders = Boolean(currentUser && isBerkeUser(currentUser));
+  const canAssignWorkOrders = isBerkeViewer;
   const [isLoading, setIsLoading] = useState(true);
   const [isler, setIsler] = useState<CompletedJob[]>([]);
   const [search, setSearch] = useState('');
   const [filterTarih, setFilterTarih] = useState('');
+  const [filterBolum, setFilterBolum] = useState('');
   const [filterVardiya, setFilterVardiya] = useState('');
-  const [berkeBolumFiltresi, setBerkeBolumFiltresi] = useState('TUM_BOLUMLER');
   const [isAnalizModalOpen, setIsAnalizModalOpen] = useState(false);
   const [selectedIsId, setSelectedIsId] = useState<string | null>(null);
   const [atananSicilNo, setAtananSicilNo] = useState('');
@@ -139,10 +131,7 @@ export default function TamamlananIsler() {
     const loadCompletedJobs = async () => {
       try {
         setIsLoading(true);
-        const params = canAssignWorkOrders && berkeBolumFiltresi !== 'TUM_BOLUMLER'
-          ? { bolum: berkeBolumFiltresi }
-          : undefined;
-        const response = await jobEntriesApi.getCompleted(params);
+        const response = await jobEntriesApi.getCompleted();
         const data = response.data?.data as CompletedJob[] | undefined;
         setIsler(Array.isArray(data) ? data : []);
       } catch {
@@ -153,7 +142,7 @@ export default function TamamlananIsler() {
     };
 
     void loadCompletedJobs();
-  }, [berkeBolumFiltresi, canAssignWorkOrders, currentUser?.id]);
+  }, [currentUser?.id]);
 
   const selectedIs = selectedIsId
     ? isler.find((is) => is.id === selectedIsId) || null
@@ -441,6 +430,14 @@ export default function TamamlananIsler() {
     })
   ), [isler]);
 
+  const bolumSecenekleri = useMemo(() => Array.from(
+    new Set(
+      satirlar
+        .map(({ personel }) => personel.bolum)
+        .filter((bolum) => bolum && bolum !== '-')
+    )
+  ).sort((a, b) => a.localeCompare(b, 'tr-TR')), [satirlar]);
+
   const filteredSatirlar = useMemo(() => satirlar.filter(({ is, personel }) => {
     const searchText = normalizeForSearch(search);
     const matchSearch = !searchText
@@ -448,13 +445,15 @@ export default function TamamlananIsler() {
       || normalizeForSearch(is.makina).includes(searchText)
       || normalizeForSearch(is.aciklama).includes(searchText)
       || normalizeForSearch(personel.adSoyad).includes(searchText)
-      || normalizeForSearch(personel.sicilNo).includes(searchText);
+      || normalizeForSearch(personel.sicilNo).includes(searchText)
+      || normalizeForSearch(personel.bolum).includes(searchText);
 
     const matchTarih = !filterTarih || is.tarih === filterTarih;
+    const matchBolum = !isBerkeViewer || !filterBolum || personel.bolum === filterBolum;
     const matchVardiya = !filterVardiya || is.vardiya.includes(filterVardiya);
 
-    return matchSearch && matchTarih && matchVardiya;
-  }), [filterTarih, filterVardiya, satirlar, search]);
+    return matchSearch && matchTarih && matchBolum && matchVardiya;
+  }), [filterBolum, filterTarih, filterVardiya, isBerkeViewer, satirlar, search]);
 
   const filteredIsler = useMemo(() => Array.from(
     new Map(filteredSatirlar.map(({ is }) => [is.id, is])).values()
@@ -555,6 +554,18 @@ export default function TamamlananIsler() {
             className="input w-full md:w-44"
             placeholder="Tarih filtrele"
           />
+          {isBerkeViewer && (
+            <select
+              value={filterBolum}
+              onChange={(e) => setFilterBolum(e.target.value)}
+              className="input w-full md:w-64"
+            >
+              <option value="">Tum Bolumler</option>
+              {bolumSecenekleri.map((bolum) => (
+                <option key={bolum} value={bolum}>{bolum}</option>
+              ))}
+            </select>
+          )}
           <select
             value={filterVardiya}
             onChange={(e) => setFilterVardiya(e.target.value)}
@@ -565,18 +576,6 @@ export default function TamamlananIsler() {
             <option value="VARDIYA 2">Vardiya 2</option>
             <option value="VARDIYA 3">Vardiya 3</option>
           </select>
-          {canAssignWorkOrders && (
-            <select
-              value={berkeBolumFiltresi}
-              onChange={(e) => setBerkeBolumFiltresi(e.target.value)}
-              className="input w-full md:w-64"
-            >
-              <option value="TUM_BOLUMLER">Tum Bolumler</option>
-              {BERKE_BOLUM_SECENEKLERI.map((bolum) => (
-                <option key={bolum} value={bolum}>{bolum}</option>
-              ))}
-            </select>
-          )}
         </div>
       </div>
 

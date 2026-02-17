@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { Trash2, Save, RefreshCw } from 'lucide-react';
@@ -15,8 +15,37 @@ import {
 import { appStateApi, jobEntriesApi } from '../services/api';
 import type { CompletedJob, PlannedJob } from '../types/jobEntries';
 import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
+import { useAuthStore } from '../store/authStore';
 
 const PLANLANAN_TO_IS_EMRI_KEY = 'cmms_planlanan_is_to_is_emri';
+
+const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
+  'ELEKTRIK': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM ANA BINA': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA': 'ELEKTRIK BAKIM EK BINA',
+  'MEKANIK': 'MEKANIK BAKIM',
+  'MEKANIK BAKIM': 'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM': 'ISK ELEKTRIK BAKIM',
+  'ISK MEKANIK BAKIM': 'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'YARDIMCI ISLETMELER': 'YARDIMCI TESISLER',
+  'YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'YONETIM': 'YONETIM'
+};
+
+function normalizeDepartment(value: unknown): string {
+  const key = String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!key) return '';
+  return DEPARTMENT_ALIAS_MAP[key] || key;
+}
 
 type TimeInterval = {
   start: number;
@@ -47,6 +76,12 @@ function hasTimeOverlap(a: TimeInterval, b: TimeInterval): boolean {
 }
 
 export default function IsEmriGirisi() {
+  const currentUser = useAuthStore((state) => state.user);
+  const currentUserBolum = useMemo(
+    () => normalizeDepartment(currentUser?.departman),
+    [currentUser?.departman]
+  );
+
   const [vardiyalar, setVardiyalar] = useState<Vardiya[]>(defaultVardiyalar);
   const [mudahaleTurleri, setMudahaleTurleri] = useState<MudahaleTuru[]>(defaultMudahaleTurleri);
   const [personelListesi, setPersonelListesi] = useState<Personel[]>(defaultPersonelListesi);
@@ -109,16 +144,20 @@ export default function IsEmriGirisi() {
         const plannedJobs = plannedResponse.data?.data as PlannedJob[] | undefined;
         const plannedList = Array.isArray(plannedJobs) ? plannedJobs : [];
         const normalizedLists = normalizeSettingsLists(listsResponse.data?.data?.value);
+        const scopedPersonelListesi = normalizedLists.personelListesi.filter(
+          (personel) => normalizeDepartment(personel.bolum) === currentUserBolum
+        );
+
         setVardiyalar(normalizedLists.vardiyalar);
         setMudahaleTurleri(normalizedLists.mudahaleTurleri);
-        setPersonelListesi(normalizedLists.personelListesi);
+        setPersonelListesi(scopedPersonelListesi);
         setMakinaListesi(normalizedLists.makinaListesi);
 
         const transferRaw = sessionStorage.getItem(PLANLANAN_TO_IS_EMRI_KEY);
         if (transferRaw) {
           try {
             const selected = JSON.parse(transferRaw) as PlannedJob;
-            applyPlanlananToForm(selected, normalizedLists.personelListesi);
+            applyPlanlananToForm(selected, scopedPersonelListesi);
           } catch {
             // ignore invalid transfer payload
           } finally {
@@ -129,7 +168,7 @@ export default function IsEmriGirisi() {
 
         const firstPlanned = plannedList.find((item) => item.gorevTipi !== 'DURUS_RAPOR_ANALIZ');
         if (firstPlanned) {
-          applyPlanlananToForm(firstPlanned, normalizedLists.personelListesi);
+          applyPlanlananToForm(firstPlanned, scopedPersonelListesi);
         }
       } catch {
         toast.error('Baslangic verileri yuklenemedi');
@@ -139,7 +178,7 @@ export default function IsEmriGirisi() {
     };
 
     void bootstrap();
-  }, []);
+  }, [currentUserBolum]);
 
   useEffect(() => {
     if (baslangicSaati && bitisSaati) {
@@ -159,6 +198,11 @@ export default function IsEmriGirisi() {
   }, [baslangicSaati, bitisSaati]);
 
   const handlePersonelEkle = () => {
+    if (!currentUserBolum) {
+      toast.error('Kullanici bolumu tanimli degil');
+      return;
+    }
+
     if (!selectedPersonel) {
       toast.error('Lutfen personel seciniz');
       return;
@@ -166,6 +210,11 @@ export default function IsEmriGirisi() {
 
     const personel = personelListesi.find((p) => p.sicilNo === selectedPersonel);
     if (!personel) return;
+
+    if (normalizeDepartment(personel.bolum) !== currentUserBolum) {
+      toast.error('Sadece kendi bolumunuzden personel secilebilir');
+      return;
+    }
 
     if (eklenenPersoneller.some((p) => p.sicilNo === personel.sicilNo)) {
       toast.error('Bu personel zaten eklenmis');
@@ -197,6 +246,11 @@ export default function IsEmriGirisi() {
   };
 
   const handleKaydet = async () => {
+    if (!currentUserBolum) {
+      toast.error('Kullanici bolumu tanimli degil');
+      return;
+    }
+
     if (!makina) {
       toast.error('Makine / Hat seciniz');
       return;
@@ -223,6 +277,14 @@ export default function IsEmriGirisi() {
     }
     if (eklenenPersoneller.length === 0) {
       toast.error('En az bir personel ekleyiniz');
+      return;
+    }
+
+    const isBolumDisiPersonelVar = eklenenPersoneller.some(
+      (personel) => normalizeDepartment(personel.bolum) !== currentUserBolum
+    );
+    if (isBolumDisiPersonelVar) {
+      toast.error('Sadece kendi bolumunuzden personel ekleyebilirsiniz');
       return;
     }
     if (!aciklama.trim()) {
@@ -434,6 +496,9 @@ export default function IsEmriGirisi() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Personel Sec
               </label>
+              <p className="mb-2 text-xs text-gray-500">
+                Aktif bolum: {currentUserBolum || 'Tanimsiz'}
+              </p>
               <div className="flex flex-col sm:flex-row items-stretch gap-2">
                 <select
                   value={selectedPersonel}
