@@ -1,5 +1,17 @@
 export type Role = 'ADMIN' | 'BAKIM_MUDURU' | 'BAKIM_SEFI' | 'TEKNISYEN' | 'OPERATOR';
-export type Departman = 'MEKANIK' | 'ELEKTRIK' | 'YARDIMCI_ISLETMELER' | 'URETIM' | 'YONETIM';
+export type Departman =
+  | 'MEKANIK'
+  | 'ELEKTRIK'
+  | 'YARDIMCI_ISLETMELER'
+  | 'URETIM'
+  | 'YONETIM'
+  | 'ELEKTRIK BAKIM ANA BINA'
+  | 'ELEKTRIK BAKIM EK BINA'
+  | 'MEKANIK BAKIM'
+  | 'ISK ELEKTRIK BAKIM'
+  | 'ISK MEKANIK BAKIM'
+  | 'ISK YARDIMCI TESISLER'
+  | 'YARDIMCI TESISLER';
 export type IsEmriDurum = 'BEKLEMEDE' | 'ATANDI' | 'DEVAM_EDIYOR' | 'ONAY_BEKLIYOR' | 'TAMAMLANDI' | 'IPTAL';
 export type Oncelik = 'ACIL' | 'YUKSEK' | 'NORMAL' | 'DUSUK';
 export type KritiklikSeviyesi = 'A' | 'B' | 'C';
@@ -210,7 +222,14 @@ export const DepartmanLabels: Record<Departman, string> = {
   ELEKTRIK: 'Elektrik',
   YARDIMCI_ISLETMELER: 'Yardimci Isletmeler',
   URETIM: 'Uretim',
-  YONETIM: 'Yonetim'
+  YONETIM: 'Yonetim',
+  'ELEKTRIK BAKIM ANA BINA': 'Elektrik Bakim Ana Bina',
+  'ELEKTRIK BAKIM EK BINA': 'Elektrik Bakim Ek Bina',
+  'MEKANIK BAKIM': 'Mekanik Bakim',
+  'ISK ELEKTRIK BAKIM': 'ISK Elektrik Bakim',
+  'ISK MEKANIK BAKIM': 'ISK Mekanik Bakim',
+  'ISK YARDIMCI TESISLER': 'ISK Yardimci Tesisler',
+  'YARDIMCI TESISLER': 'Yardimci Tesisler'
 };
 
 export const RoleLabels: Record<Role, string> = {

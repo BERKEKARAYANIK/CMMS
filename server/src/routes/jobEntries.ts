@@ -109,6 +109,42 @@ function normalizeText(value: unknown): string {
   return String(value || '').trim();
 }
 
+function normalizeDepartmentKey(value: unknown): string {
+  return String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
+  'ELEKTRIK': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM ANA BINA': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA': 'ELEKTRIK BAKIM EK BINA',
+  'MEKANIK': 'MEKANIK BAKIM',
+  'MEKANIK BAKIM': 'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM': 'ISK ELEKTRIK BAKIM',
+  'ISK MEKANIK BAKIM': 'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'YARDIMCI ISLETMELER': 'YARDIMCI TESISLER',
+  'YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'YONETIM': 'YONETIM'
+};
+
+function normalizeDepartment(value: unknown): string {
+  const key = normalizeDepartmentKey(value);
+  if (!key) return '';
+  return DEPARTMENT_ALIAS_MAP[key] || key;
+}
+
+function isAllDepartmentsSelection(value: unknown): boolean {
+  const normalized = normalizeDepartmentKey(value);
+  return normalized === 'ALL' || normalized === 'TUM BOLUMLER';
+}
+
 function normalizePlannedTaskType(value: unknown): PlannedTaskType {
   return value === 'DURUS_RAPOR_ANALIZ' ? 'DURUS_RAPOR_ANALIZ' : 'PLANLI_BAKIM';
 }
@@ -410,6 +446,27 @@ router.delete('/planned/:recordId', authenticate, async (req: AuthRequest, res: 
 
 router.get('/completed', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    const isBerke = isBerkeUser(req.user);
+    const requestedBolum = normalizeText(req.query?.bolum);
+    const requestedBolumNormalized = normalizeDepartment(requestedBolum);
+    const userBolumNormalized = normalizeDepartment(req.user?.departman);
+
+    const activeBolum = isBerke
+      ? (
+          requestedBolum
+            && !isAllDepartmentsSelection(requestedBolum)
+            ? requestedBolumNormalized
+            : ''
+        )
+      : userBolumNormalized;
+
+    if (!isBerke && !activeBolum) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
     const completed = await prisma.tamamlananIs.findMany({
       include: {
         personeller: {
@@ -419,9 +476,21 @@ router.get('/completed', authenticate, async (req: AuthRequest, res: Response) =
       orderBy: { createdAt: 'desc' }
     });
 
+    const filteredCompleted = completed
+      .map((job) => {
+        if (!activeBolum) return job;
+        return {
+          ...job,
+          personeller: job.personeller.filter(
+            (personel) => normalizeDepartment(personel.bolum) === activeBolum
+          )
+        };
+      })
+      .filter((job) => job.personeller.length > 0);
+
     res.json({
       success: true,
-      data: completed.map(mapCompletedJob)
+      data: filteredCompleted.map(mapCompletedJob)
     });
   } catch (error) {
     console.error('Get completed jobs error:', error);
@@ -455,7 +524,7 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
     rawPersoneller.forEach((personel) => {
       const sicilNo = normalizeText(personel.sicilNo);
       const adSoyad = normalizeText(personel.adSoyad);
-      const bolum = normalizeText(personel.bolum);
+      const bolum = normalizeDepartment(personel.bolum);
       if (!sicilNo || !adSoyad || !bolum) return;
       personelMap.set(sicilNo, { sicilNo, adSoyad, bolum });
     });
@@ -502,7 +571,7 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
         analizBackendWorkOrderNo: normalizeText(analizAtamasi?.backendWorkOrderNo) || null,
         analizAtananSicilNo: normalizeText(analizAtamasi?.atananSicilNo) || null,
         analizAtananAdSoyad: normalizeText(analizAtamasi?.atananAdSoyad) || null,
-        analizAtananBolum: normalizeText(analizAtamasi?.atananBolum) || null,
+        analizAtananBolum: normalizeDepartment(analizAtamasi?.atananBolum) || null,
         analizAtamaTarihi: parseOptionalDate(analizAtamasi?.atamaTarihi) ?? null,
         personeller: {
           create: personeller.map((personel) => ({
@@ -670,7 +739,7 @@ router.patch('/completed/:recordId/analysis-assignment', authenticate, async (re
     const backendWorkOrderNo = normalizeText(analizAtamasi.backendWorkOrderNo);
     const atananSicilNo = normalizeText(analizAtamasi.atananSicilNo);
     const atananAdSoyad = normalizeText(analizAtamasi.atananAdSoyad);
-    const atananBolum = normalizeText(analizAtamasi.atananBolum);
+    const atananBolum = normalizeDepartment(analizAtamasi.atananBolum);
     const planlananIsId = parseOptionalInt(analizAtamasi.planlananIsId);
     const atamaTarihi = parseOptionalDate(analizAtamasi.atamaTarihi) ?? new Date();
 

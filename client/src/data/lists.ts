@@ -43,9 +43,13 @@ export const mudahaleTurleri: MudahaleTuru[] = [
 
 // Bölümler
 export const bolumler = [
-  'ELEKTRİK BAKIM',
-  'MEKANİK BAKIM',
-  'YARDIMCI TESİSLER'
+  'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA',
+  'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM',
+  'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER',
+  'YARDIMCI TESISLER'
 ];
 
 // Personel Listesi (listeler.jpg'den)

@@ -10,6 +10,7 @@ export interface AuthRequest extends Request {
     id: number;
     sicilNo: string;
     email: string | null;
+    departman: string;
     role: AppRole;
     ad: string;
     soyad: string;
@@ -125,6 +126,7 @@ export async function authenticate(
         id: true,
         sicilNo: true,
         email: true,
+        departman: true,
         role: true,
         ad: true,
         soyad: true,

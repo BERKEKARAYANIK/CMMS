@@ -128,7 +128,7 @@ export const jobEntriesApi = {
     api.put(`/job-entries/planned/${encodeURIComponent(recordId)}`, data),
   deletePlanned: (recordId: string) =>
     api.delete(`/job-entries/planned/${encodeURIComponent(recordId)}`),
-  getCompleted: () => api.get('/job-entries/completed'),
+  getCompleted: (params?: QueryParams) => api.get('/job-entries/completed', { params }),
   createCompleted: <T extends object>(data: T) => api.post('/job-entries/completed', data),
   updateCompleted: <T extends object>(recordId: string, data: T) =>
     api.put(`/job-entries/completed/${encodeURIComponent(recordId)}`, data),

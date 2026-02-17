@@ -12,7 +12,6 @@ import type {
   BackupStatus
 } from '../types/backups';
 import {
-  bolumler,
   type Vardiya,
   type MudahaleTuru,
   type Personel,
@@ -54,6 +53,93 @@ function normalizeHeader(value: string): string {
     .map((char) => turkishCharMap[char] ?? char)
     .join('');
   return mapped.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const PERSONNEL_BASE_DEPARTMENTS = [
+  'ELEKTRIK BAKIM',
+  'MEKANIK BAKIM',
+  'YARDIMCI TESISLER',
+  'YONETIM'
+] as const;
+
+const PERSONNEL_SUB_DEPARTMENTS = [
+  '',
+  'ANA BINA',
+  'EK BINA',
+  'ISK'
+] as const;
+
+function normalizeDepartmentToken(value: string): string {
+  return String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizePersonnelDepartment(bolumValue: string, bolum2Value: string): string {
+  const bolum = normalizeDepartmentToken(bolumValue);
+  const bolum2 = normalizeDepartmentToken(bolum2Value);
+
+  if (!bolum && !bolum2) return '';
+
+  const directValues = new Set([
+    'ELEKTRIK BAKIM ANA BINA',
+    'ELEKTRIK BAKIM EK BINA',
+    'MEKANIK BAKIM',
+    'ISK ELEKTRIK BAKIM',
+    'ISK MEKANIK BAKIM',
+    'ISK YARDIMCI TESISLER',
+    'YARDIMCI TESISLER',
+    'YONETIM'
+  ]);
+  if (directValues.has(bolum)) return bolum;
+
+  const hasIsk = bolum.startsWith('ISK ') || bolum2 === 'ISK';
+
+  if (bolum.includes('ELEKTRIK')) {
+    if (hasIsk) return 'ISK ELEKTRIK BAKIM';
+    if (bolum.includes('EK BINA') || bolum2 === 'EK BINA') return 'ELEKTRIK BAKIM EK BINA';
+    return 'ELEKTRIK BAKIM ANA BINA';
+  }
+
+  if (bolum.includes('MEKANIK')) {
+    return hasIsk ? 'ISK MEKANIK BAKIM' : 'MEKANIK BAKIM';
+  }
+
+  if (bolum.includes('YARDIMCI')) {
+    return hasIsk ? 'ISK YARDIMCI TESISLER' : 'YARDIMCI TESISLER';
+  }
+
+  if (bolum === 'YONETIM') return 'YONETIM';
+
+  return bolum;
+}
+
+function splitPersonnelDepartment(fullDepartment: string): { bolum: string; bolum2: string } {
+  const normalized = normalizePersonnelDepartment(fullDepartment, '');
+  switch (normalized) {
+    case 'ELEKTRIK BAKIM ANA BINA':
+      return { bolum: 'ELEKTRIK BAKIM', bolum2: 'ANA BINA' };
+    case 'ELEKTRIK BAKIM EK BINA':
+      return { bolum: 'ELEKTRIK BAKIM', bolum2: 'EK BINA' };
+    case 'ISK ELEKTRIK BAKIM':
+      return { bolum: 'ELEKTRIK BAKIM', bolum2: 'ISK' };
+    case 'ISK MEKANIK BAKIM':
+      return { bolum: 'MEKANIK BAKIM', bolum2: 'ISK' };
+    case 'ISK YARDIMCI TESISLER':
+      return { bolum: 'YARDIMCI TESISLER', bolum2: 'ISK' };
+    case 'MEKANIK BAKIM':
+      return { bolum: 'MEKANIK BAKIM', bolum2: '' };
+    case 'YARDIMCI TESISLER':
+      return { bolum: 'YARDIMCI TESISLER', bolum2: '' };
+    case 'YONETIM':
+      return { bolum: 'YONETIM', bolum2: '' };
+    default:
+      return { bolum: normalized || fullDepartment, bolum2: '' };
+  }
 }
 
 function parseDelimitedText(text: string): string[][] {
@@ -108,6 +194,8 @@ const TEMPLATE_HEADERS = [
   'Ad',
   'Soyad',
   'Bolum',
+  'Bolum 2',
+  'Rol',
   'Ad Soyad (Birlesik)',
   'Makina Adi (Liste)'
 ];
@@ -147,15 +235,17 @@ function buildTemplateRows(
 
     const personel = personelListesi[i];
     if (personel) {
+      const bolumParcalari = splitPersonnelDepartment(personel.bolum);
       row[2] = personel.sicilNo;
       row[3] = personel.ad;
       row[4] = personel.soyad;
-      row[5] = personel.bolum;
-      row[6] = personel.adSoyad || `${personel.ad} ${personel.soyad}`.trim();
+      row[5] = bolumParcalari.bolum;
+      row[6] = bolumParcalari.bolum2;
+      row[8] = personel.adSoyad || `${personel.ad} ${personel.soyad}`.trim();
     }
 
     const makina = makinaListesi[i];
-    if (makina) row[7] = makina.ad;
+    if (makina) row[9] = makina.ad;
 
     rows.push(row);
   }
@@ -185,6 +275,8 @@ function parseTemplateRows(rows: string[][]): ParsedTemplate {
     ad: indexFor(['ad', 'adi', 'isim']),
     soyad: indexFor(['soyad', 'soyadi']),
     bolum: indexFor(['bolum', 'departman']),
+    bolum2: indexFor(['bolum2', 'ikincibolum', 'altbolum', 'subolum']),
+    rol: indexFor(['rol', 'gorev', 'unvan']),
     adSoyad: indexFor(['adsoyad', 'adsoyadbirlesik']),
     makina: indexFor(['makina', 'makinaadi', 'makinaadiliste'])
   };
@@ -219,7 +311,8 @@ function parseTemplateRows(rows: string[][]): ParsedTemplate {
     }
 
     const sicilNo = getValue(row, indexes.sicilNo);
-    const bolum = getValue(row, indexes.bolum);
+    const bolumAna = getValue(row, indexes.bolum);
+    const bolum2 = getValue(row, indexes.bolum2);
     let ad = getValue(row, indexes.ad);
     let soyad = getValue(row, indexes.soyad);
     const adSoyad = getValue(row, indexes.adSoyad);
@@ -230,7 +323,9 @@ function parseTemplateRows(rows: string[][]): ParsedTemplate {
       if (!soyad) soyad = parts.join(' ');
     }
 
-    if (sicilNo || ad || soyad || bolum || adSoyad) {
+    const bolum = normalizePersonnelDepartment(bolumAna, bolum2);
+
+    if (sicilNo || ad || soyad || bolumAna || bolum2 || adSoyad || getValue(row, indexes.rol)) {
       if (!sicilNo || !ad || !soyad || !bolum) {
         result.skipped += 1;
       } else {
@@ -1409,8 +1504,26 @@ function MudahaleTurleriTab({ data, setData }: { data: MudahaleTuru[]; setData: 
 // Personel Tab
 function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Personel[]) => void }) {
   const [editSicil, setEditSicil] = useState<string | null>(null);
-  const [form, setForm] = useState({ sicilNo: '', ad: '', soyad: '', bolum: '', adSoyad: '' });
+  const [form, setForm] = useState({
+    sicilNo: '',
+    ad: '',
+    soyad: '',
+    bolum: '',
+    bolum2: '',
+    adSoyad: ''
+  });
   const [search, setSearch] = useState('');
+
+  const resetForm = () => {
+    setForm({
+      sicilNo: '',
+      ad: '',
+      soyad: '',
+      bolum: '',
+      bolum2: '',
+      adSoyad: ''
+    });
+  };
 
   const parseBulkRows = (rows: string[][]): BulkParseResult<Personel> => {
     const headerMap = {
@@ -1424,9 +1537,14 @@ function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Pers
       soyadi: 'soyad',
       adsoyad: 'adSoyad',
       bolum: 'bolum',
-      departman: 'bolum'
+      departman: 'bolum',
+      bolum2: 'bolum2',
+      altbolum: 'bolum2',
+      subolum: 'bolum2',
+      rol: 'rol'
     };
-    const objects = rowsToObjects(rows, headerMap, ['sicilNo', 'ad', 'soyad', 'bolum']);
+
+    const objects = rowsToObjects(rows, headerMap, ['sicilNo', 'adSoyad', 'bolum', 'bolum2', 'rol']);
     let skipped = 0;
 
     const items = objects.flatMap((row) => {
@@ -1439,7 +1557,11 @@ function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Pers
       }
 
       const sicilNo = row.sicilNo?.trim();
-      const bolum = row.bolum?.trim();
+      const bolum = normalizePersonnelDepartment(
+        row.bolum?.trim() || '',
+        row.bolum2?.trim() || ''
+      );
+
       if (!sicilNo || !ad || !soyad || !bolum) {
         skipped += 1;
         return [];
@@ -1450,7 +1572,7 @@ function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Pers
         ad,
         soyad,
         bolum,
-        adSoyad: `${ad} ${soyad}`
+        adSoyad: `${ad} ${soyad}`.trim()
       }];
     });
 
@@ -1463,62 +1585,92 @@ function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Pers
     const duplicates = items.length - unique.length;
 
     if (unique.length === 0) {
-      toast.error('Yeni kayıt bulunamadı');
+      toast.error('Yeni kayit bulunamadi');
       return;
     }
 
     setData([...data, ...unique]);
     const skippedTotal = skipped + duplicates;
-    toast.success(`${unique.length} kayıt eklendi${skippedTotal ? `, ${skippedTotal} satır atland?` : ''}`);
+    toast.success(`${unique.length} kayit eklendi${skippedTotal ? `, ${skippedTotal} satir atlandi` : ''}`);
   };
 
   const handleAdd = () => {
-    if (!form.sicilNo || !form.ad || !form.soyad || !form.bolum) {
-      toast.error('Tüm alanları doldurun');
+    const bolum = normalizePersonnelDepartment(form.bolum, form.bolum2);
+    if (!form.sicilNo || !form.ad || !form.soyad || !bolum) {
+      toast.error('Tum alanlari doldurun');
       return;
     }
-    if (data.some(p => p.sicilNo === form.sicilNo)) {
-      toast.error('Bu sicil numarası zaten mevcut');
+    if (data.some((p) => p.sicilNo === form.sicilNo)) {
+      toast.error('Bu sicil numarasi zaten mevcut');
       return;
     }
+
     const newPersonel: Personel = {
-      ...form,
-      adSoyad: `${form.ad} ${form.soyad}`
+      sicilNo: form.sicilNo,
+      ad: form.ad,
+      soyad: form.soyad,
+      bolum,
+      adSoyad: `${form.ad} ${form.soyad}`.trim()
     };
+
     setData([...data, newPersonel]);
-    setForm({ sicilNo: '', ad: '', soyad: '', bolum: '', adSoyad: '' });
+    resetForm();
     toast.success('Personel eklendi');
   };
 
   const handleEdit = (item: Personel) => {
+    const bolumParcalari = splitPersonnelDepartment(item.bolum);
     setEditSicil(item.sicilNo);
-    setForm({ ...item });
+    setForm({
+      sicilNo: item.sicilNo,
+      ad: item.ad,
+      soyad: item.soyad,
+      bolum: bolumParcalari.bolum,
+      bolum2: bolumParcalari.bolum2,
+      adSoyad: item.adSoyad
+    });
   };
 
   const handleSave = () => {
-    setData(data.map(p => p.sicilNo === editSicil ? { ...form, adSoyad: `${form.ad} ${form.soyad}` } : p));
+    const bolum = normalizePersonnelDepartment(form.bolum, form.bolum2);
+    if (!form.ad || !form.soyad || !bolum) {
+      toast.error('Tum alanlari doldurun');
+      return;
+    }
+
+    setData(data.map((p) => (
+      p.sicilNo === editSicil
+        ? {
+            sicilNo: form.sicilNo,
+            ad: form.ad,
+            soyad: form.soyad,
+            bolum,
+            adSoyad: `${form.ad} ${form.soyad}`.trim()
+          }
+        : p
+    )));
+
     setEditSicil(null);
-    setForm({ sicilNo: '', ad: '', soyad: '', bolum: '', adSoyad: '' });
-    toast.success('Personel güncellendi');
+    resetForm();
+    toast.success('Personel guncellendi');
   };
 
   const handleDelete = (sicilNo: string) => {
-    if (confirm('Silmek istediğinize emin misiniz?')) {
-      setData(data.filter(p => p.sicilNo !== sicilNo));
+    if (confirm('Silmek istediginize emin misiniz?')) {
+      setData(data.filter((p) => p.sicilNo !== sicilNo));
       toast.success('Personel silindi');
     }
   };
 
-  const filteredData = data.filter(p =>
-    p.adSoyad.toLowerCase().includes(search.toLowerCase()) ||
-    p.sicilNo.includes(search)
+  const filteredData = data.filter((p) =>
+    p.adSoyad.toLowerCase().includes(search.toLowerCase()) || p.sicilNo.includes(search)
   );
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-lg">Personel Listesi ({data.length} kişi)</h3>
+      <h3 className="font-semibold text-lg">Personel Listesi ({data.length} kisi)</h3>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2 p-4 bg-gray-50 rounded-lg">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-2 p-4 bg-gray-50 rounded-lg">
         <input
           type="text"
           placeholder="Sicil No"
@@ -1549,8 +1701,19 @@ function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Pers
           className="px-3 py-2 border rounded-md"
           disabled={!!editSicil}
         >
-          <option value="">Bölüm Seç</option>
-          {bolumler.map(b => (
+          <option value="">Bolum Sec</option>
+          {PERSONNEL_BASE_DEPARTMENTS.map((b) => (
+            <option key={b} value={b}>{b}</option>
+          ))}
+        </select>
+        <select
+          value={editSicil ? '' : form.bolum2}
+          onChange={(e) => setForm({ ...form, bolum2: e.target.value })}
+          className="px-3 py-2 border rounded-md"
+          disabled={!!editSicil}
+        >
+          <option value="">Bolum 2 (Opsiyonel)</option>
+          {PERSONNEL_SUB_DEPARTMENTS.filter((b) => b !== '').map((b) => (
             <option key={b} value={b}>{b}</option>
           ))}
         </select>
@@ -1573,7 +1736,7 @@ function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Pers
 
       <BulkImport
         title="Toplu Personel Ekle"
-        columnsHint="Sicil No, Ad, Soyad, Bölüm"
+        columnsHint="Sicil No, Ad Soyad, Bolum, Bolum 2, Rol"
         parseRows={parseBulkRows}
         onAdd={handleBulkAdd}
       />
@@ -1585,72 +1748,98 @@ function PersonelTab({ data, setData }: { data: Personel[]; setData: (data: Pers
               <th className="px-4 py-3 text-left">Sicil No</th>
               <th className="px-4 py-3 text-left">Ad</th>
               <th className="px-4 py-3 text-left">Soyad</th>
-              <th className="px-4 py-3 text-left">Bölüm</th>
-              <th className="px-4 py-3 text-center w-24">İşlem</th>
+              <th className="px-4 py-3 text-left">Bolum</th>
+              <th className="px-4 py-3 text-left">Bolum 2</th>
+              <th className="px-4 py-3 text-center w-24">Islem</th>
             </tr>
           </thead>
           <tbody className="divide-y">
-            {filteredData.map(item => (
-              <tr key={item.sicilNo} className="hover:bg-gray-50">
-                <td className="px-4 py-2 font-mono">{item.sicilNo}</td>
-                <td className="px-4 py-2">
-                  {editSicil === item.sicilNo ? (
-                    <input
-                      type="text"
-                      value={form.ad}
-                      onChange={(e) => setForm({ ...form, ad: e.target.value })}
-                      className="w-full px-2 py-1 border rounded"
-                    />
-                  ) : item.ad}
-                </td>
-                <td className="px-4 py-2">
-                  {editSicil === item.sicilNo ? (
-                    <input
-                      type="text"
-                      value={form.soyad}
-                      onChange={(e) => setForm({ ...form, soyad: e.target.value })}
-                      className="w-full px-2 py-1 border rounded"
-                    />
-                  ) : item.soyad}
-                </td>
-                <td className="px-4 py-2 text-sm">
-                  {editSicil === item.sicilNo ? (
-                    <select
-                      value={form.bolum}
-                      onChange={(e) => setForm({ ...form, bolum: e.target.value })}
-                      className="w-full px-2 py-1 border rounded"
-                    >
-                      {bolumler.map(b => (
-                        <option key={b} value={b}>{b}</option>
-                      ))}
-                    </select>
-                  ) : item.bolum}
-                </td>
-                <td className="px-4 py-2">
-                  <div className="flex justify-center gap-2">
+            {filteredData.map((item) => {
+              const bolumParcalari = splitPersonnelDepartment(item.bolum);
+
+              return (
+                <tr key={item.sicilNo} className="hover:bg-gray-50">
+                  <td className="px-4 py-2 font-mono">{item.sicilNo}</td>
+                  <td className="px-4 py-2">
                     {editSicil === item.sicilNo ? (
-                      <>
-                        <button onClick={handleSave} className="text-green-600 hover:text-green-800">
-                          <Save className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => { setEditSicil(null); setForm({ sicilNo: '', ad: '', soyad: '', bolum: '', adSoyad: '' }); }} className="text-gray-600 hover:text-gray-800">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => handleEdit(item)} className="text-blue-600 hover:text-blue-800">
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(item.sicilNo)} className="text-red-600 hover:text-red-800">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      <input
+                        type="text"
+                        value={form.ad}
+                        onChange={(e) => setForm({ ...form, ad: e.target.value })}
+                        className="w-full px-2 py-1 border rounded"
+                      />
+                    ) : item.ad}
+                  </td>
+                  <td className="px-4 py-2">
+                    {editSicil === item.sicilNo ? (
+                      <input
+                        type="text"
+                        value={form.soyad}
+                        onChange={(e) => setForm({ ...form, soyad: e.target.value })}
+                        className="w-full px-2 py-1 border rounded"
+                      />
+                    ) : item.soyad}
+                  </td>
+                  <td className="px-4 py-2 text-sm">
+                    {editSicil === item.sicilNo ? (
+                      <select
+                        value={form.bolum}
+                        onChange={(e) => setForm({ ...form, bolum: e.target.value })}
+                        className="w-full px-2 py-1 border rounded"
+                      >
+                        <option value="">Bolum Sec</option>
+                        {PERSONNEL_BASE_DEPARTMENTS.map((b) => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                      </select>
+                    ) : bolumParcalari.bolum}
+                  </td>
+                  <td className="px-4 py-2 text-sm">
+                    {editSicil === item.sicilNo ? (
+                      <select
+                        value={form.bolum2}
+                        onChange={(e) => setForm({ ...form, bolum2: e.target.value })}
+                        className="w-full px-2 py-1 border rounded"
+                      >
+                        <option value="">-</option>
+                        {PERSONNEL_SUB_DEPARTMENTS.filter((b) => b !== '').map((b) => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                      </select>
+                    ) : bolumParcalari.bolum2 || '-'}
+                  </td>
+                  <td className="px-4 py-2">
+                    <div className="flex justify-center gap-2">
+                      {editSicil === item.sicilNo ? (
+                        <>
+                          <button onClick={handleSave} className="text-green-600 hover:text-green-800">
+                            <Save className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditSicil(null);
+                              resetForm();
+                            }}
+                            className="text-gray-600 hover:text-gray-800"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => handleEdit(item)} className="text-blue-600 hover:text-blue-800">
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDelete(item.sicilNo)} className="text-red-600 hover:text-red-800">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1826,3 +2015,4 @@ function MakinalarTab({ data, setData }: { data: Makina[]; setData: (data: Makin
     </div>
   );
 }
+

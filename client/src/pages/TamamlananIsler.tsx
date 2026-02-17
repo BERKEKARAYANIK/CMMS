@@ -11,6 +11,15 @@ import { jobEntriesApi, usersApi, workOrdersApi } from '../services/api';
 import type { CompletedJob } from '../types/jobEntries';
 
 const MIN_DURUS_DAKIKASI = 45;
+const BERKE_BOLUM_SECENEKLERI = [
+  'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA',
+  'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM',
+  'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER',
+  'YARDIMCI TESISLER'
+] as const;
 
 function normalizeForAuth(value: string | undefined | null): string {
   return String(value || '')
@@ -99,6 +108,7 @@ export default function TamamlananIsler() {
   const [search, setSearch] = useState('');
   const [filterTarih, setFilterTarih] = useState('');
   const [filterVardiya, setFilterVardiya] = useState('');
+  const [berkeBolumFiltresi, setBerkeBolumFiltresi] = useState('TUM_BOLUMLER');
   const [isAnalizModalOpen, setIsAnalizModalOpen] = useState(false);
   const [selectedIsId, setSelectedIsId] = useState<string | null>(null);
   const [atananSicilNo, setAtananSicilNo] = useState('');
@@ -129,7 +139,10 @@ export default function TamamlananIsler() {
     const loadCompletedJobs = async () => {
       try {
         setIsLoading(true);
-        const response = await jobEntriesApi.getCompleted();
+        const params = canAssignWorkOrders && berkeBolumFiltresi !== 'TUM_BOLUMLER'
+          ? { bolum: berkeBolumFiltresi }
+          : undefined;
+        const response = await jobEntriesApi.getCompleted(params);
         const data = response.data?.data as CompletedJob[] | undefined;
         setIsler(Array.isArray(data) ? data : []);
       } catch {
@@ -140,7 +153,7 @@ export default function TamamlananIsler() {
     };
 
     void loadCompletedJobs();
-  }, []);
+  }, [berkeBolumFiltresi, canAssignWorkOrders, currentUser?.id]);
 
   const selectedIs = selectedIsId
     ? isler.find((is) => is.id === selectedIsId) || null
@@ -552,6 +565,18 @@ export default function TamamlananIsler() {
             <option value="VARDIYA 2">Vardiya 2</option>
             <option value="VARDIYA 3">Vardiya 3</option>
           </select>
+          {canAssignWorkOrders && (
+            <select
+              value={berkeBolumFiltresi}
+              onChange={(e) => setBerkeBolumFiltresi(e.target.value)}
+              className="input w-full md:w-64"
+            >
+              <option value="TUM_BOLUMLER">Tum Bolumler</option>
+              {BERKE_BOLUM_SECENEKLERI.map((bolum) => (
+                <option key={bolum} value={bolum}>{bolum}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -694,7 +719,7 @@ export default function TamamlananIsler() {
 
       {!canManage && (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Bu hesapta tamamlanan isler icin sadece goruntuleme yetkisi var.
+          Bu hesapta tamamlanan isler sadece kendi bolumune gore listelenir.
         </div>
       )}
 

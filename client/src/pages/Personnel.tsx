@@ -18,16 +18,46 @@ import {
 import type { CompletedJob } from '../types/jobEntries';
 import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
-const departmanOptions: Departman[] = ['MEKANIK', 'ELEKTRIK', 'YARDIMCI_ISLETMELER', 'URETIM', 'YONETIM'];
+const departmanOptions: Departman[] = [
+  'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA',
+  'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM',
+  'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER',
+  'YARDIMCI TESISLER',
+  'YONETIM'
+];
 const roleOptions: Role[] = ['ADMIN', 'BAKIM_MUDURU', 'BAKIM_SEFI', 'TEKNISYEN', 'OPERATOR'];
 
 function mapBolumToDepartman(bolum: string): Departman {
-  const upper = bolum.toUpperCase();
-  if (upper.includes('ELEKTR')) return 'ELEKTRIK';
-  if (upper.includes('YARDIM')) return 'YARDIMCI_ISLETMELER';
-  if (upper.includes('URET')) return 'URETIM';
-  if (upper.includes('YON')) return 'YONETIM';
-  return 'MEKANIK';
+  const normalized = bolum
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const hasIsk = normalized.startsWith('ISK ');
+  if (normalized.includes('ELEKTRIK')) {
+    if (hasIsk) return 'ISK ELEKTRIK BAKIM';
+    if (normalized.includes('EK BINA')) return 'ELEKTRIK BAKIM EK BINA';
+    if (normalized.includes('ANA BINA')) return 'ELEKTRIK BAKIM ANA BINA';
+    return 'ELEKTRIK BAKIM ANA BINA';
+  }
+
+  if (normalized.includes('MEKANIK')) {
+    return hasIsk ? 'ISK MEKANIK BAKIM' : 'MEKANIK BAKIM';
+  }
+
+  if (normalized.includes('YARDIMCI')) {
+    return hasIsk ? 'ISK YARDIMCI TESISLER' : 'YARDIMCI TESISLER';
+  }
+
+  if (normalized.includes('YON')) return 'YONETIM';
+
+  return 'MEKANIK BAKIM';
 }
 
 function toDateValue(date: Date): string {
@@ -325,7 +355,7 @@ function PersonnelModal({
     email: '',
     password: '',
     telefon: '',
-    departman: 'MEKANIK',
+    departman: 'MEKANIK BAKIM',
     unvan: '',
     uzmanlikAlani: '',
     role: 'TEKNISYEN'
@@ -340,7 +370,7 @@ function PersonnelModal({
       email: user?.email || '',
       password: '',
       telefon: user?.telefon || '',
-      departman: user?.departman || 'MEKANIK',
+      departman: user?.departman || 'MEKANIK BAKIM',
       unvan: user?.unvan || '',
       uzmanlikAlani: user?.uzmanlikAlani || '',
       role: user?.role || 'TEKNISYEN'
