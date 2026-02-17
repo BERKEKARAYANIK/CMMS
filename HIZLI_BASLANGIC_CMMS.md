@@ -105,6 +105,7 @@ Uygulanan:
 - Personel ekleme/import akisinda gorsele uygun alan yapisi:
   - `SICIL NO`, `AD SOYAD`, `BOLUM`, `BOLUM 2`, `ROL`
 - `BOLUM + BOLUM 2` kombinasyonu otomatik olarak sistem bolum sinifina normalize edilir
+  - Elektrik Bakim satirlarinda `BOLUM 2` degerine gore ayrim yapilir (`ANA BINA`, `EK BINA`, `ISK`, `YARDIMCI TESISLER`)
 - Tamamlanan Isler endpoint'i bolum bazli filtre uygular:
   - `GET /api/job-entries/completed`
   - `GET /api/job-entries/completed?bolum=<BOLUM_ADI>&vardiya=<VARDIYA>` (Berke secimi)

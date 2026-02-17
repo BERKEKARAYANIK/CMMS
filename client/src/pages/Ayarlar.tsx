@@ -66,6 +66,7 @@ const PERSONNEL_SUB_DEPARTMENTS = [
   '',
   'ANA BINA',
   'EK BINA',
+  'YARDIMCI TESISLER',
   'ISK'
 ] as const;
 
@@ -82,6 +83,7 @@ function normalizeDepartmentToken(value: string): string {
 function normalizePersonnelDepartment(bolumValue: string, bolum2Value: string): string {
   const bolum = normalizeDepartmentToken(bolumValue);
   const bolum2 = normalizeDepartmentToken(bolum2Value);
+  const combined = `${bolum} ${bolum2}`.trim();
 
   if (!bolum && !bolum2) return '';
 
@@ -96,20 +98,26 @@ function normalizePersonnelDepartment(bolumValue: string, bolum2Value: string): 
     'YONETIM'
   ]);
   if (directValues.has(bolum)) return bolum;
+  if (directValues.has(bolum2)) return bolum2;
+  if (directValues.has(combined)) return combined;
 
-  const hasIsk = bolum.startsWith('ISK ') || bolum2 === 'ISK';
+  const hasIsk = bolum.startsWith('ISK ') || bolum2 === 'ISK' || bolum2.startsWith('ISK ');
+  const hasElectric = bolum.includes('ELEKTRIK') || bolum2.includes('ELEKTRIK');
+  const hasMechanical = bolum.includes('MEKANIK') || bolum2.includes('MEKANIK');
+  const hasAuxiliary = bolum.includes('YARDIMCI') || bolum2.includes('YARDIMCI');
 
-  if (bolum.includes('ELEKTRIK')) {
+  if (hasElectric) {
+    if (hasAuxiliary) return hasIsk ? 'ISK YARDIMCI TESISLER' : 'YARDIMCI TESISLER';
+    if (combined.includes('EK BINA')) return 'ELEKTRIK BAKIM EK BINA';
     if (hasIsk) return 'ISK ELEKTRIK BAKIM';
-    if (bolum.includes('EK BINA') || bolum2 === 'EK BINA') return 'ELEKTRIK BAKIM EK BINA';
     return 'ELEKTRIK BAKIM ANA BINA';
   }
 
-  if (bolum.includes('MEKANIK')) {
+  if (hasMechanical) {
     return hasIsk ? 'ISK MEKANIK BAKIM' : 'MEKANIK BAKIM';
   }
 
-  if (bolum.includes('YARDIMCI')) {
+  if (hasAuxiliary) {
     return hasIsk ? 'ISK YARDIMCI TESISLER' : 'YARDIMCI TESISLER';
   }
 

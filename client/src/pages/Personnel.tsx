@@ -40,6 +40,10 @@ function mapBolumToDepartman(bolum: string): Departman {
     .trim();
 
   const hasIsk = normalized.startsWith('ISK ');
+  if (normalized.includes('YARDIMCI')) {
+    return hasIsk ? 'ISK YARDIMCI TESISLER' : 'YARDIMCI TESISLER';
+  }
+
   if (normalized.includes('ELEKTRIK')) {
     if (hasIsk) return 'ISK ELEKTRIK BAKIM';
     if (normalized.includes('EK BINA')) return 'ELEKTRIK BAKIM EK BINA';
@@ -49,10 +53,6 @@ function mapBolumToDepartman(bolum: string): Departman {
 
   if (normalized.includes('MEKANIK')) {
     return hasIsk ? 'ISK MEKANIK BAKIM' : 'MEKANIK BAKIM';
-  }
-
-  if (normalized.includes('YARDIMCI')) {
-    return hasIsk ? 'ISK YARDIMCI TESISLER' : 'YARDIMCI TESISLER';
   }
 
   if (normalized.includes('YON')) return 'YONETIM';
