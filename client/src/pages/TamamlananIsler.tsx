@@ -11,6 +11,34 @@ import { jobEntriesApi, usersApi, workOrdersApi } from '../services/api';
 import type { CompletedJob } from '../types/jobEntries';
 
 const MIN_DURUS_DAKIKASI = 45;
+const BERKE_DEPARTMENT_FILTER_OPTIONS = [
+  'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA',
+  'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM',
+  'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER',
+  'YARDIMCI TESISLER'
+] as const;
+
+const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
+  'ELEKTRIK': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM ANA BINA': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA': 'ELEKTRIK BAKIM EK BINA',
+  'ELEKTRIK BAKIM YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'ELEKTRIK YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'MEKANIK': 'MEKANIK BAKIM',
+  'MEKANIK BAKIM': 'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM': 'ISK ELEKTRIK BAKIM',
+  'ISK ELEKTRIK BAKIM YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'ISK ELEKTRIK YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'ISK MEKANIK BAKIM': 'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'YARDIMCI ISLETMELER': 'YARDIMCI TESISLER',
+  'YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'YONETIM': 'YONETIM'
+};
 
 function normalizeForAuth(value: string | undefined | null): string {
   return String(value || '')
@@ -32,6 +60,19 @@ function normalizeForSearch(value: string | undefined | null): string {
     .replace(/Ã§/g, 'c')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function normalizeDepartment(value: unknown): string {
+  const key = String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!key) return '';
+  return DEPARTMENT_ALIAS_MAP[key] || key;
 }
 
 function parseDateKey(value: string): Date {
@@ -88,6 +129,7 @@ type CompletedRow = {
     adSoyad: string;
     bolum: string;
   };
+  normalizedBolum: string;
 };
 
 export default function TamamlananIsler() {
@@ -426,19 +468,29 @@ export default function TamamlananIsler() {
       const personeller = is.personeller.length > 0
         ? is.personeller
         : [{ sicilNo: '-', adSoyad: '-', bolum: '-' }];
-      return personeller.map((personel) => ({ is, personel }));
+      return personeller.map((personel) => ({
+        is,
+        personel,
+        normalizedBolum: normalizeDepartment(personel.bolum) || personel.bolum || '-'
+      }));
     })
   ), [isler]);
 
-  const bolumSecenekleri = useMemo(() => Array.from(
-    new Set(
-      satirlar
-        .map(({ personel }) => personel.bolum)
-        .filter((bolum) => bolum && bolum !== '-')
-    )
-  ).sort((a, b) => a.localeCompare(b, 'tr-TR')), [satirlar]);
+  const bolumSecenekleri = useMemo(() => {
+    const fromRecords = Array.from(
+      new Set(
+        satirlar
+          .map(({ normalizedBolum }) => normalizedBolum)
+          .filter((bolum) => bolum && bolum !== '-')
+      )
+    ).sort((a, b) => a.localeCompare(b, 'tr-TR'));
 
-  const filteredSatirlar = useMemo(() => satirlar.filter(({ is, personel }) => {
+    const defaults = [...BERKE_DEPARTMENT_FILTER_OPTIONS];
+    const extras = fromRecords.filter((bolum) => !defaults.includes(bolum as typeof defaults[number]));
+    return [...defaults, ...extras];
+  }, [satirlar]);
+
+  const filteredSatirlar = useMemo(() => satirlar.filter(({ is, personel, normalizedBolum }) => {
     const searchText = normalizeForSearch(search);
     const matchSearch = !searchText
       || normalizeForSearch(is.id).includes(searchText)
@@ -446,10 +498,10 @@ export default function TamamlananIsler() {
       || normalizeForSearch(is.aciklama).includes(searchText)
       || normalizeForSearch(personel.adSoyad).includes(searchText)
       || normalizeForSearch(personel.sicilNo).includes(searchText)
-      || normalizeForSearch(personel.bolum).includes(searchText);
+      || normalizeForSearch(normalizedBolum).includes(searchText);
 
     const matchTarih = !filterTarih || is.tarih === filterTarih;
-    const matchBolum = !isBerkeViewer || !filterBolum || personel.bolum === filterBolum;
+    const matchBolum = !isBerkeViewer || !filterBolum || normalizedBolum === filterBolum;
     const matchVardiya = !filterVardiya || is.vardiya.includes(filterVardiya);
 
     return matchSearch && matchTarih && matchBolum && matchVardiya;
@@ -471,7 +523,7 @@ export default function TamamlananIsler() {
   const handleExport = () => {
     const excelData: Record<string, string | number>[] = [];
 
-    filteredSatirlar.forEach(({ is, personel }) => {
+    filteredSatirlar.forEach(({ is, personel, normalizedBolum }) => {
       const analizDurumu = (Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI
         ? (is.analizAtamasi
           ? `${is.analizAtamasi.atananAdSoyad} (${is.analizAtamasi.atananSicilNo})${is.analizAtamasi.backendWorkOrderNo ? ` - ${is.analizAtamasi.backendWorkOrderNo}` : ''}`
@@ -484,7 +536,7 @@ export default function TamamlananIsler() {
         Vardiya: is.vardiya,
         'Ad Soyad': personel.adSoyad,
         'Sicil No': personel.sicilNo,
-        Bolum: personel.bolum,
+        Bolum: normalizedBolum,
         Makina: is.makina,
         'Mudahale Turu': is.mudahaleTuru,
         Baslangic: is.baslangicSaati,
@@ -615,14 +667,14 @@ export default function TamamlananIsler() {
                   </td>
                 </tr>
               ) : (
-                filteredSatirlar.map(({ is, personel }, index) => (
+                filteredSatirlar.map(({ is, personel, normalizedBolum }, index) => (
                   <tr key={`${is.id}-${personel.sicilNo}-${index}`} className="hover:bg-gray-50">
                     <td className="px-3 py-2 font-mono text-xs">{is.id}</td>
                     <td className="px-3 py-2">{format(parseDateKey(is.tarih), 'dd.MM.yyyy')}</td>
                     <td className="px-3 py-2 text-xs">{is.vardiya}</td>
                     <td className="px-3 py-2">{personel.adSoyad}</td>
                     <td className="px-3 py-2 font-mono">{personel.sicilNo}</td>
-                    <td className="px-3 py-2 text-xs">{personel.bolum}</td>
+                    <td className="px-3 py-2 text-xs">{normalizedBolum}</td>
                     <td className="px-3 py-2">{is.makina}</td>
                     <td className="px-3 py-2">
                       <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">{is.mudahaleTuru}</span>

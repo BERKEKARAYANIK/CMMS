@@ -1135,7 +1135,7 @@ function WorkOrderCard({
         </div>
       )}
 
-      {canAssign && isExtended && (
+      {canAssign && (
         <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
           <button
             onClick={() => onDeleteReport(workOrder)}
@@ -1253,7 +1253,7 @@ export default function WorkOrders() {
   });
 
   const deleteReportMutation = useMutation({
-    mutationFn: (id: number) => workOrdersApi.update(id, { tamamlanmaNotlari: null }),
+    mutationFn: (id: number) => workOrdersApi.clearReport(id),
     onSuccess: () => {
       toast.success('Rapor silindi');
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });

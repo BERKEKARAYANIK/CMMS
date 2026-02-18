@@ -79,6 +79,7 @@ export const workOrdersApi = {
   create: <T extends object>(data: T) => api.post('/work-orders', data),
   update: <T extends object>(id: number, data: T) => api.put(`/work-orders/${id}`, data),
   delete: (id: number) => api.delete(`/work-orders/${id}`),
+  clearReport: (id: number) => api.patch(`/work-orders/${id}/clear-report`),
   updateStatus: (id: number, durum: string, aciklama?: string) =>
     api.patch(`/work-orders/${id}/status`, { durum, aciklama }),
   submitForApproval: (id: number, reportContent: string) =>

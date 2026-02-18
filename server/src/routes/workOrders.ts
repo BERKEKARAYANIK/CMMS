@@ -368,6 +368,101 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   }
 });
 
+router.patch('/:id/clear-report', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const workOrderId = Number.parseInt(req.params.id, 10);
+    const currentUser = req.user!;
+
+    const currentOrder = await prisma.isEmri.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        baslik: true,
+        durum: true,
+        tamamlanmaNotlari: true
+      }
+    });
+
+    if (!currentOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Is emri bulunamadi'
+      });
+    }
+
+    if (!canAssignWorkOrders(currentUser)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Form silme yetkisi sadece Berke Karayanik kullanicisinda'
+      });
+    }
+
+    const hasReportContent = Boolean(
+      currentOrder.tamamlanmaNotlari && currentOrder.tamamlanmaNotlari.trim()
+    );
+
+    const updateData: {
+      tamamlanmaNotlari: null;
+      onaylayanId: null;
+      onayTarihi: null;
+      durum?: string;
+      gercekBitis?: null;
+      gerceklesenSure?: null;
+    } = {
+      tamamlanmaNotlari: null,
+      onaylayanId: null,
+      onayTarihi: null
+    };
+
+    if (hasReportContent && (currentOrder.durum === 'ONAY_BEKLIYOR' || currentOrder.durum === 'TAMAMLANDI')) {
+      updateData.durum = 'DEVAM_EDIYOR';
+      updateData.gercekBitis = null;
+      updateData.gerceklesenSure = null;
+    }
+
+    const workOrder = await prisma.isEmri.update({
+      where: { id: workOrderId },
+      data: updateData,
+      include: {
+        equipment: {
+          select: { id: true, ekipmanKodu: true, ekipmanAdi: true }
+        },
+        atanan: {
+          select: { id: true, ad: true, soyad: true }
+        },
+        talepEden: {
+          select: { id: true, ad: true, soyad: true }
+        },
+        shift: {
+          select: { id: true, vardiyaAdi: true, renk: true }
+        }
+      }
+    });
+
+    await prisma.isEmriLog.create({
+      data: {
+        workOrderId,
+        userId: currentUser.id,
+        islem: 'FORM_SILINDI',
+        eskiDurum: currentOrder.durum,
+        yeniDurum: workOrder.durum,
+        aciklama: hasReportContent ? 'Is emri formu temizlendi' : 'Is emri formu zaten bostu'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: workOrder,
+      message: 'Form silindi'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Form silinemedi'
+    });
+  }
+});
+
 router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const workOrderId = Number.parseInt(req.params.id, 10);
