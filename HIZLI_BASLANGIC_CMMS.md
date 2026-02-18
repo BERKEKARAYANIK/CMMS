@@ -1,7 +1,7 @@
 # CMMS - Hizli Baslangic ve Devam Notlari
 
 Olusturma tarihi: 16.02.2026
-Son guncelleme commit'i: `a6245a8`
+Son guncelleme commit'i: `06781d3`
 Repo: `https://github.com/BERKEKARAYANIK/CMMS`
 Ana klasor: `C:\Users\YAPAY_ZEKA\Desktop\CMMS FULL\cmms`
 
@@ -26,6 +26,18 @@ Bu turda eklenen ek guncelleme:
 - Tamamlanan Isler listelemesi bolum bazli yetkiye alindi:
   - Normal kullanici: sadece kendi bolumu
   - Berke: tum bolumleri gorur; ekranda bolum + vardiya filtreleri ile bolum bolum / vardiya vardiya goruntuler
+- Tamamlanan Isler ekraninda Berke bolum filtresi sabit siniflarla netlestirildi:
+  - `ELEKTRIK BAKIM ANA BINA`
+  - `ELEKTRIK BAKIM EK BINA`
+  - `MEKANIK BAKIM`
+  - `ISK ELEKTRIK BAKIM`
+  - `ISK MEKANIK BAKIM`
+  - `ISK YARDIMCI TESISLER`
+  - `YARDIMCI TESISLER`
+- Is Emri Takibi ekraninda tum kartlarda `Formu Sil` butonu aktif edildi
+  (silme yetkisi sadece Berke):
+  - Yeni endpoint: `PATCH /api/work-orders/:id/clear-report`
+  - Form silinince rapor temizlenir; gerekiyorsa kayit `DEVAM_EDIYOR` durumuna cekilir
 
 Yeni dosyalar:
 - `CMMS_ILK_KURULUM_VE_BASLAT.bat`
@@ -119,6 +131,18 @@ Teknik dosyalar:
 - `client/src/data/lists.ts`
 - `server/src/middleware/auth.ts`
 - `server/src/routes/jobEntries.ts`
+
+### 2.10 Is Emri Takibi - Form Sil Akisi
+Uygulanan:
+- `Formu Sil` butonu is emri kartlarinda gorunur hale getirildi
+- Silme islemi genel update yerine ozel endpoint'e alindi: `PATCH /api/work-orders/:id/clear-report`
+- Form silme yetkisi sadece Berke kullanicisinda
+- Form temizleme sonrasi is emri durum/onay alanlari tutarli sekilde sifirlanir
+
+Teknik dosyalar:
+- `client/src/pages/WorkOrders.tsx`
+- `client/src/services/api.ts`
+- `server/src/routes/workOrders.ts`
 
 ### 2.4 Isimlendirme ve menu duzenleri
 Uygulanan ad degisiklikleri:
