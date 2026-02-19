@@ -17,6 +17,7 @@ export interface Personel {
   soyad: string;
   bolum: string;
   adSoyad: string;
+  rol?: string;
 }
 
 export interface Makina {

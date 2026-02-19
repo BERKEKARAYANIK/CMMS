@@ -16,7 +16,8 @@ import {
   CheckSquare,
   Cog,
   ListChecks,
-  Package
+  Package,
+  Shield
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../services/api';
@@ -35,6 +36,7 @@ const navigation = [
   { name: 'Tekrarlayan Ariza Analizi', href: '/tekrarlayan-ariza-analizi', icon: BarChart3, enabled: true },
   { name: 'Vardiyalar', href: '/shifts', icon: Calendar, enabled: false },
   { name: 'Demirbaş Formları', href: '/demirbas', icon: Package, enabled: true },
+  { name: 'Is Sagligi ve Guvenligi', href: '/isg', icon: Shield, enabled: true },
   { name: 'Ekipmanlar', href: '/equipment', icon: Settings, enabled: false },
   { name: 'Is Emri Takibi', href: '/work-orders', icon: ClipboardList, enabled: true },
   { name: 'Periyodik Bakim', href: '/preventive-maintenance', icon: Wrench, enabled: true },

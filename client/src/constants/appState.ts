@@ -72,8 +72,16 @@ function normalizePersonelListesi(value: unknown): Personel[] {
     const soyad = String(row.soyad || '').trim();
     const bolum = String(row.bolum || '').trim();
     const adSoyad = String(row.adSoyad || `${ad} ${soyad}`).trim();
+    const rol = String(row.rol || '').trim();
     if (!sicilNo || !ad || !soyad || !bolum) return [];
-    return [{ sicilNo, ad, soyad, bolum, adSoyad }];
+    return [{
+      sicilNo,
+      ad,
+      soyad,
+      bolum,
+      adSoyad,
+      rol: rol || undefined
+    }];
   });
 }
 
