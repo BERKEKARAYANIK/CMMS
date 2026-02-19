@@ -1028,6 +1028,12 @@ function WorkOrderCard({
   const canAssign = Boolean(currentUser && isBerkeUser(currentUser));
   const canWorkOnOrder = Boolean(currentUser && (workOrder.atananId === currentUser.id || isManagerRole(currentUser.role)));
   const hasAssignee = Boolean(workOrder.atananId);
+  const canShowDeleteReportButton = canAssign && (
+    hasReportContent
+    || workOrder.durum === 'DEVAM_EDIYOR'
+    || workOrder.durum === 'ONAY_BEKLIYOR'
+    || workOrder.durum === 'TAMAMLANDI'
+  );
 
   return (
     <div className={`card p-4 border-l-4 ${oncelikColors[workOrder.oncelik].replace('bg-', 'border-').replace('-100', '-500')}`}>
@@ -1135,7 +1141,7 @@ function WorkOrderCard({
         </div>
       )}
 
-      {canAssign && (
+      {canShowDeleteReportButton && (
         <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
           <button
             onClick={() => onDeleteReport(workOrder)}
@@ -1253,9 +1259,57 @@ export default function WorkOrders() {
   });
 
   const deleteReportMutation = useMutation({
-    mutationFn: (id: number) => workOrdersApi.clearReport(id),
-    onSuccess: () => {
-      toast.success('Rapor silindi');
+    mutationFn: (workOrder: WorkOrder) => workOrdersApi.clearReport(workOrder.id, workOrder.durum),
+    onSuccess: (response: any, workOrder: WorkOrder) => {
+      const updatedWorkOrder = response?.data?.data as WorkOrder | undefined;
+      const targetId = updatedWorkOrder?.id ?? workOrder.id;
+
+      queryClient.setQueriesData({ queryKey: ['work-orders'] }, (oldData: WorkOrder[] | undefined) => {
+        if (!Array.isArray(oldData)) return oldData;
+
+        return oldData.map((item) => {
+          if (item.id !== targetId) return item;
+
+          const fallbackDurum: IsEmriDurum =
+            item.durum === 'ONAY_BEKLIYOR' || item.durum === 'TAMAMLANDI'
+              ? 'DEVAM_EDIYOR'
+              : item.durum;
+
+          // Server yanıtını kullan ama tamamlanmaNotlari'nı kesinlikle null yap
+          const baseUpdate = updatedWorkOrder
+            ? { ...item, ...updatedWorkOrder }
+            : { ...item, durum: fallbackDurum };
+
+          return {
+            ...baseUpdate,
+            tamamlanmaNotlari: undefined,
+            onaylayanId: undefined,
+            onayTarihi: undefined
+          };
+        });
+      });
+
+      setReportWorkOrder((prev) => {
+        if (!prev || prev.id !== targetId) return prev;
+
+        const fallbackDurum: IsEmriDurum =
+          prev.durum === 'ONAY_BEKLIYOR' || prev.durum === 'TAMAMLANDI'
+            ? 'DEVAM_EDIYOR'
+            : prev.durum;
+
+        const baseUpdate = updatedWorkOrder
+          ? { ...prev, ...updatedWorkOrder }
+          : { ...prev, durum: fallbackDurum };
+
+        return {
+          ...baseUpdate,
+          tamamlanmaNotlari: undefined,
+          onaylayanId: undefined,
+          onayTarihi: undefined
+        };
+      });
+
+      toast.success(response?.data?.message || 'Rapor silindi');
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (error: any) => {
@@ -1285,7 +1339,7 @@ export default function WorkOrders() {
 
   const handleDeleteReport = (workOrder: WorkOrder) => {
     if (!confirm(`${workOrder.isEmriNo} formu silinsin mi?`)) return;
-    deleteReportMutation.mutate(workOrder.id);
+    deleteReportMutation.mutate(workOrder);
   };
 
   const kanbanColumns: { key: IsEmriDurum; label: string; color: string }[] = [
@@ -1373,7 +1427,7 @@ export default function WorkOrders() {
                     onReopenFromCompleted={handleReopenFromCompleted}
                     approvingId={approveMutation.isPending ? (approveMutation.variables ?? null) : null}
                     reportPendingId={submitReportMutation.isPending ? (submitReportMutation.variables?.id ?? null) : null}
-                    reportDeletingId={deleteReportMutation.isPending ? (deleteReportMutation.variables ?? null) : null}
+                    reportDeletingId={deleteReportMutation.isPending ? (deleteReportMutation.variables?.id ?? null) : null}
                     reopeningId={reopenMutation.isPending ? (reopenMutation.variables ?? null) : null}
                   />
                 ))}

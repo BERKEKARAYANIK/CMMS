@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { authenticate, AuthRequest, isBerkeUser } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 
 const router = Router();
@@ -8,26 +8,8 @@ function isManagerRole(role: string): boolean {
   return role === 'ADMIN' || role === 'BAKIM_MUDURU' || role === 'BAKIM_SEFI';
 }
 
-function normalizeForAuth(value: string | null | undefined): string {
-  return String(value || '')
-    .toLocaleLowerCase('tr-TR')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 function isBerkeSpecialUser(user: AuthRequest['user'] | undefined): boolean {
-  if (!user) return false;
-  const ad = normalizeForAuth(user.ad);
-  const fullName = normalizeForAuth(`${user.ad} ${user.soyad}`);
-  const email = normalizeForAuth(user.email);
-  const sicilNo = normalizeForAuth(user.sicilNo);
-
-  return (
-    ad === 'berke'
-    || fullName === 'berke karayanik'
-    || email.includes('berke')
-    || sicilNo === 'berke'
-  );
+  return isBerkeUser(user);
 }
 
 function canManageCompletedWorkOrders(user: AuthRequest['user'] | undefined): boolean {
@@ -406,18 +388,19 @@ router.patch('/:id/clear-report', authenticate, async (req: AuthRequest, res: Re
       onaylayanId: null;
       onayTarihi: null;
       durum?: string;
-      gercekBitis?: null;
-      gerceklesenSure?: null;
+      gercekBitis: null;
+      gerceklesenSure: null;
     } = {
       tamamlanmaNotlari: null,
       onaylayanId: null,
-      onayTarihi: null
+      onayTarihi: null,
+      gercekBitis: null,
+      gerceklesenSure: null
     };
 
+    // Sadece ONAY_BEKLIYOR veya TAMAMLANDI ise durumu DEVAM_EDIYOR yap
     if (hasReportContent && (currentOrder.durum === 'ONAY_BEKLIYOR' || currentOrder.durum === 'TAMAMLANDI')) {
       updateData.durum = 'DEVAM_EDIYOR';
-      updateData.gercekBitis = null;
-      updateData.gerceklesenSure = null;
     }
 
     const workOrder = await prisma.isEmri.update({
@@ -453,7 +436,7 @@ router.patch('/:id/clear-report', authenticate, async (req: AuthRequest, res: Re
     res.json({
       success: true,
       data: workOrder,
-      message: 'Form silindi'
+      message: hasReportContent ? 'Form silindi' : 'Silinecek form kaydi yoktu'
     });
   } catch (error) {
     res.status(500).json({

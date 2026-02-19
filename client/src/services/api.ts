@@ -79,7 +79,34 @@ export const workOrdersApi = {
   create: <T extends object>(data: T) => api.post('/work-orders', data),
   update: <T extends object>(id: number, data: T) => api.put(`/work-orders/${id}`, data),
   delete: (id: number) => api.delete(`/work-orders/${id}`),
-  clearReport: (id: number) => api.patch(`/work-orders/${id}/clear-report`),
+  clearReport: async (id: number, currentStatus?: string) => {
+    try {
+      return await api.patch(`/work-orders/${id}/clear-report`);
+    } catch (error) {
+      const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+      if (status !== 404) throw error;
+
+      if (currentStatus === 'ONAY_BEKLIYOR' || currentStatus === 'TAMAMLANDI') {
+        try {
+          await api.patch(`/work-orders/${id}/status`, {
+            durum: 'DEVAM_EDIYOR',
+            aciklama: 'Is emri formu temizlendigi icin geri yollandi'
+          });
+        } catch {
+          // Durum gecisi eski sunucu kurallarinda engellenebilir; en azindan formu temizleyelim.
+        }
+      }
+
+      const updateResponse = await api.put(`/work-orders/${id}`, { tamamlanmaNotlari: null });
+      return {
+        ...updateResponse,
+        data: {
+          ...updateResponse.data,
+          message: 'Form silindi'
+        }
+      };
+    }
+  },
   updateStatus: (id: number, durum: string, aciklama?: string) =>
     api.patch(`/work-orders/${id}/status`, { durum, aciklama }),
   submitForApproval: (id: number, reportContent: string) =>
