@@ -2,20 +2,23 @@ import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import {
-  Settings,
-  Users,
   ClipboardList,
   Wrench,
   AlertTriangle,
-  CheckCircle,
-  Clock,
-  TrendingUp,
   Zap,
   Building2,
   Shield
 } from 'lucide-react';
 import { dashboardApi } from '../services/api';
 import type { DashboardSummary } from '../types';
+
+type DepartmentFiveS = {
+  id: string;
+  name: string;
+  currentLevel: string;
+  icon: React.ElementType;
+  accent: string;
+};
 
 type IsgDepartmentKpi = {
   id: string;
@@ -32,7 +35,6 @@ type DepartmentDowntimeKpi = {
   name: string;
   icon: React.ElementType;
   accent: string;
-  totalDowntimeRate: number;
   unplannedDowntimeRate: number;
   plannedDowntimeRate: number;
   mttrMinutes: number;
@@ -40,15 +42,55 @@ type DepartmentDowntimeKpi = {
   monthlyDowntimeMinutes: number;
 };
 
-const ISG_DEPARTMENT_KPIS: IsgDepartmentKpi[] = [
+const DEPARTMENT_FIVE_S: DepartmentFiveS[] = [
   {
-    id: 'elektrik',
-    name: 'Elektrik',
-    accidents: 2,
-    nonComplianceRate: 14,
-    crossAuditRate: 86,
+    id: 'elektrik-ana-bina',
+    name: 'Elektrik Bakim Ana Bina',
+    currentLevel: '3S',
     icon: Zap,
     accent: 'bg-yellow-500'
+  },
+  {
+    id: 'elektrik-ek-bina',
+    name: 'Elektrik Bakim Ek Bina',
+    currentLevel: '3S',
+    icon: Zap,
+    accent: 'bg-amber-500'
+  },
+  {
+    id: 'mekanik',
+    name: 'Mekanik',
+    currentLevel: '3S',
+    icon: Wrench,
+    accent: 'bg-blue-500'
+  },
+  {
+    id: 'yardimci-tesisler',
+    name: 'Yardimci Tesisler',
+    currentLevel: '3S',
+    icon: Building2,
+    accent: 'bg-emerald-500'
+  }
+];
+
+const ISG_DEPARTMENT_KPIS: IsgDepartmentKpi[] = [
+  {
+    id: 'elektrik-ana-bina',
+    name: 'Elektrik Bakim Ana Bina',
+    accidents: 1,
+    nonComplianceRate: 12,
+    crossAuditRate: 88,
+    icon: Zap,
+    accent: 'bg-yellow-500'
+  },
+  {
+    id: 'elektrik-ek-bina',
+    name: 'Elektrik Bakim Ek Bina',
+    accidents: 1,
+    nonComplianceRate: 15,
+    crossAuditRate: 84,
+    icon: Zap,
+    accent: 'bg-amber-500'
   },
   {
     id: 'mekanik',
@@ -72,23 +114,32 @@ const ISG_DEPARTMENT_KPIS: IsgDepartmentKpi[] = [
 
 const DEPARTMENT_DOWNTIME_KPIS: DepartmentDowntimeKpi[] = [
   {
-    id: 'elektrik',
-    name: 'Elektrik',
+    id: 'elektrik-ana-bina',
+    name: 'Elektrik Bakim Ana Bina',
     icon: Zap,
     accent: 'bg-yellow-500',
-    totalDowntimeRate: 13.2,
-    unplannedDowntimeRate: 8.4,
-    plannedDowntimeRate: 4.8,
-    mttrMinutes: 58,
-    mtbfHours: 34,
-    monthlyDowntimeMinutes: 410
+    unplannedDowntimeRate: 6.1,
+    plannedDowntimeRate: 3.5,
+    mttrMinutes: 52,
+    mtbfHours: 38,
+    monthlyDowntimeMinutes: 290
+  },
+  {
+    id: 'elektrik-ek-bina',
+    name: 'Elektrik Bakim Ek Bina',
+    icon: Zap,
+    accent: 'bg-amber-500',
+    unplannedDowntimeRate: 4.9,
+    plannedDowntimeRate: 2.6,
+    mttrMinutes: 45,
+    mtbfHours: 46,
+    monthlyDowntimeMinutes: 215
   },
   {
     id: 'mekanik',
     name: 'Mekanik',
     icon: Wrench,
     accent: 'bg-blue-500',
-    totalDowntimeRate: 11.1,
     unplannedDowntimeRate: 7.2,
     plannedDowntimeRate: 3.9,
     mttrMinutes: 49,
@@ -100,7 +151,6 @@ const DEPARTMENT_DOWNTIME_KPIS: DepartmentDowntimeKpi[] = [
     name: 'Yardimci Tesisler',
     icon: Building2,
     accent: 'bg-emerald-500',
-    totalDowntimeRate: 7.8,
     unplannedDowntimeRate: 4.1,
     plannedDowntimeRate: 3.7,
     mttrMinutes: 39,
@@ -109,57 +159,70 @@ const DEPARTMENT_DOWNTIME_KPIS: DepartmentDowntimeKpi[] = [
   }
 ];
 
-function StatCard({
-  title,
-  value,
-  icon: Icon,
-  color,
-  subtitle
-}: {
-  title: string;
-  value: string | number;
-  icon: React.ElementType;
-  color: string;
-  subtitle?: string;
-}) {
-  return (
-    <div className="card p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="mt-1 text-3xl font-bold text-gray-900">{value}</p>
-          {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
-        </div>
-        <div className={`rounded-xl p-3 ${color}`}>
-          <Icon className="h-6 w-6 text-white" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function ProgressBar({
   label,
   value,
-  fillClass
+  fillClass,
+  maxValue = 100,
+  valueDisplay = 'percent'
 }: {
   label: string;
   value: number;
   fillClass: string;
+  maxValue?: number;
+  valueDisplay?: 'percent' | 'ratio' | 'rawPercent';
 }) {
-  const safeValue = Math.max(0, Math.min(100, Math.round(value)));
+  const safeValue = Math.max(0, Math.min(maxValue, value));
+  const safeWidth = maxValue > 0 ? (safeValue / maxValue) * 100 : 0;
+  const normalizedPercent = maxValue > 0 ? (safeValue / maxValue) * 100 : 0;
+  const formattedValue = safeValue.toFixed(2).replace('.', ',');
 
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-sm">
         <span className="text-gray-600">{label}</span>
-        <span className="font-semibold text-gray-900">%{safeValue}</span>
+        <span className="font-semibold text-gray-900">
+          {valueDisplay === 'ratio'
+            ? `${formattedValue}/${maxValue}`
+            : valueDisplay === 'rawPercent'
+              ? `%${formattedValue}`
+              : `%${Math.round(normalizedPercent)}`}
+        </span>
       </div>
       <div className="h-2.5 w-full rounded-full bg-gray-200">
         <div
           className={`h-2.5 rounded-full transition-all ${fillClass}`}
-          style={{ width: `${safeValue}%` }}
+          style={{ width: `${safeWidth}%` }}
         />
+      </div>
+    </div>
+  );
+}
+
+function DepartmentFiveSCard({ item }: { item: DepartmentFiveS }) {
+  const Icon = item.icon;
+
+  return (
+    <div className="card p-5">
+      <div className="mb-4 flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-lg p-2 ${item.accent}`}>
+            <Icon className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{item.name}</h3>
+            <p className="text-xs text-gray-500">5S Calismasi</p>
+          </div>
+        </div>
+        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+          Hedef 5S
+        </span>
+      </div>
+
+      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
+        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Mevcut Seviye</p>
+        <p className="mt-2 text-4xl font-bold text-emerald-700">{item.currentLevel}</p>
+        <p className="mt-2 text-xs text-emerald-700">Tum bolumler icin 3S tanimli</p>
       </div>
     </div>
   );
@@ -218,29 +281,40 @@ function DepartmentDowntimeCard({ item }: { item: DepartmentDowntimeKpi }) {
           </div>
         </div>
         <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
-          %{Math.round(item.totalDowntimeRate)}
+          {item.monthlyDowntimeMinutes} dk/ay
         </span>
       </div>
 
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        <div className="rounded-lg border border-red-100 bg-red-50 p-2 text-center">
-          <p className="text-[10px] font-semibold uppercase text-red-700">Toplam Durus</p>
-          <p className="mt-1 text-lg font-bold text-red-700">%{item.totalDowntimeRate}</p>
-        </div>
+      <div className="mb-4 grid grid-cols-2 gap-2">
         <div className="rounded-lg border border-orange-100 bg-orange-50 p-2 text-center">
-          <p className="text-[10px] font-semibold uppercase text-orange-700">Plansiz</p>
-          <p className="mt-1 text-lg font-bold text-orange-700">%{item.unplannedDowntimeRate}</p>
+          <p className="text-[10px] font-semibold uppercase text-orange-700">Plansiz Bakim Orani</p>
+          <p className="mt-1 text-lg font-bold text-orange-700">
+            %{item.unplannedDowntimeRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
         </div>
         <div className="rounded-lg border border-blue-100 bg-blue-50 p-2 text-center">
-          <p className="text-[10px] font-semibold uppercase text-blue-700">Planli</p>
-          <p className="mt-1 text-lg font-bold text-blue-700">%{item.plannedDowntimeRate}</p>
+          <p className="text-[10px] font-semibold uppercase text-blue-700">Planli Bakim Orani</p>
+          <p className="mt-1 text-lg font-bold text-blue-700">
+            %{item.plannedDowntimeRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
         </div>
       </div>
 
       <div className="space-y-2">
-        <ProgressBar label="Toplam Durus Orani" value={item.totalDowntimeRate} fillClass="bg-red-500" />
-        <ProgressBar label="Plansiz Durus Orani" value={item.unplannedDowntimeRate} fillClass="bg-orange-500" />
-        <ProgressBar label="Planli Durus Orani" value={item.plannedDowntimeRate} fillClass="bg-blue-500" />
+        <ProgressBar
+          label="Plansiz Bakim Orani"
+          value={item.unplannedDowntimeRate}
+          fillClass="bg-orange-500"
+          maxValue={10}
+          valueDisplay="rawPercent"
+        />
+        <ProgressBar
+          label="Planli Bakim Orani"
+          value={item.plannedDowntimeRate}
+          fillClass="bg-blue-500"
+          maxValue={100}
+          valueDisplay="rawPercent"
+        />
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
@@ -270,14 +344,6 @@ export default function Dashboard() {
     }
   });
 
-  const { data: kpis } = useQuery({
-    queryKey: ['dashboard-kpis'],
-    queryFn: async () => {
-      const response = await dashboardApi.getKPIs('month');
-      return response.data.data;
-    }
-  });
-
   if (summaryLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -295,45 +361,28 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Toplam Ekipman"
-          value={summary?.equipment.total || 0}
-          subtitle={`${summary?.equipment.active || 0} aktif`}
-          icon={Settings}
-          color="bg-blue-500"
-        />
-        <StatCard
-          title="Personel"
-          value={summary?.personnel.total || 0}
-          subtitle="Aktif personel"
-          icon={Users}
-          color="bg-green-500"
-        />
-        <StatCard
-          title="Bugunku Is Emirleri"
-          value={summary?.workOrders.today.toplam || 0}
-          subtitle={`${summary?.workOrders.today.tamamlandi || 0} tamamlandi`}
-          icon={ClipboardList}
-          color="bg-purple-500"
-        />
-        <StatCard
-          title="Periyodik Bakim"
-          value={summary?.preventiveMaintenance.upcoming || 0}
-          subtitle={`${summary?.preventiveMaintenance.overdue || 0} gecikmis`}
-          icon={Wrench}
-          color="bg-orange-500"
-        />
+      <div className="card p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <ClipboardList className="h-5 w-5 text-indigo-600" />
+          <h2 className="text-lg font-semibold text-gray-900">
+            5S Calismasi - Elektrik Ana Bina / Elektrik Ek Bina / Mekanik / Yardimci Tesisler
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {DEPARTMENT_FIVE_S.map((item) => (
+            <DepartmentFiveSCard key={item.id} item={item} />
+          ))}
+        </div>
       </div>
 
       <div className="card p-6">
         <div className="mb-4 flex items-center gap-2">
           <Shield className="h-5 w-5 text-red-600" />
           <h2 className="text-lg font-semibold text-gray-900">
-            ISG KPI Pano - Elektrik / Mekanik / Yardimci Tesisler
+            ISG KPI Pano - Elektrik Ana Bina / Elektrik Ek Bina / Mekanik / Yardimci Tesisler
           </h2>
         </div>
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {ISG_DEPARTMENT_KPIS.map((item) => (
             <DepartmentIsgCard key={item.id} item={item} />
           ))}
@@ -354,82 +403,12 @@ export default function Dashboard() {
 
       <div className="card p-6">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Durus KPI Pano - Elektrik / Mekanik / Yardimci Tesisler
+          Durus KPI Pano - Elektrik Ana Bina / Elektrik Ek Bina / Mekanik / Yardimci Tesisler
         </h2>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           {DEPARTMENT_DOWNTIME_KPIS.map((item) => (
             <DepartmentDowntimeCard key={item.id} item={item} />
           ))}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="card p-6">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Bu Ay Is Emri Durumu</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Clock className="mr-2 h-5 w-5 text-yellow-500" />
-                <span className="text-gray-600">Beklemede</span>
-              </div>
-              <span className="font-semibold">{summary?.workOrders.monthly.beklemede || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <TrendingUp className="mr-2 h-5 w-5 text-blue-500" />
-                <span className="text-gray-600">Devam Ediyor</span>
-              </div>
-              <span className="font-semibold">{summary?.workOrders.monthly.devamEdiyor || 0}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <CheckCircle className="mr-2 h-5 w-5 text-green-500" />
-                <span className="text-gray-600">Tamamlandi</span>
-              </div>
-              <span className="font-semibold">{summary?.workOrders.monthly.tamamlandi || 0}</span>
-            </div>
-            <hr />
-            <div className="flex items-center justify-between">
-              <span className="font-medium text-gray-900">Toplam</span>
-              <span className="text-xl font-bold">{summary?.workOrders.monthly.toplam || 0}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <h3 className="mb-4 text-lg font-semibold text-gray-900">Performans Gostergeleri</h3>
-          <div className="space-y-4">
-            <div>
-              <div className="mb-1 flex justify-between text-sm">
-                <span className="text-gray-600">Tamamlanma Orani</span>
-                <span className="font-medium">%{kpis?.completionRate || 0}</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-gray-200">
-                <div
-                  className="h-2 rounded-full bg-green-500"
-                  style={{ width: `${kpis?.completionRate || 0}%` }}
-                />
-              </div>
-            </div>
-            <div>
-              <div className="mb-1 flex justify-between text-sm">
-                <span className="text-gray-600">PB Uyum Orani</span>
-                <span className="font-medium">%{kpis?.pmComplianceRate || 0}</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-gray-200">
-                <div
-                  className="h-2 rounded-full bg-blue-500"
-                  style={{ width: `${kpis?.pmComplianceRate || 0}%` }}
-                />
-              </div>
-            </div>
-            <div className="border-t pt-4">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Ort. Tamamlanma Suresi</span>
-                <span className="font-semibold">{kpis?.avgCompletionTime || 0} dk</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
