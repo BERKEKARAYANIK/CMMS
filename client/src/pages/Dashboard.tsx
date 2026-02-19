@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
 import {
@@ -41,6 +42,18 @@ type DepartmentDowntimeKpi = {
   mtbfHours: number;
   monthlyDowntimeMinutes: number;
 };
+
+const getCurrentMonthKey = (): string => {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  return `${now.getFullYear()}-${month}`;
+};
+
+const normalizeMonthKey = (value: string): string => {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : getCurrentMonthKey();
+};
+
+const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 const DEPARTMENT_FIVE_S: DepartmentFiveS[] = [
   {
@@ -112,7 +125,7 @@ const ISG_DEPARTMENT_KPIS: IsgDepartmentKpi[] = [
   }
 ];
 
-const DEPARTMENT_DOWNTIME_KPIS: DepartmentDowntimeKpi[] = [
+const BASE_DEPARTMENT_DOWNTIME_KPIS: DepartmentDowntimeKpi[] = [
   {
     id: 'elektrik-ana-bina',
     name: 'Elektrik Bakim Ana Bina',
@@ -158,6 +171,35 @@ const DEPARTMENT_DOWNTIME_KPIS: DepartmentDowntimeKpi[] = [
     monthlyDowntimeMinutes: 175
   }
 ];
+
+const getDowntimeKpisByMonth = (monthKey: string): DepartmentDowntimeKpi[] => {
+  const normalizedMonth = normalizeMonthKey(monthKey);
+  const month = Number(normalizedMonth.split('-')[1]);
+  const monthOffset = month - 6.5;
+
+  return BASE_DEPARTMENT_DOWNTIME_KPIS.map((item, index) => {
+    const unplannedDelta = monthOffset * 0.08 + index * 0.03;
+    const plannedDelta = monthOffset * 0.05 - index * 0.01;
+    const monthlyDelta = monthOffset * 11 + index * 6;
+    const mttrDelta = monthOffset * 0.9;
+    const mtbfDelta = monthOffset * -1.1;
+
+    return {
+      ...item,
+      unplannedDowntimeRate: Number(clamp(item.unplannedDowntimeRate + unplannedDelta, 0.5, 9.99).toFixed(2)),
+      plannedDowntimeRate: Number(clamp(item.plannedDowntimeRate + plannedDelta, 0.5, 99.99).toFixed(2)),
+      mttrMinutes: Math.round(clamp(item.mttrMinutes + mttrDelta, 10, 240)),
+      mtbfHours: Math.round(clamp(item.mtbfHours + mtbfDelta, 1, 240)),
+      monthlyDowntimeMinutes: Math.round(clamp(item.monthlyDowntimeMinutes + monthlyDelta, 30, 1000))
+    };
+  });
+};
+
+const formatMonthLabel = (monthKey: string): string => {
+  const normalizedMonth = normalizeMonthKey(monthKey);
+  const [year, month] = normalizedMonth.split('-').map(Number);
+  return format(new Date(year, month - 1, 1), 'MMMM yyyy', { locale: tr });
+};
 
 function ProgressBar({
   label,
@@ -336,6 +378,18 @@ function DepartmentDowntimeCard({ item }: { item: DepartmentDowntimeKpi }) {
 }
 
 export default function Dashboard() {
+  const [selectedDowntimeMonth, setSelectedDowntimeMonth] = useState<string>(() => getCurrentMonthKey());
+
+  const downtimeKpis = useMemo(
+    () => getDowntimeKpisByMonth(selectedDowntimeMonth),
+    [selectedDowntimeMonth]
+  );
+
+  const selectedDowntimeMonthLabel = useMemo(
+    () => formatMonthLabel(selectedDowntimeMonth),
+    [selectedDowntimeMonth]
+  );
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: async () => {
@@ -402,11 +456,26 @@ export default function Dashboard() {
       )}
 
       <div className="card p-6">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Durus KPI Pano - Elektrik Ana Bina / Elektrik Ek Bina / Mekanik / Yardimci Tesisler
-        </h2>
+        <div className="mb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">
+            Durus KPI Pano - Elektrik Ana Bina / Elektrik Ek Bina / Mekanik / Yardimci Tesisler
+          </h2>
+          <div className="flex items-center gap-2">
+            <label htmlFor="downtime-month" className="text-sm text-gray-600">
+              Ay Secimi
+            </label>
+            <input
+              id="downtime-month"
+              type="month"
+              value={selectedDowntimeMonth}
+              onChange={(event) => setSelectedDowntimeMonth(normalizeMonthKey(event.target.value))}
+              className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          </div>
+        </div>
+        <p className="mb-4 text-sm text-gray-500">Secilen ay: {selectedDowntimeMonthLabel}</p>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {DEPARTMENT_DOWNTIME_KPIS.map((item) => (
+          {downtimeKpis.map((item) => (
             <DepartmentDowntimeCard key={item.id} item={item} />
           ))}
         </div>
