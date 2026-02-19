@@ -9,10 +9,105 @@ import {
   AlertTriangle,
   CheckCircle,
   Clock,
-  TrendingUp
+  TrendingUp,
+  Zap,
+  Building2,
+  Shield
 } from 'lucide-react';
 import { dashboardApi } from '../services/api';
-import type { DashboardSummary, ShiftCompletionStats } from '../types';
+import type { DashboardSummary } from '../types';
+
+type IsgDepartmentKpi = {
+  id: string;
+  name: string;
+  accidents: number;
+  nonComplianceRate: number;
+  crossAuditRate: number;
+  icon: React.ElementType;
+  accent: string;
+};
+
+type DepartmentDowntimeKpi = {
+  id: string;
+  name: string;
+  icon: React.ElementType;
+  accent: string;
+  totalDowntimeRate: number;
+  unplannedDowntimeRate: number;
+  plannedDowntimeRate: number;
+  mttrMinutes: number;
+  mtbfHours: number;
+  monthlyDowntimeMinutes: number;
+};
+
+const ISG_DEPARTMENT_KPIS: IsgDepartmentKpi[] = [
+  {
+    id: 'elektrik',
+    name: 'Elektrik',
+    accidents: 2,
+    nonComplianceRate: 14,
+    crossAuditRate: 86,
+    icon: Zap,
+    accent: 'bg-yellow-500'
+  },
+  {
+    id: 'mekanik',
+    name: 'Mekanik',
+    accidents: 1,
+    nonComplianceRate: 9,
+    crossAuditRate: 91,
+    icon: Wrench,
+    accent: 'bg-blue-500'
+  },
+  {
+    id: 'yardimci-tesisler',
+    name: 'Yardimci Tesisler',
+    accidents: 0,
+    nonComplianceRate: 6,
+    crossAuditRate: 95,
+    icon: Building2,
+    accent: 'bg-emerald-500'
+  }
+];
+
+const DEPARTMENT_DOWNTIME_KPIS: DepartmentDowntimeKpi[] = [
+  {
+    id: 'elektrik',
+    name: 'Elektrik',
+    icon: Zap,
+    accent: 'bg-yellow-500',
+    totalDowntimeRate: 13.2,
+    unplannedDowntimeRate: 8.4,
+    plannedDowntimeRate: 4.8,
+    mttrMinutes: 58,
+    mtbfHours: 34,
+    monthlyDowntimeMinutes: 410
+  },
+  {
+    id: 'mekanik',
+    name: 'Mekanik',
+    icon: Wrench,
+    accent: 'bg-blue-500',
+    totalDowntimeRate: 11.1,
+    unplannedDowntimeRate: 7.2,
+    plannedDowntimeRate: 3.9,
+    mttrMinutes: 49,
+    mtbfHours: 41,
+    monthlyDowntimeMinutes: 335
+  },
+  {
+    id: 'yardimci-tesisler',
+    name: 'Yardimci Tesisler',
+    icon: Building2,
+    accent: 'bg-emerald-500',
+    totalDowntimeRate: 7.8,
+    unplannedDowntimeRate: 4.1,
+    plannedDowntimeRate: 3.7,
+    mttrMinutes: 39,
+    mtbfHours: 57,
+    monthlyDowntimeMinutes: 175
+  }
+];
 
 function StatCard({
   title,
@@ -32,85 +127,134 @@ function StatCard({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-medium text-gray-600">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-          {subtitle && (
-            <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
-          )}
+          <p className="mt-1 text-3xl font-bold text-gray-900">{value}</p>
+          {subtitle && <p className="mt-1 text-sm text-gray-500">{subtitle}</p>}
         </div>
-        <div className={`p-3 rounded-xl ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
+        <div className={`rounded-xl p-3 ${color}`}>
+          <Icon className="h-6 w-6 text-white" />
         </div>
       </div>
     </div>
   );
 }
 
-function ShiftCard({
-  shift,
-  personnel,
-  workOrders
+function ProgressBar({
+  label,
+  value,
+  fillClass
 }: {
-  shift: { vardiyaAdi: string; baslangicSaati: string; bitisSaati: string; renk: string };
-  personnel: number;
-  workOrders: {
-    total: number;
-    completed: number;
-    inProgress: number;
-    pending: number;
-    completionRate: number;
-  };
+  label: string;
+  value: number;
+  fillClass: string;
 }) {
+  const safeValue = Math.max(0, Math.min(100, Math.round(value)));
+
   return (
-    <div className="card p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center">
-          <div
-            className="w-3 h-3 rounded-full mr-2"
-            style={{ backgroundColor: shift.renk }}
-          />
-          <h3 className="font-semibold text-gray-900">{shift.vardiyaAdi}</h3>
+    <div>
+      <div className="mb-1 flex items-center justify-between text-sm">
+        <span className="text-gray-600">{label}</span>
+        <span className="font-semibold text-gray-900">%{safeValue}</span>
+      </div>
+      <div className="h-2.5 w-full rounded-full bg-gray-200">
+        <div
+          className={`h-2.5 rounded-full transition-all ${fillClass}`}
+          style={{ width: `${safeValue}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DepartmentIsgCard({ item }: { item: IsgDepartmentKpi }) {
+  const Icon = item.icon;
+  const score = Math.max(
+    0,
+    Math.min(100, Math.round((100 - item.nonComplianceRate + item.crossAuditRate) / 2))
+  );
+
+  return (
+    <div className="card p-5">
+      <div className="mb-4 flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-lg p-2 ${item.accent}`}>
+            <Icon className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{item.name}</h3>
+            <p className="text-xs text-gray-500">ISG KPI</p>
+          </div>
         </div>
-        <span className="text-sm text-gray-500">
-          {shift.baslangicSaati} - {shift.bitisSaati}
+        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+          Skor {score}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="text-center p-3 bg-gray-50 rounded-lg">
-          <p className="text-2xl font-bold text-gray-900">{personnel}</p>
-          <p className="text-xs text-gray-500">Personel</p>
+      <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3">
+        <p className="text-xs font-medium uppercase tracking-wide text-red-700">ISG Kaza Sayisi</p>
+        <p className="mt-1 text-3xl font-bold text-red-700">{item.accidents}</p>
+      </div>
+
+      <div className="space-y-3">
+        <ProgressBar label="ISG Uygunsuzluk Yuzdesi" value={item.nonComplianceRate} fillClass="bg-amber-500" />
+        <ProgressBar label="ISG Capraz Denetim Yuzdesi" value={item.crossAuditRate} fillClass="bg-emerald-500" />
+      </div>
+    </div>
+  );
+}
+
+function DepartmentDowntimeCard({ item }: { item: DepartmentDowntimeKpi }) {
+  const Icon = item.icon;
+
+  return (
+    <div className="card p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`rounded-lg p-2 ${item.accent}`}>
+            <Icon className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{item.name}</h3>
+            <p className="text-xs text-gray-500">Durus KPI</p>
+          </div>
         </div>
-        <div className="text-center p-3 bg-gray-50 rounded-lg">
-          <p className="text-2xl font-bold text-gray-900">{workOrders.total}</p>
-          <p className="text-xs text-gray-500">İş Emri</p>
+        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
+          %{Math.round(item.totalDowntimeRate)}
+        </span>
+      </div>
+
+      <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="rounded-lg border border-red-100 bg-red-50 p-2 text-center">
+          <p className="text-[10px] font-semibold uppercase text-red-700">Toplam Durus</p>
+          <p className="mt-1 text-lg font-bold text-red-700">%{item.totalDowntimeRate}</p>
+        </div>
+        <div className="rounded-lg border border-orange-100 bg-orange-50 p-2 text-center">
+          <p className="text-[10px] font-semibold uppercase text-orange-700">Plansiz</p>
+          <p className="mt-1 text-lg font-bold text-orange-700">%{item.unplannedDowntimeRate}</p>
+        </div>
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-2 text-center">
+          <p className="text-[10px] font-semibold uppercase text-blue-700">Planli</p>
+          <p className="mt-1 text-lg font-bold text-blue-700">%{item.plannedDowntimeRate}</p>
         </div>
       </div>
 
       <div className="space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Tamamlanma Oranı</span>
-          <span className="font-medium text-gray-900">{workOrders.completionRate}%</span>
-        </div>
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div
-            className="bg-green-500 h-2 rounded-full transition-all"
-            style={{ width: `${workOrders.completionRate}%` }}
-          />
-        </div>
+        <ProgressBar label="Toplam Durus Orani" value={item.totalDowntimeRate} fillClass="bg-red-500" />
+        <ProgressBar label="Plansiz Durus Orani" value={item.unplannedDowntimeRate} fillClass="bg-orange-500" />
+        <ProgressBar label="Planli Durus Orani" value={item.plannedDowntimeRate} fillClass="bg-blue-500" />
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mt-4">
-        <div className="text-center">
-          <span className="badge badge-warning">{workOrders.pending}</span>
-          <p className="text-xs text-gray-500 mt-1">Bekliyor</p>
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg bg-gray-50 p-2">
+          <p className="text-gray-500">MTTR</p>
+          <p className="font-semibold text-gray-900">{item.mttrMinutes} dk</p>
         </div>
-        <div className="text-center">
-          <span className="badge badge-info">{workOrders.inProgress}</span>
-          <p className="text-xs text-gray-500 mt-1">Devam</p>
+        <div className="rounded-lg bg-gray-50 p-2">
+          <p className="text-gray-500">MTBF</p>
+          <p className="font-semibold text-gray-900">{item.mtbfHours} saat</p>
         </div>
-        <div className="text-center">
-          <span className="badge badge-success">{workOrders.completed}</span>
-          <p className="text-xs text-gray-500 mt-1">Tamam</p>
+        <div className="col-span-2 rounded-lg bg-gray-50 p-2">
+          <p className="text-gray-500">Aylik Durus Suresi</p>
+          <p className="font-semibold text-gray-900">{item.monthlyDowntimeMinutes} dk</p>
         </div>
       </div>
     </div>
@@ -118,21 +262,11 @@ function ShiftCard({
 }
 
 export default function Dashboard() {
-  const today = format(new Date(), 'yyyy-MM-dd');
-
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: async () => {
       const response = await dashboardApi.getSummary();
       return response.data.data as DashboardSummary;
-    }
-  });
-
-  const { data: shiftCompletion, isLoading: shiftLoading } = useQuery({
-    queryKey: ['shift-completion', today],
-    queryFn: async () => {
-      const response = await dashboardApi.getShiftCompletion(today);
-      return response.data.data as ShiftCompletionStats;
     }
   });
 
@@ -146,26 +280,22 @@ export default function Dashboard() {
 
   if (summaryLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-primary-600" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">
-            {format(new Date(), "d MMMM yyyy, EEEE", { locale: tr })}
-          </p>
+          <p className="text-gray-600">{format(new Date(), 'd MMMM yyyy, EEEE', { locale: tr })}</p>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Toplam Ekipman"
           value={summary?.equipment.total || 0}
@@ -181,143 +311,122 @@ export default function Dashboard() {
           color="bg-green-500"
         />
         <StatCard
-          title="Bugünkü İş Emirleri"
+          title="Bugunku Is Emirleri"
           value={summary?.workOrders.today.toplam || 0}
-          subtitle={`${summary?.workOrders.today.tamamlandi || 0} tamamlandı`}
+          subtitle={`${summary?.workOrders.today.tamamlandi || 0} tamamlandi`}
           icon={ClipboardList}
           color="bg-purple-500"
         />
         <StatCard
-          title="Periyodik Bakım"
+          title="Periyodik Bakim"
           value={summary?.preventiveMaintenance.upcoming || 0}
-          subtitle={`${summary?.preventiveMaintenance.overdue || 0} gecikmiş`}
+          subtitle={`${summary?.preventiveMaintenance.overdue || 0} gecikmis`}
           icon={Wrench}
           color="bg-orange-500"
         />
       </div>
 
-      {/* Alerts */}
+      <div className="card p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <Shield className="h-5 w-5 text-red-600" />
+          <h2 className="text-lg font-semibold text-gray-900">
+            ISG KPI Pano - Elektrik / Mekanik / Yardimci Tesisler
+          </h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {ISG_DEPARTMENT_KPIS.map((item) => (
+            <DepartmentIsgCard key={item.id} item={item} />
+          ))}
+        </div>
+      </div>
+
       {(summary?.preventiveMaintenance.overdue || 0) > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center">
-          <AlertTriangle className="w-5 h-5 text-red-500 mr-3" />
+        <div className="flex items-center rounded-xl border border-red-200 bg-red-50 p-4">
+          <AlertTriangle className="mr-3 h-5 w-5 text-red-500" />
           <div>
-            <p className="font-medium text-red-800">Gecikmiş Bakımlar</p>
+            <p className="font-medium text-red-800">Gecikmis Bakimlar</p>
             <p className="text-sm text-red-600">
-              {summary?.preventiveMaintenance.overdue} adet periyodik bakım gecikmiş durumda
+              {summary?.preventiveMaintenance.overdue} adet periyodik bakim gecikmis durumda
             </p>
           </div>
         </div>
       )}
 
-      {/* Shift Completion */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Vardiya Bazlı İş Emri Durumu
+      <div className="card p-6">
+        <h2 className="mb-4 text-lg font-semibold text-gray-900">
+          Durus KPI Pano - Elektrik / Mekanik / Yardimci Tesisler
         </h2>
-        {shiftLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="card p-4 animate-pulse">
-                <div className="h-4 bg-gray-200 rounded w-1/2 mb-4" />
-                <div className="h-20 bg-gray-200 rounded" />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {shiftCompletion?.shifts.map((item) => (
-              <ShiftCard
-                key={item.shift.id}
-                shift={item.shift}
-                personnel={item.personnel}
-                workOrders={item.workOrders}
-              />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {DEPARTMENT_DOWNTIME_KPIS.map((item) => (
+            <DepartmentDowntimeCard key={item.id} item={item} />
+          ))}
+        </div>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Stats */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Bu Ay İş Emri Durumu
-          </h3>
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">Bu Ay Is Emri Durumu</h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <Clock className="w-5 h-5 text-yellow-500 mr-2" />
+                <Clock className="mr-2 h-5 w-5 text-yellow-500" />
                 <span className="text-gray-600">Beklemede</span>
               </div>
-              <span className="font-semibold">
-                {summary?.workOrders.monthly.beklemede || 0}
-              </span>
+              <span className="font-semibold">{summary?.workOrders.monthly.beklemede || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <TrendingUp className="w-5 h-5 text-blue-500 mr-2" />
+                <TrendingUp className="mr-2 h-5 w-5 text-blue-500" />
                 <span className="text-gray-600">Devam Ediyor</span>
               </div>
-              <span className="font-semibold">
-                {summary?.workOrders.monthly.devamEdiyor || 0}
-              </span>
+              <span className="font-semibold">{summary?.workOrders.monthly.devamEdiyor || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 text-green-500 mr-2" />
-                <span className="text-gray-600">Tamamlandı</span>
+                <CheckCircle className="mr-2 h-5 w-5 text-green-500" />
+                <span className="text-gray-600">Tamamlandi</span>
               </div>
-              <span className="font-semibold">
-                {summary?.workOrders.monthly.tamamlandi || 0}
-              </span>
+              <span className="font-semibold">{summary?.workOrders.monthly.tamamlandi || 0}</span>
             </div>
             <hr />
             <div className="flex items-center justify-between">
               <span className="font-medium text-gray-900">Toplam</span>
-              <span className="font-bold text-xl">
-                {summary?.workOrders.monthly.toplam || 0}
-              </span>
+              <span className="text-xl font-bold">{summary?.workOrders.monthly.toplam || 0}</span>
             </div>
           </div>
         </div>
 
-        {/* KPI Summary */}
         <div className="card p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            Performans Göstergeleri
-          </h3>
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">Performans Gostergeleri</h3>
           <div className="space-y-4">
             <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Tamamlanma Oranı</span>
-                <span className="font-medium">{kpis?.completionRate || 0}%</span>
+              <div className="mb-1 flex justify-between text-sm">
+                <span className="text-gray-600">Tamamlanma Orani</span>
+                <span className="font-medium">%{kpis?.completionRate || 0}</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="h-2 w-full rounded-full bg-gray-200">
                 <div
-                  className="bg-green-500 h-2 rounded-full"
+                  className="h-2 rounded-full bg-green-500"
                   style={{ width: `${kpis?.completionRate || 0}%` }}
                 />
               </div>
             </div>
             <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">PB Uyum Oranı</span>
-                <span className="font-medium">{kpis?.pmComplianceRate || 0}%</span>
+              <div className="mb-1 flex justify-between text-sm">
+                <span className="text-gray-600">PB Uyum Orani</span>
+                <span className="font-medium">%{kpis?.pmComplianceRate || 0}</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="h-2 w-full rounded-full bg-gray-200">
                 <div
-                  className="bg-blue-500 h-2 rounded-full"
+                  className="h-2 rounded-full bg-blue-500"
                   style={{ width: `${kpis?.pmComplianceRate || 0}%` }}
                 />
               </div>
             </div>
-            <div className="pt-4 border-t">
+            <div className="border-t pt-4">
               <div className="flex justify-between">
-                <span className="text-gray-600">Ort. Tamamlanma Süresi</span>
-                <span className="font-semibold">
-                  {kpis?.avgCompletionTime || 0} dk
-                </span>
+                <span className="text-gray-600">Ort. Tamamlanma Suresi</span>
+                <span className="font-semibold">{kpis?.avgCompletionTime || 0} dk</span>
               </div>
             </div>
           </div>

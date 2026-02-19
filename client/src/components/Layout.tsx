@@ -25,7 +25,7 @@ import { isBerkeUser, isSystemAdminUser } from '../utils/access';
 import { queryClient } from '../queryClient';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard, enabled: false },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, enabled: true },
   { name: 'Is Girisi', href: '/is-emri-girisi', icon: FilePlus, enabled: true },
   { name: 'Dc Motor Bakım İş Girişi', href: '/dc-motor-bakim', icon: ClipboardList, enabled: true },
   { name: 'Tamamlanan Isler', href: '/tamamlanan-isler', icon: CheckSquare, enabled: true },

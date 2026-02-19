@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { useAuthStore } from './store/authStore';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
 import Personnel from './pages/Personnel';
 import IsEmriGirisi from './pages/IsEmriGirisi';
 import TamamlananIsler from './pages/TamamlananIsler';
@@ -70,7 +71,7 @@ function App() {
           </PrivateRoute>
         }
       >
-        <Route index element={<DisabledPage title="Dashboard" />} />
+        <Route index element={<Dashboard />} />
         <Route path="is-emri-girisi" element={<IsEmriGirisi />} />
         <Route path="tamamlanan-isler" element={<TamamlananIsler />} />
         <Route path="planlanan-isler" element={<PlanlananIsler />} />
