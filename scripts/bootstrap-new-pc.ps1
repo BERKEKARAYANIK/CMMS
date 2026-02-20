@@ -1,6 +1,7 @@
 param(
   [switch]$NoAdminPrompt,
-  [switch]$SkipNpmInstall
+  [switch]$SkipNpmInstall,
+  [switch]$AllowOnlineInstall
 )
 
 $ErrorActionPreference = 'Stop'
@@ -10,6 +11,14 @@ $serverDir = Join-Path $projectRoot 'server'
 $clientDir = Join-Path $projectRoot 'client'
 $serverEnvPath = Join-Path $serverDir '.env'
 $logDir = Join-Path $projectRoot 'service-logs'
+$offlineDir = Join-Path $projectRoot 'offline'
+$runtimeDir = Join-Path $projectRoot 'runtime'
+$bundledNodeDir = Join-Path $runtimeDir 'nodejs'
+$bundledNodeExe = Join-Path $bundledNodeDir 'node.exe'
+$bundledNpmCmd = Join-Path $bundledNodeDir 'npm.cmd'
+$offlineNodeZip = Join-Path $offlineDir 'node-runtime.zip'
+$offlineServerModulesZip = Join-Path $offlineDir 'server-node_modules.zip'
+$offlineClientModulesZip = Join-Path $offlineDir 'client-node_modules.zip'
 
 function Write-Info {
   param([string]$Message)
@@ -38,22 +47,90 @@ function Refresh-ProcessPath {
   $env:Path = "$machine;$user"
 }
 
-function Install-NodeIfMissing {
-  if ((Ensure-Tool 'node') -and (Ensure-Tool 'npm')) {
+function Expand-ZipToPath {
+  param(
+    [string]$ZipPath,
+    [string]$Destination
+  )
+
+  if (!(Test-Path $ZipPath)) {
+    throw "Offline paket bulunamadi: $ZipPath"
+  }
+
+  if (!(Test-Path $Destination)) {
+    New-Item -Path $Destination -ItemType Directory -Force | Out-Null
+  }
+
+  Expand-Archive -LiteralPath $ZipPath -DestinationPath $Destination -Force
+}
+
+function Ensure-BundledNodeRuntime {
+  if ((Test-Path $bundledNodeExe) -and (Test-Path $bundledNpmCmd)) {
     return
   }
 
-  Write-WarnLine 'Node.js/NPM bulunamadi. Otomatik kurulum deneniyor (winget)...'
+  if (!(Test-Path $offlineNodeZip)) {
+    return
+  }
+
+  Write-Info "Offline Node.js runtime aciliyor: $offlineNodeZip"
+  if (Test-Path $bundledNodeDir) {
+    Remove-Item -Path $bundledNodeDir -Recurse -Force
+  }
+
+  New-Item -Path $bundledNodeDir -ItemType Directory -Force | Out-Null
+  Expand-ZipToPath -ZipPath $offlineNodeZip -Destination $bundledNodeDir
+
+  if (!(Test-Path $bundledNodeExe)) {
+    $nestedNodeExe = Get-ChildItem -Path $bundledNodeDir -Recurse -File -Filter 'node.exe' -ErrorAction SilentlyContinue |
+      Select-Object -First 1
+
+    if ($nestedNodeExe) {
+      $nestedDir = Split-Path -Path $nestedNodeExe.FullName -Parent
+      if ($nestedDir -ne $bundledNodeDir) {
+        Copy-Item -Path (Join-Path $nestedDir '*') -Destination $bundledNodeDir -Recurse -Force
+      }
+    }
+  }
+
+  if (!(Test-Path $bundledNodeExe) -or !(Test-Path $bundledNpmCmd)) {
+    throw "Offline Node.js runtime gecersiz. Beklenen dosyalar: $bundledNodeExe ve $bundledNpmCmd"
+  }
+}
+
+function Install-NodeOnlineFallback {
+  if (-not $AllowOnlineInstall) {
+    throw 'Node.js bulunamadi. Offline kurulum icin offline/node-runtime.zip dosyasini ekleyin veya -AllowOnlineInstall ile tekrar calistirin.'
+  }
+
+  Write-WarnLine 'Node.js runtime bulunamadi. Online kurulum deneniyor (winget)...'
   if (-not (Ensure-Tool 'winget')) {
-    throw 'Node.js bulunamadi ve winget yok. Lutfen Node.js LTS kurup tekrar calistirin.'
+    throw 'Node.js bulunamadi ve winget yok. offline/node-runtime.zip ekleyin veya manuel Node.js kurun.'
   }
 
   & winget install --id OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements
   Refresh-ProcessPath
 
   if (-not ((Ensure-Tool 'node') -and (Ensure-Tool 'npm'))) {
-    throw 'Node.js kurulumu tamamlanamadi. Lutfen manuel kurup tekrar deneyin.'
+    throw 'Node.js online kurulum sonrasi da bulunamadi.'
   }
+}
+
+function Ensure-NodeRuntime {
+  Ensure-BundledNodeRuntime
+
+  if ((Test-Path $bundledNodeExe) -and (Test-Path $bundledNpmCmd)) {
+    $env:Path = "$bundledNodeDir;$env:Path"
+    Write-Info "Lokal Node.js runtime kullaniliyor: $bundledNodeDir"
+    return
+  }
+
+  if ((Ensure-Tool 'node') -and (Ensure-Tool 'npm')) {
+    Write-WarnLine 'Offline runtime bulunamadi; sistemdeki Node.js kullaniliyor.'
+    return
+  }
+
+  Install-NodeOnlineFallback
 }
 
 function Get-PreferredIPv4 {
@@ -187,6 +264,37 @@ function Invoke-CmdChecked {
   }
 }
 
+function Ensure-NodeModules {
+  param(
+    [string]$WorkingDir,
+    [string]$OfflineZip,
+    [string]$DisplayName
+  )
+
+  $nodeModulesPath = Join-Path $WorkingDir 'node_modules'
+  if (Test-Path $nodeModulesPath) {
+    Write-Info "$DisplayName mevcut, paket kurulumu atlandi."
+    return
+  }
+
+  if (Test-Path $OfflineZip) {
+    Write-Info "$DisplayName offline arsivden aciliyor: $(Split-Path -Path $OfflineZip -Leaf)"
+    Expand-ZipToPath -ZipPath $OfflineZip -Destination $WorkingDir
+  }
+
+  if (Test-Path $nodeModulesPath) {
+    return
+  }
+
+  if ($AllowOnlineInstall) {
+    Write-WarnLine "$DisplayName offline arsiv bulunamadi; npm install calistiriliyor."
+    Invoke-CmdChecked -WorkingDir $WorkingDir -Command 'npm install'
+    return
+  }
+
+  throw "$DisplayName bulunamadi. Offline arsivi ekleyin: $OfflineZip"
+}
+
 function Ensure-FirewallRule {
   param(
     [string]$Name,
@@ -259,16 +367,30 @@ function Stop-CmmsTasksIfRunning {
 
 if (-not (Test-IsAdmin) -and -not $NoAdminPrompt) {
   Write-Info 'Yonetici izinleri gerekiyor. UAC penceresi aciliyor...'
-  $args = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -NoAdminPrompt"
-  Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList $args | Out-Null
+  $argList = @(
+    '-NoProfile',
+    '-ExecutionPolicy',
+    'Bypass',
+    '-File',
+    "`"$PSCommandPath`"",
+    '-NoAdminPrompt'
+  )
+
+  if ($SkipNpmInstall) {
+    $argList += '-SkipNpmInstall'
+  }
+  if ($AllowOnlineInstall) {
+    $argList += '-AllowOnlineInstall'
+  }
+
+  Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList ($argList -join ' ') | Out-Null
   exit 190
 }
 
 $isAdmin = Test-IsAdmin
 
 Write-Info 'CMMS tek tik kurulum/baslatma basladi'
-
-Install-NodeIfMissing
+Ensure-NodeRuntime
 
 $localIp = Get-PreferredIPv4
 Write-Info "Tespit edilen IP: $localIp"
@@ -281,10 +403,10 @@ Ensure-ServerEnv -LocalIp $localIp
 Write-Info 'server/.env guncellendi'
 
 if (-not $SkipNpmInstall) {
-  Invoke-CmdChecked -WorkingDir $serverDir -Command 'npm install'
-  Invoke-CmdChecked -WorkingDir $clientDir -Command 'npm install'
+  Ensure-NodeModules -WorkingDir $serverDir -OfflineZip $offlineServerModulesZip -DisplayName 'server/node_modules'
+  Ensure-NodeModules -WorkingDir $clientDir -OfflineZip $offlineClientModulesZip -DisplayName 'client/node_modules'
 } else {
-  Write-WarnLine 'npm install adimi atlandi (-SkipNpmInstall)'
+  Write-WarnLine 'Paket kurulumu atlandi (-SkipNpmInstall)'
 }
 
 Stop-CmmsTasksIfRunning
@@ -312,8 +434,9 @@ if (-not $apiOk -or -not $webOk) {
 
 Write-Host ''
 Write-Host '================ CMMS HAZIR ================' -ForegroundColor Green
-Write-Host ("Web (bu bilgisayar): http://localhost:5174")
-Write-Host ("Web (ag):            http://{0}:5174" -f $localIp)
-Write-Host ("API Health:          http://{0}:4001/api/health" -f $localIp)
-Write-Host ("Log klasoru:         {0}" -f $logDir)
+Write-Host ("Web (bu bilgisayar):    http://localhost:5174")
+Write-Host ("Web (ag):               http://{0}:5174" -f $localIp)
+Write-Host ("API Health:             http://{0}:4001/api/health" -f $localIp)
+Write-Host ("Otomatik baslatma:      Acik (PC acilisinda)")
+Write-Host ("Log klasoru:            {0}" -f $logDir)
 Write-Host '============================================' -ForegroundColor Green

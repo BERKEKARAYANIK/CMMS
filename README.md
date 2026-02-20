@@ -76,3 +76,21 @@ Elle acilan `npm run dev` surecleri kapanmasin diye gorev tabanli servis scriptl
 - Loglar:
   - `service-logs/server-service.log`
   - `service-logs/client-service.log`
+
+## Windows Offline Kurulum (Internetsiz)
+
+Asagidaki adimlarla herhangi bir PC'de internet olmadan kurulum yapabilirsiniz:
+
+1. Gelistirme bilgisayarinda offline paketleri olusturun:
+   - `powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\prepare-offline-bundle.ps1`
+2. Asagidaki dosyalarin proje ile ayni klasorde oldugunu kontrol edin:
+   - `offline/node-runtime.zip`
+   - `offline/server-node_modules.zip`
+   - `offline/client-node_modules.zip`
+3. Yeni PC'de `CMMS_ILK_KURULUM_VE_BASLAT.bat` dosyasini yonetici olarak calistirin.
+
+Kurulum script'i su islemleri otomatik yapar:
+- Node.js runtime'i offline zipten cikarir (internet gerekmez)
+- Server/client bagimliliklarini offline ziplerden kurar
+- Servisleri gorev zamanlayiciya kaydeder
+- Servisleri PC acilisinda otomatik baslatir

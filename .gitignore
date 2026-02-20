@@ -23,6 +23,8 @@ dist/
 *.out
 tmp_cookie.txt
 service-logs/
+runtime/nodejs/
+offline/*.zip
 
 # Local databases
 *.db
