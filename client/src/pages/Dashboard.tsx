@@ -8,10 +8,18 @@ import {
   AlertTriangle,
   Zap,
   Building2,
-  Shield
+  Shield,
+  Star
 } from 'lucide-react';
-import { dashboardApi } from '../services/api';
+import { appStateApi, dashboardApi } from '../services/api';
 import type { DashboardSummary } from '../types';
+import {
+  APP_STATE_KEYS,
+  normalizeDashboardFiveSLevels,
+  type DashboardFiveSLevelsState
+} from '../constants/appState';
+import { ISG_YEARLY_DEPARTMENT_RATES, type IsgYearKey } from '../data/isg';
+import { ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR } from '../data/isgMissing';
 
 type DepartmentFiveS = {
   id: string;
@@ -29,6 +37,16 @@ type IsgDepartmentKpi = {
   crossAuditRate: number;
   icon: React.ElementType;
   accent: string;
+};
+
+type IsgDepartmentKpiDefinition = {
+  id: string;
+  name: string;
+  accidents: number;
+  icon: React.ElementType;
+  accent: string;
+  uygunsuzlukDepartmentAliases: string[];
+  caprazDepartmentAliases: string[];
 };
 
 type DepartmentDowntimeKpi = {
@@ -54,6 +72,28 @@ const normalizeMonthKey = (value: string): string => {
 };
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
+const DASHBOARD_ISG_YEAR: IsgYearKey = '2026';
+
+const normalizeDepartmentText = (value: string): string =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const matchesDepartmentByAliases = (department: string, aliases: string[]): boolean => {
+  const normalizedDepartment = normalizeDepartmentText(department);
+  return aliases.some((alias) => {
+    const normalizedAlias = normalizeDepartmentText(alias);
+    return (
+      normalizedDepartment === normalizedAlias
+      || normalizedDepartment.includes(normalizedAlias)
+      || normalizedAlias.includes(normalizedDepartment)
+    );
+  });
+};
 
 const DEPARTMENT_FIVE_S: DepartmentFiveS[] = [
   {
@@ -86,42 +126,42 @@ const DEPARTMENT_FIVE_S: DepartmentFiveS[] = [
   }
 ];
 
-const ISG_DEPARTMENT_KPIS: IsgDepartmentKpi[] = [
+const ISG_DEPARTMENT_KPI_DEFINITIONS: IsgDepartmentKpiDefinition[] = [
   {
     id: 'elektrik-ana-bina',
     name: 'Elektrik Bakim Ana Bina',
     accidents: 1,
-    nonComplianceRate: 12,
-    crossAuditRate: 88,
     icon: Zap,
-    accent: 'bg-yellow-500'
+    accent: 'bg-yellow-500',
+    uygunsuzlukDepartmentAliases: ['E.BAKIM-1', 'E BAKIM 1', 'ELEKTRIK BAKIM ANA BINA'],
+    caprazDepartmentAliases: ['E. BAKIM', 'E BAKIM', 'ELEKTRIK BAKIM']
   },
   {
     id: 'elektrik-ek-bina',
     name: 'Elektrik Bakim Ek Bina',
     accidents: 1,
-    nonComplianceRate: 15,
-    crossAuditRate: 84,
     icon: Zap,
-    accent: 'bg-amber-500'
+    accent: 'bg-amber-500',
+    uygunsuzlukDepartmentAliases: ['E.BAKIM-2', 'E BAKIM 2', 'ELEKTRIK BAKIM EK BINA'],
+    caprazDepartmentAliases: ['E. BAKIM', 'E BAKIM', 'ELEKTRIK BAKIM']
   },
   {
     id: 'mekanik',
     name: 'Mekanik',
     accidents: 1,
-    nonComplianceRate: 9,
-    crossAuditRate: 91,
     icon: Wrench,
-    accent: 'bg-blue-500'
+    accent: 'bg-blue-500',
+    uygunsuzlukDepartmentAliases: ['M. BAKIM', 'M BAKIM', 'MEKANIK BAKIM'],
+    caprazDepartmentAliases: ['M. BAKIM', 'M BAKIM', 'MEKANIK BAKIM']
   },
   {
     id: 'yardimci-tesisler',
     name: 'Yardimci Tesisler',
     accidents: 0,
-    nonComplianceRate: 6,
-    crossAuditRate: 95,
     icon: Building2,
-    accent: 'bg-emerald-500'
+    accent: 'bg-emerald-500',
+    uygunsuzlukDepartmentAliases: ['Y. TESISLER', 'Y TESISLER', 'YARDIMCI TESISLER'],
+    caprazDepartmentAliases: ['Y. TESISLER', 'Y TESISLER', 'YARDIMCI TESISLER']
   }
 ];
 
@@ -201,6 +241,52 @@ const formatMonthLabel = (monthKey: string): string => {
   return format(new Date(year, month - 1, 1), 'MMMM yyyy', { locale: tr });
 };
 
+function getFiveSVisual(level: string): {
+  panelClass: string;
+  textClass: string;
+  showStar: boolean;
+} {
+  const normalizedLevel = String(level || '').trim().toUpperCase();
+
+  if (normalizedLevel === '0S' || normalizedLevel === '1S') {
+    return {
+      panelClass: 'border-red-100 bg-red-50',
+      textClass: 'text-red-700',
+      showStar: false
+    };
+  }
+
+  if (normalizedLevel === '2S') {
+    return {
+      panelClass: 'border-amber-100 bg-amber-50',
+      textClass: 'text-amber-700',
+      showStar: false
+    };
+  }
+
+  if (normalizedLevel === '3S') {
+    return {
+      panelClass: 'border-lime-100 bg-lime-50',
+      textClass: 'text-lime-700',
+      showStar: false
+    };
+  }
+
+  if (normalizedLevel === '4S' || normalizedLevel === '5S') {
+    return {
+      panelClass: 'border-emerald-100 bg-emerald-50',
+      textClass: 'text-emerald-700',
+      showStar: normalizedLevel === '5S'
+    };
+  }
+
+  return {
+    panelClass: 'border-gray-200 bg-gray-50',
+    textClass: 'text-gray-700',
+    showStar: false
+  };
+}
+
 function ProgressBar({
   label,
   value,
@@ -243,6 +329,7 @@ function ProgressBar({
 
 function DepartmentFiveSCard({ item }: { item: DepartmentFiveS }) {
   const Icon = item.icon;
+  const fiveSVisual = getFiveSVisual(item.currentLevel);
 
   return (
     <div className="card p-5">
@@ -261,10 +348,14 @@ function DepartmentFiveSCard({ item }: { item: DepartmentFiveS }) {
         </span>
       </div>
 
-      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-center">
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Mevcut Seviye</p>
-        <p className="mt-2 text-4xl font-bold text-emerald-700">{item.currentLevel}</p>
-        <p className="mt-2 text-xs text-emerald-700">Tum bolumler icin 3S tanimli</p>
+      <div className={`relative rounded-xl border p-4 text-center ${fiveSVisual.panelClass}`}>
+        {fiveSVisual.showStar && (
+          <span className="absolute right-2 top-2 rounded-full bg-amber-100 p-1">
+            <Star className="h-4 w-4 fill-amber-400 text-amber-500" />
+          </span>
+        )}
+        <p className={`text-xs font-medium uppercase tracking-wide ${fiveSVisual.textClass}`}>Mevcut Seviye</p>
+        <p className={`mt-2 text-4xl font-bold ${fiveSVisual.textClass}`}>{item.currentLevel}</p>
       </div>
     </div>
   );
@@ -272,14 +363,10 @@ function DepartmentFiveSCard({ item }: { item: DepartmentFiveS }) {
 
 function DepartmentIsgCard({ item }: { item: IsgDepartmentKpi }) {
   const Icon = item.icon;
-  const score = Math.max(
-    0,
-    Math.min(100, Math.round((100 - item.nonComplianceRate + item.crossAuditRate) / 2))
-  );
 
   return (
     <div className="card p-5">
-      <div className="mb-4 flex items-start justify-between">
+      <div className="mb-4 flex items-start">
         <div className="flex items-center gap-3">
           <div className={`rounded-lg p-2 ${item.accent}`}>
             <Icon className="h-5 w-5 text-white" />
@@ -289,9 +376,6 @@ function DepartmentIsgCard({ item }: { item: IsgDepartmentKpi }) {
             <p className="text-xs text-gray-500">ISG KPI</p>
           </div>
         </div>
-        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
-          Skor {score}
-        </span>
       </div>
 
       <div className="mb-4 rounded-xl border border-red-100 bg-red-50 p-3">
@@ -312,7 +396,7 @@ function DepartmentDowntimeCard({ item }: { item: DepartmentDowntimeKpi }) {
 
   return (
     <div className="card p-5">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex items-center">
         <div className="flex items-center gap-3">
           <div className={`rounded-lg p-2 ${item.accent}`}>
             <Icon className="h-5 w-5 text-white" />
@@ -322,9 +406,6 @@ function DepartmentDowntimeCard({ item }: { item: DepartmentDowntimeKpi }) {
             <p className="text-xs text-gray-500">Durus KPI</p>
           </div>
         </div>
-        <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-700">
-          {item.monthlyDowntimeMinutes} dk/ay
-        </span>
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-2">
@@ -380,6 +461,22 @@ function DepartmentDowntimeCard({ item }: { item: DepartmentDowntimeKpi }) {
 export default function Dashboard() {
   const [selectedDowntimeMonth, setSelectedDowntimeMonth] = useState<string>(() => getCurrentMonthKey());
 
+  const { data: dashboardFiveSLevels } = useQuery({
+    queryKey: ['dashboard-five-s-levels'],
+    queryFn: async () => {
+      const response = await appStateApi.get(APP_STATE_KEYS.dashboardFiveSLevels);
+      return normalizeDashboardFiveSLevels(response.data?.data?.value) as DashboardFiveSLevelsState;
+    }
+  });
+
+  const departmentFiveS = useMemo(
+    () => DEPARTMENT_FIVE_S.map((item) => ({
+      ...item,
+      currentLevel: dashboardFiveSLevels?.[item.id] || item.currentLevel
+    })),
+    [dashboardFiveSLevels]
+  );
+
   const downtimeKpis = useMemo(
     () => getDowntimeKpisByMonth(selectedDowntimeMonth),
     [selectedDowntimeMonth]
@@ -389,6 +486,37 @@ export default function Dashboard() {
     () => formatMonthLabel(selectedDowntimeMonth),
     [selectedDowntimeMonth]
   );
+
+  const isgDepartmentKpis = useMemo<IsgDepartmentKpi[]>(() => {
+    const uygunsuzlukRates = ISG_YEARLY_DEPARTMENT_RATES[DASHBOARD_ISG_YEAR];
+    const caprazDepartments =
+      ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR[DASHBOARD_ISG_YEAR]?.['capraz-denetim']?.departments || [];
+
+    return ISG_DEPARTMENT_KPI_DEFINITIONS.map((definition) => {
+      const uygunsuzlukDepartment = uygunsuzlukRates.find(
+        (item) => matchesDepartmentByAliases(item.department, definition.uygunsuzlukDepartmentAliases)
+      );
+
+      const caprazDepartment = caprazDepartments.find((item) =>
+        matchesDepartmentByAliases(item.department, definition.caprazDepartmentAliases)
+      );
+
+      const nonComplianceRate = Number((uygunsuzlukDepartment?.closureRate || 0).toFixed(2));
+      const crossAuditRate = caprazDepartment && caprazDepartment.total > 0
+        ? Number((((caprazDepartment.total - caprazDepartment.missing) / caprazDepartment.total) * 100).toFixed(2))
+        : 0;
+
+      return {
+        id: definition.id,
+        name: definition.name,
+        accidents: definition.accidents,
+        nonComplianceRate,
+        crossAuditRate,
+        icon: definition.icon,
+        accent: definition.accent
+      };
+    });
+  }, []);
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['dashboard-summary'],
@@ -423,7 +551,7 @@ export default function Dashboard() {
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {DEPARTMENT_FIVE_S.map((item) => (
+          {departmentFiveS.map((item) => (
             <DepartmentFiveSCard key={item.id} item={item} />
           ))}
         </div>
@@ -437,7 +565,7 @@ export default function Dashboard() {
           </h2>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {ISG_DEPARTMENT_KPIS.map((item) => (
+          {isgDepartmentKpis.map((item) => (
             <DepartmentIsgCard key={item.id} item={item} />
           ))}
         </div>

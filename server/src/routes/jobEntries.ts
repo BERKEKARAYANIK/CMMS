@@ -2,7 +2,8 @@ import { Router, Response } from 'express';
 import {
   authenticate,
   AuthRequest,
-  isBerkeUser
+  isBerkeUser,
+  isSystemAdminUser
 } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 
@@ -58,7 +59,7 @@ type CompletedJobResponse = {
 
 function canManageEntries(user: AuthRequest['user'] | undefined): boolean {
   if (!user) return false;
-  return isBerkeUser(user);
+  return isBerkeUser(user) || isSystemAdminUser(user);
 }
 
 function toDateKey(date: Date): string {
@@ -517,14 +518,6 @@ router.get('/completed', authenticate, async (req: AuthRequest, res: Response) =
 
 router.post('/completed', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    const activeBolum = getAuthenticatedDepartment(req);
-    if (!activeBolum) {
-      return res.status(403).json({
-        success: false,
-        message: 'Kullanici bolumu tanimli degil'
-      });
-    }
-
     const tarih = parseDateKey(req.body?.tarih);
     const vardiya = normalizeText(req.body?.vardiya);
     const makina = normalizeText(req.body?.makina);
@@ -566,14 +559,25 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
       });
     }
 
-    const isBolumDisiPersonelVar = personeller.some(
-      (personel) => normalizeDepartment(personel.bolum) !== activeBolum
-    );
-    if (isBolumDisiPersonelVar) {
-      return res.status(403).json({
-        success: false,
-        message: 'Sadece kendi bolumunuzden personel secilebilir'
-      });
+    const canManageAllDepartments = canManageEntries(req.user);
+    const activeDepartment = getAuthenticatedDepartment(req);
+    if (!canManageAllDepartments) {
+      if (!activeDepartment) {
+        return res.status(403).json({
+          success: false,
+          message: 'Kullanici bolumu tanimli degil'
+        });
+      }
+
+      const outOfDepartment = personeller.find(
+        (personel) => normalizeDepartment(personel.bolum) !== activeDepartment
+      );
+      if (outOfDepartment) {
+        return res.status(403).json({
+          success: false,
+          message: 'Sadece kendi bolumunuzdeki personeller secilebilir'
+        });
+      }
     }
 
     const analizAtamasi = req.body?.analizAtamasi as {

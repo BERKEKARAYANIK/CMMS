@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express';
+﻿import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import { AUTH_COOKIE_NAME, JWT_SECRET } from '../config.js';
@@ -29,12 +29,9 @@ type UserIdentity = {
 export function normalizeAuthText(value: string | null | undefined): string {
   return String(value || '')
     .toLocaleLowerCase('tr-TR')
-    .replace(/[çÇ]/g, 'c')
-    .replace(/[ğĞ]/g, 'g')
-    .replace(/[ıİ]/g, 'i')
-    .replace(/[öÖ]/g, 'o')
-    .replace(/[şŞ]/g, 's')
-    .replace(/[üÜ]/g, 'u')
+    .replace(/ı/g, 'i')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -173,3 +170,4 @@ export function authorize(...roles: AppRole[]) {
     next();
   };
 }
+

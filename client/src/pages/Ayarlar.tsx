@@ -19,8 +19,14 @@ import {
 } from '../data/lists';
 import {
   APP_STATE_KEYS,
+  buildDefaultDashboardFiveSLevels,
+  DASHBOARD_FIVE_S_DEPARTMENTS,
+  FIVE_S_LEVEL_OPTIONS,
   buildDefaultSettingsLists,
+  normalizeDashboardFiveSLevels,
   normalizeSettingsLists,
+  sortPersonelListesiByName,
+  type DashboardFiveSLevelsState,
   type SettingsListsState
 } from '../constants/appState';
 import {
@@ -323,7 +329,7 @@ function parseTemplateRows(rows: string[][]): ParsedTemplate {
   return result;
 }
 
-type TabType = 'vardiyalar' | 'mudahaleTurleri' | 'personel' | 'makinalar';
+type TabType = 'vardiyalar' | 'mudahaleTurleri' | 'personel' | 'makinalar' | 'fiveS';
 
 const MIN_BACKUP_INTERVAL_MINUTES = 5;
 const MAX_BACKUP_INTERVAL_MINUTES = 24 * 60;
@@ -369,6 +375,11 @@ export default function Ayarlar() {
   const [backupSettings, setBackupSettings] = useState<BackupSettings>(DEFAULT_BACKUP_SETTINGS);
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [isBackupLoading, setIsBackupLoading] = useState(true);
+  const [dashboardFiveSLevels, setDashboardFiveSLevels] = useState<DashboardFiveSLevelsState>(
+    buildDefaultDashboardFiveSLevels()
+  );
+  const [isDashboardFiveSLoading, setIsDashboardFiveSLoading] = useState(true);
+  const [isDashboardFiveSSaving, setIsDashboardFiveSSaving] = useState(false);
 
   const persistLists = async (nextLists: SettingsListsState) => {
     try {
@@ -378,6 +389,24 @@ export default function Ayarlar() {
       toast.error('Liste degisiklikleri kaydedilemedi');
     } finally {
       setIsListsSaving(false);
+    }
+  };
+
+  const persistDashboardFiveSLevels = async (nextLevels: DashboardFiveSLevelsState) => {
+    if (!canManagePasswords) {
+      toast.error('Bu alan icin yetkiniz yok');
+      return;
+    }
+
+    try {
+      setIsDashboardFiveSSaving(true);
+      await appStateApi.set(APP_STATE_KEYS.dashboardFiveSLevels, nextLevels);
+      queryClient.invalidateQueries({ queryKey: ['dashboard-five-s-levels'] });
+      toast.success('Dashboard 5S seviyeleri kaydedildi');
+    } catch {
+      toast.error('Dashboard 5S seviyeleri kaydedilemedi');
+    } finally {
+      setIsDashboardFiveSSaving(false);
     }
   };
 
@@ -513,7 +542,9 @@ export default function Ayarlar() {
 
       const mergedVardiyalar = uniqueByKey(parsed.vardiyalar, (item) => item.ad);
       const mergedMudahaleTurleri = uniqueByKey(parsed.mudahaleTurleri, (item) => item.ad);
-      const mergedPersonel = uniqueByKey(parsed.personelListesi, (item) => item.sicilNo);
+      const mergedPersonel = sortPersonelListesiByName(
+        uniqueByKey(parsed.personelListesi, (item) => item.sicilNo)
+      );
       const mergedMakina = uniqueByKey(parsed.makinaListesi, (item) => item.ad);
 
       const appliedCount =
@@ -592,7 +623,26 @@ export default function Ayarlar() {
     void loadBackupSettings();
   }, [canManagePasswords]);
 
+  useEffect(() => {
+    const loadDashboardFiveSLevels = async () => {
+      try {
+        setIsDashboardFiveSLoading(true);
+        const response = await appStateApi.get(APP_STATE_KEYS.dashboardFiveSLevels);
+        const normalized = normalizeDashboardFiveSLevels(response.data?.data?.value);
+        setDashboardFiveSLevels(normalized);
+      } catch {
+        setDashboardFiveSLevels(buildDefaultDashboardFiveSLevels());
+        toast.error('Dashboard 5S seviyeleri yuklenemedi, varsayilan degerler kullanildi');
+      } finally {
+        setIsDashboardFiveSLoading(false);
+      }
+    };
+
+    void loadDashboardFiveSLevels();
+  }, []);
+
   const tabs = [
+    { id: 'fiveS' as TabType, label: '5S' },
     { id: 'vardiyalar' as TabType, label: 'Vardiyalar' },
     { id: 'mudahaleTurleri' as TabType, label: 'Mudahale Turleri' },
     { id: 'personel' as TabType, label: 'Personel' },
@@ -665,6 +715,14 @@ export default function Ayarlar() {
       return;
     }
     runBackupNowMutation.mutate();
+  };
+
+  const handleDashboardFiveSLevelChange = (departmentId: string, nextLevel: string) => {
+    if (!(FIVE_S_LEVEL_OPTIONS as readonly string[]).includes(nextLevel)) return;
+    setDashboardFiveSLevels((prev) => ({
+      ...prev,
+      [departmentId]: nextLevel as DashboardFiveSLevelsState[string]
+    }));
   };
 
   const backupLastResultLabel = backupStatus?.lastResult === 'success'
@@ -983,6 +1041,68 @@ export default function Ayarlar() {
 
       {/* Tab Content */}
       <div className="card p-6">
+        {activeTab === 'fiveS' && (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h3 className="font-semibold text-lg">5S Ayarlari</h3>
+                <p className="text-xs text-gray-500">Secilen degerler Dashboard'a ayni sekilde yansir.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void persistDashboardFiveSLevels(dashboardFiveSLevels)}
+                disabled={!canManagePasswords || isDashboardFiveSLoading || isDashboardFiveSSaving}
+                className="btn btn-primary"
+              >
+                {isDashboardFiveSSaving ? 'Kaydediliyor...' : '5S Seviyelerini Kaydet'}
+              </button>
+            </div>
+
+            {!canManagePasswords && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700">
+                Bu alani sadece sistem yoneticisi veya Berke Karayanik duzenleyebilir.
+              </div>
+            )}
+
+            {isDashboardFiveSLoading ? (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+                Dashboard 5S seviyeleri yukleniyor...
+              </div>
+            ) : (
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-4 py-3 text-left">Bolum</th>
+                      <th className="px-4 py-3 text-left md:w-64">Mevcut 5S Seviyesi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {DASHBOARD_FIVE_S_DEPARTMENTS.map((department) => (
+                      <tr key={department.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800">{department.name}</td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={dashboardFiveSLevels[department.id]}
+                            onChange={(event) => handleDashboardFiveSLevelChange(department.id, event.target.value)}
+                            className="input"
+                            disabled={!canManagePasswords || isDashboardFiveSSaving}
+                          >
+                            {FIVE_S_LEVEL_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
         {activeTab === 'vardiyalar' && (
           <VardiyalarTab
             data={vardiyalar}
@@ -1015,11 +1135,12 @@ export default function Ayarlar() {
           <PersonelTab
             data={personelListesi}
             setData={(data) => {
-              setPersonelListesi(data);
+              const sortedData = sortPersonelListesiByName(data);
+              setPersonelListesi(sortedData);
               void persistLists({
                 vardiyalar,
                 mudahaleTurleri,
-                personelListesi: data,
+                personelListesi: sortedData,
                 makinaListesi
               });
             }}

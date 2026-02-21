@@ -11,10 +11,7 @@ import type {
   User
 } from '../types';
 import { DepartmanLabels, RoleLabels } from '../types';
-import {
-  personelListesi as defaultPersonelListesi,
-  type Personel
-} from '../data/lists';
+import { type Personel } from '../data/lists';
 import type { CompletedJob } from '../types/jobEntries';
 import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
@@ -749,7 +746,7 @@ export default function Personnel() {
         const lists = normalizeSettingsLists(response.data?.data?.value);
         setLocalPersonelListesi(lists.personelListesi);
       } catch {
-        setLocalPersonelListesi(defaultPersonelListesi);
+        setLocalPersonelListesi([]);
       }
     };
 
@@ -771,35 +768,44 @@ export default function Personnel() {
   }, []);
 
   const { data: users, isLoading } = useQuery({
-    queryKey: ['users', search, filterDepartman],
+    queryKey: ['users'],
     queryFn: async () => {
-      const params: Record<string, string> = {};
-      if (search) params.search = search;
-      if (filterDepartman) params.departman = filterDepartman;
-      const response = await usersApi.getAll(params);
+      const response = await usersApi.getAll();
       return response.data.data as User[];
     }
   });
 
   const displayUsers = (() => {
-    const apiUsers = users || [];
-    const existing = new Set(apiUsers.map((user) => user.sicilNo));
-    const localUsers: User[] = localPersonelListesi.map((personel, index) => ({
-      id: -(index + 1),
-      sicilNo: personel.sicilNo,
-      ad: personel.ad,
-      soyad: personel.soyad,
-      email: '',
-      telefon: '',
-      departman: mapBolumToDepartman(personel.bolum),
-      unvan: '',
-      uzmanlikAlani: '',
-      role: 'TEKNISYEN',
-      aktif: true,
-      createdAt: new Date(0).toISOString()
-    }));
-    const uniqueLocal = localUsers.filter((user) => !existing.has(user.sicilNo));
-    return [...apiUsers, ...uniqueLocal];
+    const apiUsersBySicil = new Map((users || []).map((user) => [user.sicilNo, user]));
+
+    return localPersonelListesi.map((personel, index) => {
+      const matchedUser = apiUsersBySicil.get(personel.sicilNo);
+
+      if (!matchedUser) {
+        return {
+          id: -(index + 1),
+          sicilNo: personel.sicilNo,
+          ad: personel.ad,
+          soyad: personel.soyad,
+          email: '',
+          telefon: '',
+          departman: mapBolumToDepartman(personel.bolum),
+          unvan: '',
+          uzmanlikAlani: '',
+          role: 'TEKNISYEN',
+          aktif: true,
+          createdAt: new Date(0).toISOString()
+        } as User;
+      }
+
+      return {
+        ...matchedUser,
+        sicilNo: personel.sicilNo,
+        ad: personel.ad || matchedUser.ad,
+        soyad: personel.soyad || matchedUser.soyad,
+        departman: mapBolumToDepartman(personel.bolum)
+      };
+    });
   })();
 
   const filteredUsers = displayUsers.filter((user) => {

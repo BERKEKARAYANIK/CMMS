@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import type { ElementType } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -21,7 +21,7 @@ import { equipmentApi, shiftsApi, usersApi, workOrdersApi } from '../services/ap
 import { useAuthStore } from '../store/authStore';
 import type { Equipment, IsEmriDurum, Oncelik, Shift, User, WorkOrder } from '../types';
 import { IsEmriDurumLabels, OncelikLabels } from '../types';
-import { isBerkeUser } from '../utils/access';
+import { isBerkeUser, isSystemAdminUser } from '../utils/access';
 
 const durumOptions: IsEmriDurum[] = ['BEKLEMEDE', 'ATANDI', 'DEVAM_EDIYOR', 'ONAY_BEKLIYOR', 'TAMAMLANDI', 'IPTAL'];
 const oncelikOptions: Oncelik[] = ['ACIL', 'YUKSEK', 'NORMAL', 'DUSUK'];
@@ -996,12 +996,14 @@ function WorkOrderCard({
   workOrder,
   currentUser,
   onStatusChange,
+  onCancelAssignment,
   onOpenReport,
   onViewReport,
   onApprove,
   onDeleteReport,
   onReopenFromCompleted,
   approvingId,
+  assignmentCancelingId,
   reportPendingId,
   reportDeletingId,
   reopeningId
@@ -1009,12 +1011,14 @@ function WorkOrderCard({
   workOrder: WorkOrder;
   currentUser: User | null;
   onStatusChange: (id: number, durum: IsEmriDurum) => void;
+  onCancelAssignment: (workOrder: WorkOrder) => void;
   onOpenReport: (workOrder: WorkOrder) => void;
   onViewReport: (workOrder: WorkOrder) => void;
   onApprove: (id: number) => void;
   onDeleteReport: (workOrder: WorkOrder) => void;
   onReopenFromCompleted: (workOrder: WorkOrder) => void;
   approvingId: number | null;
+  assignmentCancelingId: number | null;
   reportPendingId: number | null;
   reportDeletingId: number | null;
   reopeningId: number | null;
@@ -1025,11 +1029,12 @@ function WorkOrderCard({
   const canFillReport = Boolean(currentUser && (workOrder.atananId === currentUser.id || isManagerRole(currentUser.role)));
   const canApprove = Boolean(currentUser && (workOrder.talepEdenId === currentUser.id || isManagerRole(currentUser.role)));
   const canManageCompleted = canManageCompletedFlow(currentUser);
-  const canAssign = Boolean(currentUser && isBerkeUser(currentUser));
+  const canAssign = Boolean(currentUser && (isBerkeUser(currentUser) || isSystemAdminUser(currentUser)));
+  const canDeleteReport = Boolean(currentUser && (isBerkeUser(currentUser) || isSystemAdminUser(currentUser)));
   const canWorkOnOrder = Boolean(currentUser && (workOrder.atananId === currentUser.id || isManagerRole(currentUser.role)));
   const hasAssignee = Boolean(workOrder.atananId);
-  const canShowDeleteReportButton = canAssign && (
-    hasReportContent
+  const canShowDeleteReportButton = canDeleteReport && (
+    workOrder.durum === 'BEKLEMEDE'
     || workOrder.durum === 'DEVAM_EDIYOR'
     || workOrder.durum === 'ONAY_BEKLIYOR'
     || workOrder.durum === 'TAMAMLANDI'
@@ -1071,6 +1076,15 @@ function WorkOrderCard({
           )}
           {hasAssignee && canWorkOnOrder && (workOrder.durum === 'ATANDI' || workOrder.durum === 'BEKLEMEDE') && (
             <button onClick={() => onStatusChange(workOrder.id, 'DEVAM_EDIYOR')} className="btn btn-primary text-xs">Basla</button>
+          )}
+          {workOrder.durum === 'ATANDI' && hasAssignee && canAssign && (
+            <button
+              onClick={() => onCancelAssignment(workOrder)}
+              className="btn btn-secondary text-xs"
+              disabled={assignmentCancelingId === workOrder.id}
+            >
+              {assignmentCancelingId === workOrder.id ? 'Iptal Ediliyor...' : 'Atamayi Iptal Et'}
+            </button>
           )}
           {!isExtended && canWorkOnOrder && workOrder.durum === 'DEVAM_EDIYOR' && (
             <button onClick={() => onStatusChange(workOrder.id, 'TAMAMLANDI')} className="btn btn-success text-xs">Tamamla</button>
@@ -1166,7 +1180,9 @@ export default function WorkOrders() {
   const [isReportReadOnly, setIsReportReadOnly] = useState(false);
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((state) => state.user);
-  const canAssignWorkOrders = Boolean(currentUser && isBerkeUser(currentUser));
+  const canAssignWorkOrders = Boolean(
+    currentUser && (isBerkeUser(currentUser) || isSystemAdminUser(currentUser))
+  );
 
   const { data: workOrders, isLoading } = useQuery({
     queryKey: ['work-orders', currentUser?.id ?? 'anon', search, filterDurum, filterOncelik],
@@ -1258,62 +1274,44 @@ export default function WorkOrders() {
     }
   });
 
-  const deleteReportMutation = useMutation({
-    mutationFn: (workOrder: WorkOrder) => workOrdersApi.clearReport(workOrder.id, workOrder.durum),
+  const cancelAssignmentMutation = useMutation({
+    mutationFn: (workOrder: WorkOrder) => workOrdersApi.cancelAssignment(workOrder.id),
     onSuccess: (response: any, workOrder: WorkOrder) => {
       const updatedWorkOrder = response?.data?.data as WorkOrder | undefined;
-      const targetId = updatedWorkOrder?.id ?? workOrder.id;
 
-      queryClient.setQueriesData({ queryKey: ['work-orders'] }, (oldData: WorkOrder[] | undefined) => {
-        if (!Array.isArray(oldData)) return oldData;
-
-        return oldData.map((item) => {
-          if (item.id !== targetId) return item;
-
-          const fallbackDurum: IsEmriDurum =
-            item.durum === 'ONAY_BEKLIYOR' || item.durum === 'TAMAMLANDI'
-              ? 'DEVAM_EDIYOR'
-              : item.durum;
-
-          // Server yanıtını kullan ama tamamlanmaNotlari'nı kesinlikle null yap
-          const baseUpdate = updatedWorkOrder
-            ? { ...item, ...updatedWorkOrder }
-            : { ...item, durum: fallbackDurum };
-
-          return {
-            ...baseUpdate,
-            tamamlanmaNotlari: undefined,
-            onaylayanId: undefined,
-            onayTarihi: undefined
-          };
+      if (updatedWorkOrder) {
+        queryClient.setQueriesData({ queryKey: ['work-orders'] }, (oldData: WorkOrder[] | undefined) => {
+          if (!Array.isArray(oldData)) return oldData;
+          return oldData.map((item) => (item.id === workOrder.id ? { ...item, ...updatedWorkOrder } : item));
         });
-      });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+      }
 
-      setReportWorkOrder((prev) => {
-        if (!prev || prev.id !== targetId) return prev;
-
-        const fallbackDurum: IsEmriDurum =
-          prev.durum === 'ONAY_BEKLIYOR' || prev.durum === 'TAMAMLANDI'
-            ? 'DEVAM_EDIYOR'
-            : prev.durum;
-
-        const baseUpdate = updatedWorkOrder
-          ? { ...prev, ...updatedWorkOrder }
-          : { ...prev, durum: fallbackDurum };
-
-        return {
-          ...baseUpdate,
-          tamamlanmaNotlari: undefined,
-          onaylayanId: undefined,
-          onayTarihi: undefined
-        };
-      });
-
-      toast.success(response?.data?.message || 'Rapor silindi');
+      toast.success(response?.data?.message || 'Atama iptal edildi');
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Rapor silinemedi');
+      toast.error(error.response?.data?.message || 'Atama iptal edilemedi');
+    }
+  });
+
+  const deleteReportMutation = useMutation({
+    mutationFn: (workOrder: WorkOrder) => workOrdersApi.delete(workOrder.id),
+    onSuccess: (response: any, workOrder: WorkOrder) => {
+      queryClient.setQueriesData({ queryKey: ['work-orders'] }, (oldData: WorkOrder[] | undefined) => {
+        if (!Array.isArray(oldData)) return oldData;
+        return oldData.filter((item) => item.id !== workOrder.id);
+      });
+
+      setReportWorkOrder((prev) => (prev?.id === workOrder.id ? null : prev));
+      setIsReportReadOnly(false);
+
+      toast.success(response?.data?.message || 'Form silindi');
+      queryClient.invalidateQueries({ queryKey: ['work-orders'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Form silinemedi');
     }
   });
 
@@ -1340,6 +1338,11 @@ export default function WorkOrders() {
   const handleDeleteReport = (workOrder: WorkOrder) => {
     if (!confirm(`${workOrder.isEmriNo} formu silinsin mi?`)) return;
     deleteReportMutation.mutate(workOrder);
+  };
+
+  const handleCancelAssignment = (workOrder: WorkOrder) => {
+    if (!confirm(`${workOrder.isEmriNo} icin atama iptal edilsin mi?`)) return;
+    cancelAssignmentMutation.mutate(workOrder);
   };
 
   const kanbanColumns: { key: IsEmriDurum; label: string; color: string }[] = [
@@ -1414,6 +1417,7 @@ export default function WorkOrders() {
                     workOrder={wo}
                     currentUser={currentUser}
                     onStatusChange={(id, durum) => statusMutation.mutate({ id, durum })}
+                    onCancelAssignment={handleCancelAssignment}
                     onOpenReport={(selectedWorkOrder) => {
                       setIsReportReadOnly(false);
                       setReportWorkOrder(selectedWorkOrder);
@@ -1426,6 +1430,7 @@ export default function WorkOrders() {
                     onDeleteReport={handleDeleteReport}
                     onReopenFromCompleted={handleReopenFromCompleted}
                     approvingId={approveMutation.isPending ? (approveMutation.variables ?? null) : null}
+                    assignmentCancelingId={cancelAssignmentMutation.isPending ? (cancelAssignmentMutation.variables?.id ?? null) : null}
                     reportPendingId={submitReportMutation.isPending ? (submitReportMutation.variables?.id ?? null) : null}
                     reportDeletingId={deleteReportMutation.isPending ? (deleteReportMutation.variables?.id ?? null) : null}
                     reopeningId={reopenMutation.isPending ? (reopenMutation.variables ?? null) : null}

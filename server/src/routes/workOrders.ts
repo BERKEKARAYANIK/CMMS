@@ -1,5 +1,10 @@
 import { Router, Response } from 'express';
-import { authenticate, AuthRequest, isBerkeUser } from '../middleware/auth.js';
+import {
+  authenticate,
+  AuthRequest,
+  isBerkeUser,
+  isSystemAdminUser
+} from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 
 const router = Router();
@@ -19,7 +24,7 @@ function canManageCompletedWorkOrders(user: AuthRequest['user'] | undefined): bo
 
 function canAssignWorkOrders(user: AuthRequest['user'] | undefined): boolean {
   if (!user) return false;
-  return isBerkeSpecialUser(user);
+  return isSystemAdminUser(user) || isBerkeSpecialUser(user);
 }
 
 function canWorkOnWorkOrder(
@@ -192,7 +197,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
     if (parsedAtananId && !canAssignWorkOrders(req.user)) {
       return res.status(403).json({
         success: false,
-        message: 'Is emri atamasi sadece Berke Karayanik tarafindan yapilabilir'
+        message: 'Is emri atamasi sadece sistem yoneticisi veya Berke Karayanik tarafindan yapilabilir'
       });
     }
 
@@ -295,7 +300,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res: Response) => {
     if (assignmentFieldProvided && !canAssignWorkOrders(req.user)) {
       return res.status(403).json({
         success: false,
-        message: 'Is emri atamasi sadece Berke Karayanik tarafindan yapilabilir'
+        message: 'Is emri atamasi sadece sistem yoneticisi veya Berke Karayanik tarafindan yapilabilir'
       });
     }
 
@@ -375,7 +380,7 @@ router.patch('/:id/clear-report', authenticate, async (req: AuthRequest, res: Re
     if (!canAssignWorkOrders(currentUser)) {
       return res.status(403).json({
         success: false,
-        message: 'Form silme yetkisi sadece Berke Karayanik kullanicisinda'
+        message: 'Form silme yetkisi sadece sistem yoneticisi veya Berke Karayanik kullanicisinda'
       });
     }
 
@@ -446,6 +451,94 @@ router.patch('/:id/clear-report', authenticate, async (req: AuthRequest, res: Re
   }
 });
 
+router.patch('/:id/cancel-assignment', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const workOrderId = Number.parseInt(req.params.id, 10);
+    const currentUser = req.user!;
+
+    if (!canAssignWorkOrders(currentUser)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Atama iptal yetkisi sadece sistem yoneticisi veya Berke Karayanik kullanicisinda'
+      });
+    }
+
+    const currentOrder = await prisma.isEmri.findUnique({
+      where: { id: workOrderId },
+      select: {
+        id: true,
+        durum: true,
+        atananId: true
+      }
+    });
+
+    if (!currentOrder) {
+      return res.status(404).json({
+        success: false,
+        message: 'Is emri bulunamadi'
+      });
+    }
+
+    if (currentOrder.durum !== 'ATANDI') {
+      return res.status(400).json({
+        success: false,
+        message: 'Atama iptal islemi sadece ATANDI durumundaki kayitlarda yapilabilir'
+      });
+    }
+
+    if (!currentOrder.atananId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu kayitta aktif atama bulunmuyor'
+      });
+    }
+
+    const workOrder = await prisma.isEmri.update({
+      where: { id: workOrderId },
+      data: {
+        atananId: null,
+        durum: 'BEKLEMEDE'
+      },
+      include: {
+        equipment: {
+          select: { id: true, ekipmanKodu: true, ekipmanAdi: true }
+        },
+        atanan: {
+          select: { id: true, ad: true, soyad: true }
+        },
+        talepEden: {
+          select: { id: true, ad: true, soyad: true }
+        },
+        shift: {
+          select: { id: true, vardiyaAdi: true, renk: true }
+        }
+      }
+    });
+
+    await prisma.isEmriLog.create({
+      data: {
+        workOrderId,
+        userId: currentUser.id,
+        islem: 'ATAMA_IPTAL_EDILDI',
+        eskiDurum: currentOrder.durum,
+        yeniDurum: 'BEKLEMEDE',
+        aciklama: 'Atama iptal edildi'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: workOrder,
+      message: 'Atama iptal edildi'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Atama iptal edilemedi'
+    });
+  }
+});
+
 router.delete('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const workOrderId = Number.parseInt(req.params.id, 10);
@@ -505,7 +598,7 @@ router.patch('/:id/status', authenticate, async (req: AuthRequest, res: Response
     if (durum === 'ATANDI' && !canAssignWorkOrders(currentUser)) {
       return res.status(403).json({
         success: false,
-        message: 'Is emri atamasi sadece Berke Karayanik tarafindan yapilabilir'
+        message: 'Is emri atamasi sadece sistem yoneticisi veya Berke Karayanik tarafindan yapilabilir'
       });
     }
 

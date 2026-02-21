@@ -1,14 +1,11 @@
-import type { User } from '../types';
+﻿import type { User } from '../types';
 
 function normalizeAuthText(value: string | null | undefined): string {
   return String(value || '')
     .toLocaleLowerCase('tr-TR')
-    .replace(/[çÇ]/g, 'c')
-    .replace(/[ğĞ]/g, 'g')
-    .replace(/[ıİ]/g, 'i')
-    .replace(/[öÖ]/g, 'o')
-    .replace(/[şŞ]/g, 's')
-    .replace(/[üÜ]/g, 'u')
+    .replace(/ı/g, 'i')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -47,3 +44,4 @@ export function buildDefaultPasswordPreview(ad: string, soyad: string): string {
   const initials = parts.map((part) => part.charAt(0).toLowerCase()).join('');
   return `${initials || 'user'}123456`;
 }
+

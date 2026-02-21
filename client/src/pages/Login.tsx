@@ -43,8 +43,8 @@ export default function Login() {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary-100 mb-4">
               <Wrench className="w-8 h-8 text-primary-600" />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">ProMaint ERW Bakim Merkezi</h1>
-            <p className="text-gray-600 mt-1">Bakim Yonetim Sistemi</p>
+            <h1 className="text-2xl font-bold text-gray-900">ERW Bakim Kontrol Merkezi</h1>
+            <p className="text-gray-600 mt-1">Bakim Yonetim Platformu</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -127,7 +127,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-gray-400 text-sm mt-6">
-          ProMaint ERW Bakim Merkezi v1.0.0 - Bakim Yonetim Sistemi
+          ERW Bakim Kontrol Merkezi v1.0.0
         </p>
       </div>
     </div>

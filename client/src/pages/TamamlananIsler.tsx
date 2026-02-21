@@ -6,9 +6,11 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { useAuthStore } from '../store/authStore';
 import type { User } from '../types';
-import { isBerkeUser } from '../utils/access';
-import { jobEntriesApi, usersApi, workOrdersApi } from '../services/api';
+import { isBerkeUser, isSystemAdminUser } from '../utils/access';
+import { appStateApi, jobEntriesApi, usersApi, workOrdersApi } from '../services/api';
 import type { CompletedJob } from '../types/jobEntries';
+import type { Personel } from '../data/lists';
+import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
 const MIN_DURUS_DAKIKASI = 45;
 const BERKE_DEPARTMENT_FILTER_OPTIONS = [
@@ -136,7 +138,10 @@ export default function TamamlananIsler() {
   const currentUser = useAuthStore((state) => state.user);
   const isBerkeViewer = Boolean(currentUser && isBerkeUser(currentUser));
   const canManage = canManageCompletedJobs(currentUser);
-  const canAssignWorkOrders = isBerkeViewer;
+  const canAssignWorkOrders = Boolean(
+    currentUser
+    && (isSystemAdminUser(currentUser) || isBerkeUser(currentUser))
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isler, setIsler] = useState<CompletedJob[]>([]);
   const [search, setSearch] = useState('');
@@ -160,6 +165,19 @@ export default function TamamlananIsler() {
   const [editMalzeme, setEditMalzeme] = useState('');
   const [isEditKaydediliyor, setIsEditKaydediliyor] = useState(false);
 
+  const {
+    data: ayarlarPersoneller,
+    isLoading: ayarlarPersonellerYukleniyor
+  } = useQuery({
+    queryKey: ['tamamlanan-analiz-settings-personel-list'],
+    enabled: canAssignWorkOrders,
+    queryFn: async () => {
+      const response = await appStateApi.get(APP_STATE_KEYS.settingsLists);
+      const lists = normalizeSettingsLists(response.data?.data?.value);
+      return lists.personelListesi as Personel[];
+    }
+  });
+
   const { data: aktifKullanicilar, isLoading: kullanicilarYukleniyor } = useQuery({
     queryKey: ['tamamlanan-analiz-users-list', currentUser?.id ?? 'anon'],
     enabled: canAssignWorkOrders,
@@ -168,6 +186,11 @@ export default function TamamlananIsler() {
       return response.data.data as User[];
     }
   });
+
+  const atamaPersonelListesi = useMemo(
+    () => ayarlarPersoneller || [],
+    [ayarlarPersoneller]
+  );
 
   useEffect(() => {
     const loadCompletedJobs = async () => {
@@ -295,7 +318,7 @@ export default function TamamlananIsler() {
 
   const openAnalizModal = (is: CompletedJob) => {
     if (!canAssignWorkOrders) {
-      toast.error('Is emri atamasi sadece Berke Karayanik tarafindan yapilabilir');
+      toast.error('Is emri atamasi sadece sistem yoneticisi veya Berke Karayanik tarafindan yapilabilir');
       return;
     }
 
@@ -327,7 +350,7 @@ export default function TamamlananIsler() {
 
   const handleAnalizAtamaKaydet = async () => {
     if (!canAssignWorkOrders) {
-      toast.error('Is emri atamasi sadece Berke Karayanik tarafindan yapilabilir');
+      toast.error('Is emri atamasi sadece sistem yoneticisi veya Berke Karayanik tarafindan yapilabilir');
       return;
     }
 
@@ -354,17 +377,13 @@ export default function TamamlananIsler() {
       return;
     }
 
-    const atananKullanici = aktifKullanicilar?.find((user) => user.sicilNo === atananSicilNo);
-    if (!atananKullanici) {
-      toast.error('Secilen kisi aktif sistem kullanicilarinda bulunamadi');
+    const secilenPersonel = atamaPersonelListesi.find((personel) => personel.sicilNo === atananSicilNo);
+    if (!secilenPersonel) {
+      toast.error('Secilen kisi Ayarlar personel listesinde bulunamadi');
       return;
     }
 
-    const secilenPersonel = {
-      sicilNo: atananKullanici.sicilNo,
-      adSoyad: `${atananKullanici.ad} ${atananKullanici.soyad}`.trim(),
-      bolum: atananKullanici.departman
-    };
+    const atananKullanici = aktifKullanicilar?.find((user) => user.sicilNo === atananSicilNo);
 
     setIsAtamaKaydediliyor(true);
     let createdWorkOrderId: number | null = null;
@@ -380,13 +399,19 @@ export default function TamamlananIsler() {
         .filter(Boolean)
         .join(' ');
 
-      const createResponse = await workOrdersApi.create({
+      const createPayload: Record<string, string | number> = {
         baslik: `[UDR] Uzayan Durus Analizi - ${selectedIs.makina}`,
         aciklama,
         oncelik: 'YUKSEK',
-        atananId: String(atananKullanici.id),
         tahminiSure: Number(selectedIs.sureDakika) || 120
-      });
+      };
+
+      // Ayarlar listesinde olup aktif hesap bulunamayan personeller icin is emri atamasiz acilir.
+      if (atananKullanici) {
+        createPayload.atananId = String(atananKullanici.id);
+      }
+
+      const createResponse = await workOrdersApi.create(createPayload);
 
       const createdWorkOrder = createResponse.data?.data as { id?: number; isEmriNo?: string } | undefined;
       if (!createdWorkOrder?.id && !createdWorkOrder?.isEmriNo) {
@@ -403,9 +428,18 @@ export default function TamamlananIsler() {
         atananBolum: secilenPersonel.bolum,
         atamaTarihi: nowIso
       };
+      const isAtamaYapildi = Boolean(atananKullanici);
       const successText = createdWorkOrder?.isEmriNo
-        ? `${secilenPersonel.adSoyad} icin ${createdWorkOrder.isEmriNo} olusturuldu`
-        : `${secilenPersonel.adSoyad} icin analiz is emri olusturuldu`;
+        ? (
+            isAtamaYapildi
+              ? `${secilenPersonel.adSoyad} icin ${createdWorkOrder.isEmriNo} olusturuldu`
+              : `${createdWorkOrder.isEmriNo} olusturuldu (atanan hesap aktif olmadigi icin BEKLEMEDE)`
+          )
+        : (
+            isAtamaYapildi
+              ? `${secilenPersonel.adSoyad} icin analiz is emri olusturuldu`
+              : 'Analiz is emri olusturuldu (atanan hesap aktif olmadigi icin BEKLEMEDE)'
+          );
       const updateResponse = await jobEntriesApi.updateCompletedAnalysis(selectedIs.id, {
         analizAtamasi: localAnalizAtamasi
       });
@@ -707,7 +741,7 @@ export default function TamamlananIsler() {
                             Is Emrine Aktar
                           </button>
                         ) : (
-                          <span className="text-xs text-gray-400">Sadece Berke</span>
+                          <span className="text-xs text-gray-400">Sadece Yetkili Kullanici</span>
                         )
                       ) : (
                         <span className="text-xs text-gray-400">Gerekli degil</span>
@@ -934,12 +968,12 @@ export default function TamamlananIsler() {
                     value={atananSicilNo}
                     onChange={(event) => setAtananSicilNo(event.target.value)}
                     className="input"
-                    disabled={isAtamaKaydediliyor || kullanicilarYukleniyor}
+                    disabled={isAtamaKaydediliyor || kullanicilarYukleniyor || ayarlarPersonellerYukleniyor}
                   >
                     <option value="">Seciniz...</option>
-                    {(aktifKullanicilar || []).map((user) => (
-                      <option key={user.id} value={user.sicilNo}>
-                        {user.ad} {user.soyad} ({user.sicilNo}) - {user.departman}
+                    {atamaPersonelListesi.map((personel) => (
+                      <option key={personel.sicilNo} value={personel.sicilNo}>
+                        {(personel.adSoyad || `${personel.ad} ${personel.soyad}`.trim())} ({personel.sicilNo}) - {personel.bolum}
                       </option>
                     ))}
                   </select>

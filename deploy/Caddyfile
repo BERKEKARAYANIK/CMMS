@@ -1,4 +1,7 @@
-{$CMMS_DOMAIN} {
+{$CMMS_DOMAIN}, www.{$CMMS_DOMAIN} {
+  @www host www.{$CMMS_DOMAIN}
+  redir @www https://{$CMMS_DOMAIN}{uri} permanent
+
   encode gzip zstd
 
   @api path /api/*

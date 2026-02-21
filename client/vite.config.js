@@ -8,9 +8,9 @@ export default defineConfig({
             registerType: 'autoUpdate',
             injectRegister: 'auto',
             manifest: {
-                name: 'CMMS Bakim Yonetim Sistemi',
-                short_name: 'CMMS',
-                description: 'Bakim ekipleri icin is girisi ve takip uygulamasi',
+                name: 'ERW Bakim Kontrol Merkezi',
+                short_name: 'ERW Bakim',
+                description: 'ERW Bakim Kontrol Merkezi uygulamasi',
                 lang: 'tr',
                 start_url: '/',
                 scope: '/',
@@ -27,8 +27,11 @@ export default defineConfig({
                 ]
             },
             workbox: {
+                cleanupOutdatedCaches: true,
+                clientsClaim: true,
                 globPatterns: ['**/*.{js,css,html,svg,png,ico,json}'],
-                navigateFallbackDenylist: [/^\/api\//]
+                navigateFallbackDenylist: [/^\/api\//],
+                skipWaiting: true
             }
         })
     ],

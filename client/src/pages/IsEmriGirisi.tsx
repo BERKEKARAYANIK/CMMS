@@ -1,11 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { Trash2, Save, RefreshCw } from 'lucide-react';
 import {
   vardiyalar as defaultVardiyalar,
   mudahaleTurleri as defaultMudahaleTurleri,
-  personelListesi as defaultPersonelListesi,
   makinaListesi as defaultMakinaListesi,
   type Personel,
   type Vardiya,
@@ -14,11 +13,23 @@ import {
 } from '../data/lists';
 import { appStateApi, jobEntriesApi } from '../services/api';
 import type { CompletedJob, PlannedJob } from '../types/jobEntries';
-import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 import { useAuthStore } from '../store/authStore';
+import { isBerkeUser, isSystemAdminUser } from '../utils/access';
+import {
+  APP_STATE_KEYS,
+  buildDefaultSettingsLists,
+  normalizeSettingsLists
+} from '../constants/appState';
 
 const PLANLANAN_TO_IS_EMRI_KEY = 'cmms_planlanan_is_to_is_emri';
-
+const TIME_STEP_MINUTES = 1;
+const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
+const MINUTE_OPTIONS = Array.from(
+  { length: 60 / TIME_STEP_MINUTES },
+  (_, index) => String(index * TIME_STEP_MINUTES).padStart(2, '0')
+);
+const WHEEL_ROW_HEIGHT = 40;
+const WHEEL_SPACER_HEIGHT = WHEEL_ROW_HEIGHT * 2;
 const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
   'ELEKTRIK': 'ELEKTRIK BAKIM ANA BINA',
   'ELEKTRIK BAKIM': 'ELEKTRIK BAKIM ANA BINA',
@@ -37,19 +48,6 @@ const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
   'YARDIMCI TESISLER': 'YARDIMCI TESISLER',
   'YONETIM': 'YONETIM'
 };
-
-function normalizeDepartment(value: unknown): string {
-  const key = String(value || '')
-    .toLocaleUpperCase('tr-TR')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  if (!key) return '';
-  return DEPARTMENT_ALIAS_MAP[key] || key;
-}
 
 type TimeInterval = {
   start: number;
@@ -79,16 +77,237 @@ function hasTimeOverlap(a: TimeInterval, b: TimeInterval): boolean {
   return a.start < b.end && b.start < a.end;
 }
 
+function roundMinuteToStep(minute: number): string {
+  const rounded = Math.floor(minute / TIME_STEP_MINUTES) * TIME_STEP_MINUTES;
+  return String(rounded).padStart(2, '0');
+}
+
+function parseTimeForPicker(value: string): { hour: string; minute: string } {
+  const [hourRaw, minuteRaw] = value.split(':');
+  const parsedHour = Number.parseInt(hourRaw || '', 10);
+  const parsedMinute = Number.parseInt(minuteRaw || '', 10);
+
+  if (!Number.isNaN(parsedHour) && parsedHour >= 0 && parsedHour < 24
+    && !Number.isNaN(parsedMinute) && parsedMinute >= 0 && parsedMinute < 60) {
+    return {
+      hour: String(parsedHour).padStart(2, '0'),
+      minute: roundMinuteToStep(parsedMinute)
+    };
+  }
+
+  const now = new Date();
+  return {
+    hour: String(now.getHours()).padStart(2, '0'),
+    minute: roundMinuteToStep(now.getMinutes())
+  };
+}
+
+function clampIndex(index: number, max: number): number {
+  if (index < 0) return 0;
+  if (index > max) return max;
+  return index;
+}
+
+function normalizeDepartment(value: unknown): string {
+  const key = String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!key) return '';
+  return DEPARTMENT_ALIAS_MAP[key] || key;
+}
+
+function filterPersonnelByDepartment(
+  personeller: Personel[],
+  activeDepartment: string,
+  canSeeAllPersonnel: boolean
+): Personel[] {
+  if (canSeeAllPersonnel) return personeller;
+  if (!activeDepartment) return [];
+  return personeller.filter((personel) => normalizeDepartment(personel.bolum) === activeDepartment);
+}
+
+function TimeWheelPicker({
+  value,
+  onChange,
+  placeholder
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [hour, setHour] = useState('00');
+  const [minute, setMinute] = useState('00');
+  const hourRef = useRef<HTMLDivElement | null>(null);
+  const minuteRef = useRef<HTMLDivElement | null>(null);
+
+  const syncScroller = (ref: HTMLDivElement | null, index: number) => {
+    if (!ref) return;
+    ref.scrollTo({ top: index * WHEEL_ROW_HEIGHT, behavior: 'auto' });
+  };
+
+  const openPicker = () => {
+    const parsed = parseTimeForPicker(value);
+    setHour(parsed.hour);
+    setMinute(parsed.minute);
+    setIsOpen(true);
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const hourIndex = HOUR_OPTIONS.indexOf(hour);
+    const minuteIndex = MINUTE_OPTIONS.indexOf(minute);
+
+    const rafId = requestAnimationFrame(() => {
+      syncScroller(hourRef.current, hourIndex < 0 ? 0 : hourIndex);
+      syncScroller(minuteRef.current, minuteIndex < 0 ? 0 : minuteIndex);
+    });
+
+    return () => cancelAnimationFrame(rafId);
+  }, [isOpen, hour, minute]);
+
+  const handleHourScroll = () => {
+    const scroller = hourRef.current;
+    if (!scroller) return;
+    const index = clampIndex(
+      Math.round(scroller.scrollTop / WHEEL_ROW_HEIGHT),
+      HOUR_OPTIONS.length - 1
+    );
+    const next = HOUR_OPTIONS[index];
+    if (next !== hour) setHour(next);
+  };
+
+  const handleMinuteScroll = () => {
+    const scroller = minuteRef.current;
+    if (!scroller) return;
+    const index = clampIndex(
+      Math.round(scroller.scrollTop / WHEEL_ROW_HEIGHT),
+      MINUTE_OPTIONS.length - 1
+    );
+    const next = MINUTE_OPTIONS[index];
+    if (next !== minute) setMinute(next);
+  };
+
+  const selectHour = (next: string) => {
+    setHour(next);
+    const index = HOUR_OPTIONS.indexOf(next);
+    syncScroller(hourRef.current, index < 0 ? 0 : index);
+  };
+
+  const selectMinute = (next: string) => {
+    setMinute(next);
+    const index = MINUTE_OPTIONS.indexOf(next);
+    syncScroller(minuteRef.current, index < 0 ? 0 : index);
+  };
+
+  const handleApply = () => {
+    onChange(`${hour}:${minute}`);
+    setIsOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={openPicker}
+        className="w-full px-3 py-2 text-left bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
+        {value || placeholder}
+      </button>
+
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
+          <button
+            type="button"
+            aria-label="Kapat"
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setIsOpen(false)}
+          />
+
+          <div className="relative w-full max-w-[360px] rounded-2xl bg-white p-3 shadow-xl sm:p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <button
+                type="button"
+                className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+                onClick={() => setIsOpen(false)}
+              >
+                Vazgec
+              </button>
+              <p className="text-sm font-semibold text-gray-800">Saat Secimi</p>
+              <button
+                type="button"
+                className="rounded-md px-3 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                onClick={handleApply}
+              >
+                Tamam
+              </button>
+            </div>
+
+            <div className="relative grid grid-cols-2 gap-2">
+              <div className="pointer-events-none absolute left-0 right-0 top-1/2 z-10 -translate-y-1/2 rounded-md border border-blue-200 bg-blue-50/40">
+                <div className="h-10" />
+              </div>
+
+              <div
+                ref={hourRef}
+                onScroll={handleHourScroll}
+                className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin"
+              >
+                <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
+                {HOUR_OPTIONS.map((valueHour) => (
+                  <button
+                    key={`hour-${valueHour}`}
+                    type="button"
+                    onClick={() => selectHour(valueHour)}
+                    className={`h-10 w-full px-2 text-center text-lg transition-colors ${
+                      valueHour === hour ? 'font-semibold text-blue-700' : 'text-gray-600'
+                    }`}
+                  >
+                    {valueHour}
+                  </button>
+                ))}
+                <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
+              </div>
+
+              <div
+                ref={minuteRef}
+                onScroll={handleMinuteScroll}
+                className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin"
+              >
+                <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
+                {MINUTE_OPTIONS.map((valueMinute) => (
+                  <button
+                    key={`minute-${valueMinute}`}
+                    type="button"
+                    onClick={() => selectMinute(valueMinute)}
+                    className={`h-10 w-full px-2 text-center text-lg transition-colors ${
+                      valueMinute === minute ? 'font-semibold text-blue-700' : 'text-gray-600'
+                    }`}
+                  >
+                    {valueMinute}
+                  </button>
+                ))}
+                <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function IsEmriGirisi() {
   const currentUser = useAuthStore((state) => state.user);
-  const currentUserBolum = useMemo(
-    () => normalizeDepartment(currentUser?.departman),
-    [currentUser?.departman]
-  );
-
   const [vardiyalar, setVardiyalar] = useState<Vardiya[]>(defaultVardiyalar);
   const [mudahaleTurleri, setMudahaleTurleri] = useState<MudahaleTuru[]>(defaultMudahaleTurleri);
-  const [personelListesi, setPersonelListesi] = useState<Personel[]>(defaultPersonelListesi);
+  const [personelListesi, setPersonelListesi] = useState<Personel[]>([]);
   const [makinaListesi, setMakinaListesi] = useState<Makina[]>(defaultMakinaListesi);
 
   const [isBootstrapping, setIsBootstrapping] = useState(true);
@@ -108,6 +327,18 @@ export default function IsEmriGirisi() {
 
   const [selectedPersonel, setSelectedPersonel] = useState('');
   const [eklenenPersoneller, setEklenenPersoneller] = useState<Personel[]>([]);
+
+  const canSeeAllPersonnel = Boolean(
+    currentUser && (isSystemAdminUser(currentUser) || isBerkeUser(currentUser))
+  );
+  const activeDepartment = useMemo(
+    () => normalizeDepartment(currentUser?.departman),
+    [currentUser?.departman]
+  );
+  const visiblePersonelListesi = useMemo(
+    () => filterPersonnelByDepartment(personelListesi, activeDepartment, canSeeAllPersonnel),
+    [activeDepartment, canSeeAllPersonnel, personelListesi]
+  );
 
   const applyPlanlananToForm = (
     planned: PlannedJob,
@@ -134,34 +365,57 @@ export default function IsEmriGirisi() {
 
   useEffect(() => {
     const bootstrap = async () => {
+      const fallbackLists = buildDefaultSettingsLists();
+
       try {
         setIsBootstrapping(true);
-        const [completedResponse, plannedResponse, listsResponse] = await Promise.all([
+        const [completedResult, plannedResult, listsResult] = await Promise.allSettled([
           jobEntriesApi.getCompleted(),
           jobEntriesApi.getPlanned(),
           appStateApi.get(APP_STATE_KEYS.settingsLists)
         ]);
 
-        const completed = completedResponse.data?.data as CompletedJob[] | undefined;
-        setMevcutIsler(Array.isArray(completed) ? completed : []);
+        if (completedResult.status === 'fulfilled') {
+          const completed = completedResult.value.data?.data as CompletedJob[] | undefined;
+          setMevcutIsler(Array.isArray(completed) ? completed : []);
+        } else {
+          setMevcutIsler([]);
+        }
 
-        const plannedJobs = plannedResponse.data?.data as PlannedJob[] | undefined;
-        const plannedList = Array.isArray(plannedJobs) ? plannedJobs : [];
-        const normalizedLists = normalizeSettingsLists(listsResponse.data?.data?.value);
-        const scopedPersonelListesi = normalizedLists.personelListesi.filter(
-          (personel) => normalizeDepartment(personel.bolum) === currentUserBolum
+        let plannedList: PlannedJob[] = [];
+        if (plannedResult.status === 'fulfilled') {
+          const plannedJobs = plannedResult.value.data?.data as PlannedJob[] | undefined;
+          plannedList = Array.isArray(plannedJobs) ? plannedJobs : [];
+        }
+
+        const normalizedLists = listsResult.status === 'fulfilled'
+          ? normalizeSettingsLists(listsResult.value.data?.data?.value)
+          : {
+              vardiyalar: fallbackLists.vardiyalar,
+              mudahaleTurleri: fallbackLists.mudahaleTurleri,
+              personelListesi: [],
+              makinaListesi: fallbackLists.makinaListesi
+            };
+        const visiblePersonnelFromSettings = filterPersonnelByDepartment(
+          normalizedLists.personelListesi,
+          activeDepartment,
+          canSeeAllPersonnel
         );
 
         setVardiyalar(normalizedLists.vardiyalar);
         setMudahaleTurleri(normalizedLists.mudahaleTurleri);
-        setPersonelListesi(scopedPersonelListesi);
+        setPersonelListesi(normalizedLists.personelListesi);
         setMakinaListesi(normalizedLists.makinaListesi);
+
+        if (listsResult.status === 'rejected') {
+          toast.error('Merkezi personel listesi alinamadi');
+        }
 
         const transferRaw = sessionStorage.getItem(PLANLANAN_TO_IS_EMRI_KEY);
         if (transferRaw) {
           try {
             const selected = JSON.parse(transferRaw) as PlannedJob;
-            applyPlanlananToForm(selected, scopedPersonelListesi);
+            applyPlanlananToForm(selected, visiblePersonnelFromSettings);
           } catch {
             // ignore invalid transfer payload
           } finally {
@@ -172,9 +426,10 @@ export default function IsEmriGirisi() {
 
         const firstPlanned = plannedList.find((item) => item.gorevTipi !== 'DURUS_RAPOR_ANALIZ');
         if (firstPlanned) {
-          applyPlanlananToForm(firstPlanned, scopedPersonelListesi);
+          applyPlanlananToForm(firstPlanned, visiblePersonnelFromSettings);
         }
       } catch {
+        setPersonelListesi([]);
         toast.error('Baslangic verileri yuklenemedi');
       } finally {
         setIsBootstrapping(false);
@@ -182,7 +437,19 @@ export default function IsEmriGirisi() {
     };
 
     void bootstrap();
-  }, [currentUserBolum]);
+  }, [activeDepartment, canSeeAllPersonnel]);
+
+  useEffect(() => {
+    setSelectedPersonel((prev) => (
+      visiblePersonelListesi.some((personel) => personel.sicilNo === prev) ? prev : ''
+    ));
+    setEklenenPersoneller((prev) => (
+      prev.filter((personel) => (
+        canSeeAllPersonnel
+        || normalizeDepartment(personel.bolum) === activeDepartment
+      ))
+    ));
+  }, [activeDepartment, canSeeAllPersonnel, visiblePersonelListesi]);
 
   useEffect(() => {
     if (baslangicSaati && bitisSaati) {
@@ -202,21 +469,14 @@ export default function IsEmriGirisi() {
   }, [baslangicSaati, bitisSaati]);
 
   const handlePersonelEkle = () => {
-    if (!currentUserBolum) {
-      toast.error('Kullanici bolumu tanimli degil');
-      return;
-    }
-
     if (!selectedPersonel) {
       toast.error('Lutfen personel seciniz');
       return;
     }
 
-    const personel = personelListesi.find((p) => p.sicilNo === selectedPersonel);
-    if (!personel) return;
-
-    if (normalizeDepartment(personel.bolum) !== currentUserBolum) {
-      toast.error('Sadece kendi bolumunuzden personel secilebilir');
+    const personel = visiblePersonelListesi.find((p) => p.sicilNo === selectedPersonel);
+    if (!personel) {
+      toast.error('Sadece kendi bolumunuzdeki personeller secilebilir');
       return;
     }
 
@@ -250,11 +510,6 @@ export default function IsEmriGirisi() {
   };
 
   const handleKaydet = async () => {
-    if (!currentUserBolum) {
-      toast.error('Kullanici bolumu tanimli degil');
-      return;
-    }
-
     if (!makina) {
       toast.error('Makine / Hat seciniz');
       return;
@@ -281,14 +536,6 @@ export default function IsEmriGirisi() {
     }
     if (eklenenPersoneller.length === 0) {
       toast.error('En az bir personel ekleyiniz');
-      return;
-    }
-
-    const isBolumDisiPersonelVar = eklenenPersoneller.some(
-      (personel) => normalizeDepartment(personel.bolum) !== currentUserBolum
-    );
-    if (isBolumDisiPersonelVar) {
-      toast.error('Sadece kendi bolumunuzden personel ekleyebilirsiniz');
       return;
     }
     if (!aciklama.trim()) {
@@ -419,11 +666,10 @@ export default function IsEmriGirisi() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Baslangic Saati
               </label>
-              <input
-                type="time"
+              <TimeWheelPicker
                 value={baslangicSaati}
-                onChange={(e) => setBaslangicSaati(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={setBaslangicSaati}
+                placeholder="Saat seciniz..."
               />
             </div>
 
@@ -488,11 +734,10 @@ export default function IsEmriGirisi() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Bitis Saati
               </label>
-              <input
-                type="time"
+              <TimeWheelPicker
                 value={bitisSaati}
-                onChange={(e) => setBitisSaati(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                onChange={setBitisSaati}
+                placeholder="Saat seciniz..."
               />
             </div>
 
@@ -500,9 +745,6 @@ export default function IsEmriGirisi() {
               <label className="block text-sm font-semibold text-gray-700 mb-1">
                 Personel Sec
               </label>
-              <p className="mb-2 text-xs text-gray-500">
-                Aktif bolum: {currentUserBolum || 'Tanimsiz'}
-              </p>
               <div className="flex flex-col sm:flex-row items-stretch gap-2">
                 <select
                   value={selectedPersonel}
@@ -510,7 +752,7 @@ export default function IsEmriGirisi() {
                   className="min-w-0 flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Seciniz...</option>
-                  {personelListesi.map((p) => (
+                  {visiblePersonelListesi.map((p) => (
                     <option key={p.sicilNo} value={p.sicilNo}>
                       {p.adSoyad} ({p.sicilNo}) - {p.bolum}
                     </option>
@@ -524,6 +766,11 @@ export default function IsEmriGirisi() {
                   EKLE
                 </button>
               </div>
+              {!canSeeAllPersonnel && visiblePersonelListesi.length === 0 && (
+                <p className="mt-1 text-xs text-amber-700">
+                  Kendi bolumunuzde secilebilir personel bulunamadi.
+                </p>
+              )}
             </div>
 
             <div>

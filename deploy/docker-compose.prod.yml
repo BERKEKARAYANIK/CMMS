@@ -9,6 +9,8 @@ services:
       PORT: 4001
       NODE_ENV: production
       CLIENT_ORIGIN: https://${CMMS_DOMAIN}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
     volumes:
       - cmms_data:/data
     restart: unless-stopped

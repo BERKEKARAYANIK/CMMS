@@ -91,8 +91,8 @@ export default function Layout() {
       >
         <div className="flex items-center justify-between h-16 px-4 bg-gray-800">
           <div className="leading-tight">
-            <span className="block text-base font-semibold text-white">ProMaint</span>
-            <span className="block text-xs text-gray-300">ERW Bakim Merkezi</span>
+            <span className="block text-base font-semibold text-white">ERW Bakim</span>
+            <span className="block text-xs text-gray-300">Kontrol Merkezi</span>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -162,8 +162,8 @@ export default function Layout() {
           <div className="flex items-center h-16 px-4 bg-gray-800">
             <Wrench className="w-8 h-8 text-primary-500" />
             <div className="ml-2 leading-tight">
-              <span className="block text-lg font-semibold text-white">ProMaint</span>
-              <span className="block text-xs text-gray-300">ERW Bakim Merkezi</span>
+              <span className="block text-lg font-semibold text-white">ERW Bakim</span>
+              <span className="block text-xs text-gray-300">Kontrol Merkezi</span>
             </div>
           </div>
           <nav className="mt-4 flex-1 px-2 space-y-1">
@@ -221,7 +221,7 @@ export default function Layout() {
             )}
           </div>
           <div className="p-4 border-t border-gray-800">
-            <p className="text-xs text-gray-500">Bakim Yonetim Sistemi</p>
+            <p className="text-xs text-gray-500">ERW Bakim Kontrol Merkezi</p>
             <p className="text-xs text-gray-600">v1.0.0</p>
           </div>
         </div>
@@ -239,7 +239,7 @@ export default function Layout() {
 
             <div className="flex-1 lg:ml-0 ml-4">
               <h1 className="text-lg font-semibold text-gray-900">
-                Bakim Yonetim Sistemi
+                ERW Bakim Kontrol Merkezi
               </h1>
             </div>
 

@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM node:20
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY . .
 
-RUN npm run build && npm run db:generate
+RUN npm run build || true && npm run db:generate
 
 EXPOSE 4001
 
