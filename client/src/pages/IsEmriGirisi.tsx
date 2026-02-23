@@ -9,8 +9,8 @@ import {
   type Personel,
   type Vardiya,
   type MudahaleTuru,
-  type Makina
-} from '../data/lists';
+  type Makina } from
+'../data/lists';
 import { appStateApi, jobEntriesApi } from '../services/api';
 import type { CompletedJob, PlannedJob } from '../types/jobEntries';
 import { useAuthStore } from '../store/authStore';
@@ -18,8 +18,8 @@ import { isBerkeUser, isSystemAdminUser } from '../utils/access';
 import {
   APP_STATE_KEYS,
   buildDefaultSettingsLists,
-  normalizeSettingsLists
-} from '../constants/appState';
+  normalizeSettingsLists } from
+'../constants/appState';
 
 const PLANLANAN_TO_IS_EMRI_KEY = 'cmms_planlanan_is_to_is_emri';
 const TIME_STEP_MINUTES = 1;
@@ -82,13 +82,13 @@ function roundMinuteToStep(minute: number): string {
   return String(rounded).padStart(2, '0');
 }
 
-function parseTimeForPicker(value: string): { hour: string; minute: string } {
+function parseTimeForPicker(value: string): {hour: string;minute: string;} {
   const [hourRaw, minuteRaw] = value.split(':');
   const parsedHour = Number.parseInt(hourRaw || '', 10);
   const parsedMinute = Number.parseInt(minuteRaw || '', 10);
 
-  if (!Number.isNaN(parsedHour) && parsedHour >= 0 && parsedHour < 24
-    && !Number.isNaN(parsedMinute) && parsedMinute >= 0 && parsedMinute < 60) {
+  if (!Number.isNaN(parsedHour) && parsedHour >= 0 && parsedHour < 24 &&
+  !Number.isNaN(parsedMinute) && parsedMinute >= 0 && parsedMinute < 60) {
     return {
       hour: String(parsedHour).padStart(2, '0'),
       minute: roundMinuteToStep(parsedMinute)
@@ -109,23 +109,23 @@ function clampIndex(index: number, max: number): number {
 }
 
 function normalizeDepartment(value: unknown): string {
-  const key = String(value || '')
-    .toLocaleUpperCase('tr-TR')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const key = String(value || '').
+  toLocaleUpperCase('tr-TR').
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/[^A-Z0-9]+/g, ' ').
+  replace(/\s+/g, ' ').
+  trim();
 
   if (!key) return '';
   return DEPARTMENT_ALIAS_MAP[key] || key;
 }
 
 function filterPersonnelByDepartment(
-  personeller: Personel[],
-  activeDepartment: string,
-  canSeeAllPersonnel: boolean
-): Personel[] {
+personeller: Personel[],
+activeDepartment: string,
+canSeeAllPersonnel: boolean)
+: Personel[] {
   if (canSeeAllPersonnel) return personeller;
   if (!activeDepartment) return [];
   return personeller.filter((personel) => normalizeDepartment(personel.bolum) === activeDepartment);
@@ -135,11 +135,11 @@ function TimeWheelPicker({
   value,
   onChange,
   placeholder
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
-}) {
+
+
+
+
+}: {value: string;onChange: (value: string) => void;placeholder: string;}) {
   const [isOpen, setIsOpen] = useState(false);
   const [hour, setHour] = useState('00');
   const [minute, setMinute] = useState('00');
@@ -216,35 +216,35 @@ function TimeWheelPicker({
       <button
         type="button"
         onClick={openPicker}
-        className="w-full px-3 py-2 text-left bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-      >
+        className="w-full px-3 py-2 text-left bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+        
         {value || placeholder}
       </button>
 
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
+      {isOpen &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
           <button
-            type="button"
-            aria-label="Kapat"
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setIsOpen(false)}
-          />
+          type="button"
+          aria-label="Kapat"
+          className="absolute inset-0 bg-black/40"
+          onClick={() => setIsOpen(false)} />
+        
 
           <div className="relative w-full max-w-[360px] rounded-2xl bg-white p-3 shadow-xl sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <button
-                type="button"
-                className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
-                onClick={() => setIsOpen(false)}
-              >
+              type="button"
+              className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+              onClick={() => setIsOpen(false)}>
+              
                 Vazgec
               </button>
-              <p className="text-sm font-semibold text-gray-800">Saat Secimi</p>
+              <p className="text-sm font-semibold text-gray-800">Saat Seçimi</p>
               <button
-                type="button"
-                className="rounded-md px-3 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-                onClick={handleApply}
-              >
+              type="button"
+              className="rounded-md px-3 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+              onClick={handleApply}>
+              
                 Tamam
               </button>
             </div>
@@ -255,52 +255,52 @@ function TimeWheelPicker({
               </div>
 
               <div
-                ref={hourRef}
-                onScroll={handleHourScroll}
-                className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin"
-              >
+              ref={hourRef}
+              onScroll={handleHourScroll}
+              className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin">
+              
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
-                {HOUR_OPTIONS.map((valueHour) => (
-                  <button
-                    key={`hour-${valueHour}`}
-                    type="button"
-                    onClick={() => selectHour(valueHour)}
-                    className={`h-10 w-full px-2 text-center text-lg transition-colors ${
-                      valueHour === hour ? 'font-semibold text-blue-700' : 'text-gray-600'
-                    }`}
-                  >
+                {HOUR_OPTIONS.map((valueHour) =>
+              <button
+                key={`hour-${valueHour}`}
+                type="button"
+                onClick={() => selectHour(valueHour)}
+                className={`h-10 w-full px-2 text-center text-lg transition-colors ${
+                valueHour === hour ? 'font-semibold text-blue-700' : 'text-gray-600'}`
+                }>
+                
                     {valueHour}
                   </button>
-                ))}
+              )}
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
               </div>
 
               <div
-                ref={minuteRef}
-                onScroll={handleMinuteScroll}
-                className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin"
-              >
+              ref={minuteRef}
+              onScroll={handleMinuteScroll}
+              className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin">
+              
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
-                {MINUTE_OPTIONS.map((valueMinute) => (
-                  <button
-                    key={`minute-${valueMinute}`}
-                    type="button"
-                    onClick={() => selectMinute(valueMinute)}
-                    className={`h-10 w-full px-2 text-center text-lg transition-colors ${
-                      valueMinute === minute ? 'font-semibold text-blue-700' : 'text-gray-600'
-                    }`}
-                  >
+                {MINUTE_OPTIONS.map((valueMinute) =>
+              <button
+                key={`minute-${valueMinute}`}
+                type="button"
+                onClick={() => selectMinute(valueMinute)}
+                className={`h-10 w-full px-2 text-center text-lg transition-colors ${
+                valueMinute === minute ? 'font-semibold text-blue-700' : 'text-gray-600'}`
+                }>
+                
                     {valueMinute}
                   </button>
-                ))}
+              )}
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
               </div>
             </div>
           </div>
         </div>
-      )}
-    </>
-  );
+      }
+    </>);
+
 }
 
 export default function IsEmriGirisi() {
@@ -327,6 +327,7 @@ export default function IsEmriGirisi() {
 
   const [selectedPersonel, setSelectedPersonel] = useState('');
   const [eklenenPersoneller, setEklenenPersoneller] = useState<Personel[]>([]);
+  const currentUserSicilNo = String(currentUser?.sicilNo || '').trim();
 
   const canSeeAllPersonnel = Boolean(
     currentUser && (isSystemAdminUser(currentUser) || isBerkeUser(currentUser))
@@ -341,9 +342,9 @@ export default function IsEmriGirisi() {
   );
 
   const applyPlanlananToForm = (
-    planned: PlannedJob,
-    personnelSource: Personel[] = personelListesi
-  ) => {
+  planned: PlannedJob,
+  personnelSource: Personel[] = personelListesi) =>
+  {
     setPlanlananId(planned.id);
     setMakina(planned.makina || '');
     setMudahaleTuru(planned.mudahaleTuru || '');
@@ -370,10 +371,10 @@ export default function IsEmriGirisi() {
       try {
         setIsBootstrapping(true);
         const [completedResult, plannedResult, listsResult] = await Promise.allSettled([
-          jobEntriesApi.getCompleted(),
-          jobEntriesApi.getPlanned(),
-          appStateApi.get(APP_STATE_KEYS.settingsLists)
-        ]);
+        jobEntriesApi.getCompleted(),
+        jobEntriesApi.getPlanned(),
+        appStateApi.get(APP_STATE_KEYS.settingsLists)]
+        );
 
         if (completedResult.status === 'fulfilled') {
           const completed = completedResult.value.data?.data as CompletedJob[] | undefined;
@@ -388,14 +389,14 @@ export default function IsEmriGirisi() {
           plannedList = Array.isArray(plannedJobs) ? plannedJobs : [];
         }
 
-        const normalizedLists = listsResult.status === 'fulfilled'
-          ? normalizeSettingsLists(listsResult.value.data?.data?.value)
-          : {
-              vardiyalar: fallbackLists.vardiyalar,
-              mudahaleTurleri: fallbackLists.mudahaleTurleri,
-              personelListesi: [],
-              makinaListesi: fallbackLists.makinaListesi
-            };
+        const normalizedLists = listsResult.status === 'fulfilled' ?
+        normalizeSettingsLists(listsResult.value.data?.data?.value) :
+        {
+          vardiyalar: fallbackLists.vardiyalar,
+          mudahaleTurleri: fallbackLists.mudahaleTurleri,
+          personelListesi: [],
+          makinaListesi: fallbackLists.makinaListesi
+        };
         const visiblePersonnelFromSettings = filterPersonnelByDepartment(
           normalizedLists.personelListesi,
           activeDepartment,
@@ -417,11 +418,11 @@ export default function IsEmriGirisi() {
             const selected = JSON.parse(transferRaw) as PlannedJob;
             applyPlanlananToForm(selected, visiblePersonnelFromSettings);
           } catch {
+
+
+
             // ignore invalid transfer payload
-          } finally {
-            sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);
-          }
-          return;
+          } finally {sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);}return;
         }
 
         const firstPlanned = plannedList.find((item) => item.gorevTipi !== 'DURUS_RAPOR_ANALIZ');
@@ -430,7 +431,7 @@ export default function IsEmriGirisi() {
         }
       } catch {
         setPersonelListesi([]);
-        toast.error('Baslangic verileri yuklenemedi');
+        toast.error("Başlangıç verileri yüklenemedi");
       } finally {
         setIsBootstrapping(false);
       }
@@ -440,16 +441,27 @@ export default function IsEmriGirisi() {
   }, [activeDepartment, canSeeAllPersonnel]);
 
   useEffect(() => {
-    setSelectedPersonel((prev) => (
-      visiblePersonelListesi.some((personel) => personel.sicilNo === prev) ? prev : ''
-    ));
-    setEklenenPersoneller((prev) => (
-      prev.filter((personel) => (
-        canSeeAllPersonnel
-        || normalizeDepartment(personel.bolum) === activeDepartment
-      ))
-    ));
-  }, [activeDepartment, canSeeAllPersonnel, visiblePersonelListesi]);
+    const defaultSelectedPersonel =
+    currentUserSicilNo &&
+    visiblePersonelListesi.some((personel) => personel.sicilNo === currentUserSicilNo) ?
+    currentUserSicilNo :
+    '';
+
+    setSelectedPersonel((prev) =>
+    visiblePersonelListesi.some((personel) => personel.sicilNo === prev) ? prev : defaultSelectedPersonel
+    );
+    setEklenenPersoneller((prev) =>
+    prev.filter((personel) =>
+    canSeeAllPersonnel ||
+    normalizeDepartment(personel.bolum) === activeDepartment
+    )
+    );
+  }, [
+    activeDepartment,
+    canSeeAllPersonnel,
+    currentUserSicilNo,
+    visiblePersonelListesi
+  ]);
 
   useEffect(() => {
     if (baslangicSaati && bitisSaati) {
@@ -470,13 +482,13 @@ export default function IsEmriGirisi() {
 
   const handlePersonelEkle = () => {
     if (!selectedPersonel) {
-      toast.error('Lutfen personel seciniz');
+      toast.error("Lütfen personel seçiniz");
       return;
     }
 
     const personel = visiblePersonelListesi.find((p) => p.sicilNo === selectedPersonel);
     if (!personel) {
-      toast.error('Sadece kendi bolumunuzdeki personeller secilebilir');
+      toast.error("Sadece kendi bölümünüzdeki personeller seçilebilir");
       return;
     }
 
@@ -511,15 +523,15 @@ export default function IsEmriGirisi() {
 
   const handleKaydet = async () => {
     if (!makina) {
-      toast.error('Makine / Hat seciniz');
+      toast.error("Makine / Hat seçiniz");
       return;
     }
     if (!vardiya) {
-      toast.error('Vardiya seciniz');
+      toast.error("Vardiya seçiniz");
       return;
     }
     if (!mudahaleTuru) {
-      toast.error('Mudahale turu seciniz');
+      toast.error("Müdahale türü seçiniz");
       return;
     }
     if (!tarih) {
@@ -527,11 +539,11 @@ export default function IsEmriGirisi() {
       return;
     }
     if (!baslangicSaati) {
-      toast.error('Baslangic saati giriniz');
+      toast.error("Başlangıç saati giriniz");
       return;
     }
     if (!bitisSaati) {
-      toast.error('Bitis saati giriniz');
+      toast.error("Bitiş saati giriniz");
       return;
     }
     if (eklenenPersoneller.length === 0) {
@@ -539,13 +551,13 @@ export default function IsEmriGirisi() {
       return;
     }
     if (!aciklama.trim()) {
-      toast.error('Mudahale aciklamasi giriniz');
+      toast.error('Müdahale açıklaması giriniz');
       return;
     }
 
     const yeniIsAraligi = buildTimeInterval(tarih, baslangicSaati, bitisSaati);
     if (!yeniIsAraligi) {
-      toast.error('Saat araligi gecersiz');
+      toast.error("Saat aralığı gecersiz");
       return;
     }
 
@@ -566,7 +578,7 @@ export default function IsEmriGirisi() {
 
       if (cakisanIs) {
         toast.error(
-          `${personel.adSoyad} icin ${cakisanIs.tarih} ${cakisanIs.baslangicSaati}-${cakisanIs.bitisSaati} araliginda baska is var`
+          `${personel.adSoyad} için ${cakisanIs.tarih} ${cakisanIs.baslangicSaati}-${cakisanIs.bitisSaati} aralığında başka iş var`
         );
         return;
       }
@@ -602,15 +614,15 @@ export default function IsEmriGirisi() {
         try {
           await jobEntriesApi.deletePlanned(planlananId);
         } catch {
-          // planned item cleanup best effort
-        }
-        setPlanlananId(null);
-      }
 
-      toast.success('Is girisi kaydedildi');
+
+
+          // planned item cleanup best effort
+        }setPlanlananId(null);}
+      toast.success("İş girişi kaydedildi");
       handleTemizle();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Is girisi kaydedilemedi');
+      toast.error(error?.response?.data?.message || "İş girişi kaydedilemedi");
     } finally {
       setIsSaving(false);
     }
@@ -619,83 +631,83 @@ export default function IsEmriGirisi() {
   return (
     <div className="max-w-5xl mx-auto">
       <div className="bg-white rounded-xl shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Is Girisi</h1>
-        <p className="text-red-500 text-sm mb-6">* Tum alanlar zorunludur ve denetime tabidir.</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">İş Girişi</h1>
+        <p className="text-red-500 text-sm mb-6">* Tüm alanlar zorunludur ve denetime tabidir.</p>
 
-        {isBootstrapping && (
-          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
-            Veriler yukleniyor...
+        {isBootstrapping &&
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700">
+            Veriler yükleniyor...
           </div>
-        )}
+        }
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Makine / Hat Secimi
+                Makine / Hat Seçimi
               </label>
               <select
                 value={makina}
                 onChange={(e) => setMakina(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Seciniz...</option>
-                {makinaListesi.map((m) => (
-                  <option key={m.id} value={m.ad}>{m.ad}</option>
-                ))}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                
+                <option value="">Seçiniz...</option>
+                {makinaListesi.map((m) =>
+                <option key={m.id} value={m.ad}>{m.ad}</option>
+                )}
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Mudahale Turu
+                Müdahale Türü
               </label>
               <select
                 value={mudahaleTuru}
                 onChange={(e) => setMudahaleTuru(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Seciniz...</option>
-                {mudahaleTurleri.map((m) => (
-                  <option key={m.id} value={m.ad}>{m.ad}</option>
-                ))}
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                
+                <option value="">Seçiniz...</option>
+                {mudahaleTurleri.map((m) =>
+                <option key={m.id} value={m.ad}>{m.ad}</option>
+                )}
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Baslangic Saati
+                Başlangıç Saati
               </label>
               <TimeWheelPicker
                 value={baslangicSaati}
                 onChange={setBaslangicSaati}
-                placeholder="Saat seciniz..."
-              />
+                placeholder="Saat seçiniz..." />
+              
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Mudahale Suresi (dk)
+                Müdahale Süresi (dk)
               </label>
               <input
                 type="number"
                 value={sureDakika}
                 readOnly
-                className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700"
-              />
+                className="w-full px-3 py-2 bg-gray-100 border border-gray-300 rounded-md text-gray-700" />
+              
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Mudahale Aciklamasi
+                Müdahale Açıklaması
               </label>
               <textarea
                 value={aciklama}
                 onChange={(e) => setAciklama(e.target.value)}
                 rows={6}
                 className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Yapilan islem detaylarini yaziniz..."
-              />
+                placeholder="Yapilan işlem detaylarini yaziniz..." />
+              
             </div>
           </div>
 
@@ -707,14 +719,14 @@ export default function IsEmriGirisi() {
               <select
                 value={vardiya}
                 onChange={(e) => setVardiya(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Seciniz...</option>
-                {vardiyalar.map((v) => (
-                  <option key={v.id} value={`${v.ad} (${v.saat})`}>
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                
+                <option value="">Seçiniz...</option>
+                {vardiyalar.map((v) =>
+                <option key={v.id} value={`${v.ad} (${v.saat})`}>
                     {v.ad} ({v.saat})
                   </option>
-                ))}
+                )}
               </select>
             </div>
 
@@ -726,51 +738,51 @@ export default function IsEmriGirisi() {
                 type="date"
                 value={tarih}
                 onChange={(e) => setTarih(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+              
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Bitis Saati
+                Bitiş Saati
               </label>
               <TimeWheelPicker
                 value={bitisSaati}
                 onChange={setBitisSaati}
-                placeholder="Saat seciniz..."
-              />
+                placeholder="Saat seçiniz..." />
+              
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-1">
-                Personel Sec
+                Personel Seç
               </label>
               <div className="flex flex-col sm:flex-row items-stretch gap-2">
                 <select
                   value={selectedPersonel}
                   onChange={(e) => setSelectedPersonel(e.target.value)}
-                  className="min-w-0 flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Seciniz...</option>
-                  {visiblePersonelListesi.map((p) => (
-                    <option key={p.sicilNo} value={p.sicilNo}>
+                  className="min-w-0 flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                  
+                  <option value="">Seçiniz...</option>
+                  {visiblePersonelListesi.map((p) =>
+                  <option key={p.sicilNo} value={p.sicilNo}>
                       {p.adSoyad} ({p.sicilNo}) - {p.bolum}
                     </option>
-                  ))}
+                  )}
                 </select>
                 <button
                   type="button"
                   onClick={handlePersonelEkle}
-                  className="w-full sm:w-24 shrink-0 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-md transition-colors"
-                >
+                  className="w-full sm:w-24 shrink-0 px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-md transition-colors">
+                  
                   EKLE
                 </button>
               </div>
-              {!canSeeAllPersonnel && visiblePersonelListesi.length === 0 && (
-                <p className="mt-1 text-xs text-amber-700">
-                  Kendi bolumunuzde secilebilir personel bulunamadi.
+              {!canSeeAllPersonnel && visiblePersonelListesi.length === 0 &&
+              <p className="mt-1 text-xs text-amber-700">
+                  Kendi bölümünüzde seçilebilir personel bulunamadı.
                 </p>
-              )}
+              }
             </div>
 
             <div>
@@ -778,28 +790,28 @@ export default function IsEmriGirisi() {
                 PERSONEL
               </label>
               <div className="bg-white border border-gray-300 rounded-md min-h-[180px] max-h-[180px] overflow-y-auto">
-                {eklenenPersoneller.length === 0 ? (
-                  <div className="flex items-center justify-center h-[180px] text-gray-400 text-sm">
+                {eklenenPersoneller.length === 0 ?
+                <div className="flex items-center justify-center h-[180px] text-gray-400 text-sm">
                     Personel eklenmedi
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-200">
-                    {eklenenPersoneller.map((p) => (
-                      <div key={p.sicilNo} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
+                  </div> :
+
+                <div className="divide-y divide-gray-200">
+                    {eklenenPersoneller.map((p) =>
+                  <div key={p.sicilNo} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50">
                         <span className="text-sm">
                           {p.adSoyad} ({p.sicilNo})
                         </span>
                         <button
-                          type="button"
-                          onClick={() => handlePersonelSil(p.sicilNo)}
-                          className="text-red-500 hover:text-red-700 p-1"
-                        >
+                      type="button"
+                      onClick={() => handlePersonelSil(p.sicilNo)}
+                      className="text-red-500 hover:text-red-700 p-1">
+                      
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
-                    ))}
+                  )}
                   </div>
-                )}
+                }
               </div>
             </div>
           </div>
@@ -814,16 +826,16 @@ export default function IsEmriGirisi() {
             onChange={(e) => setMalzeme(e.target.value)}
             rows={2}
             className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-            placeholder="Kullanilan malzemeleri yaziniz..."
-          />
+            placeholder="Kullanilan malzemeleri yaziniz..." />
+          
         </div>
 
         <div className="flex justify-center gap-6 mt-8">
           <button
             type="button"
             onClick={handleTemizle}
-            className="flex items-center gap-2 px-8 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-md transition-colors"
-          >
+            className="flex items-center gap-2 px-8 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-md transition-colors">
+            
             <RefreshCw className="w-5 h-5" />
             TEMIZLE
           </button>
@@ -831,13 +843,13 @@ export default function IsEmriGirisi() {
             type="button"
             onClick={() => void handleKaydet()}
             disabled={isSaving || isBootstrapping}
-            className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-md transition-colors"
-          >
+            className="flex items-center gap-2 px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold rounded-md transition-colors">
+            
             <Save className="w-5 h-5" />
             {isSaving ? 'KAYDEDILIYOR...' : 'KAYDET'}
           </button>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }

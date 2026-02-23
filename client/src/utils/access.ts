@@ -1,4 +1,5 @@
-﻿import type { User } from '../types';
+import type { User } from '../types';
+export { buildDefaultPasswordPreview } from './passwordPolicy';
 
 function normalizeAuthText(value: string | null | undefined): string {
   return String(value || '')
@@ -35,13 +36,3 @@ export function isSystemAdminUser(user: User | null | undefined): boolean {
 export function buildCompactLoginName(ad: string, soyad: string): string {
   return normalizeAuthText(`${ad} ${soyad}`).replace(/\s+/g, '');
 }
-
-export function buildDefaultPasswordPreview(ad: string, soyad: string): string {
-  const parts = normalizeAuthText(`${ad} ${soyad}`)
-    .split(' ')
-    .map((part) => part.replace(/[^a-z0-9]/g, ''))
-    .filter(Boolean);
-  const initials = parts.map((part) => part.charAt(0).toLowerCase()).join('');
-  return `${initials || 'user'}123456`;
-}
-

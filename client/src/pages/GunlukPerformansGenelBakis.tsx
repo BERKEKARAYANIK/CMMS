@@ -46,13 +46,13 @@ interface MonthData {
 const WEEKDAY_FULL = ['Pazartesi', 'Sali', 'Carsamba', 'Persembe', 'Cuma', 'Cumartesi', 'Pazar'];
 
 function normalizeText(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ı/g, 'i')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
+  return value.
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/ı/g, 'i').
+  toLowerCase().
+  replace(/\s+/g, ' ').
+  trim();
 }
 
 function toMonthValue(date: Date): string {
@@ -68,7 +68,7 @@ function toDateValue(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-function parseMonthValue(value: string): { year: number; monthIndex: number } {
+function parseMonthValue(value: string): {year: number;monthIndex: number;} {
   const [yearText, monthText] = value.split('-');
   const year = Number.parseInt(yearText || '0', 10);
   const month = Number.parseInt(monthText || '1', 10);
@@ -141,7 +141,7 @@ function parseTimeToMinutes(value: string): number | null {
   const minute = Number.parseInt(match[2], 10);
 
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-  return (hour * 60) + minute;
+  return hour * 60 + minute;
 }
 
 function calculateDurationMinutes(startTime: string, endTime: string): number {
@@ -150,7 +150,7 @@ function calculateDurationMinutes(startTime: string, endTime: string): number {
 
   if (start === null || end === null) return 0;
   if (end > start) return end - start;
-  return (24 * 60 - start) + end;
+  return 24 * 60 - start + end;
 }
 
 function extractShiftCode(value: string): string | null {
@@ -166,7 +166,7 @@ function extractShiftCode(value: string): string | null {
   return fallback ? fallback[1] : null;
 }
 
-function extractShiftTimeRange(value: string): { start: string; end: string } | null {
+function extractShiftTimeRange(value: string): {start: string;end: string;} | null {
   const match = /(\d{2}[:.]\d{2})\s*-\s*(\d{2}[:.]\d{2})/.exec(value);
   if (!match) return null;
 
@@ -216,9 +216,9 @@ function createEmptyPersonDayStat(sicilNo = '-', adSoyad = '-'): PersonDayStat {
 }
 
 function personMatchesFilter(
-  person: { sicilNo: string; adSoyad: string },
-  selectedPersonKey: string
-): boolean {
+person: {sicilNo: string;adSoyad: string;},
+selectedPersonKey: string)
+: boolean {
   if (selectedPersonKey === 'ALL') return true;
 
   if (selectedPersonKey.startsWith('sicil:')) {
@@ -233,11 +233,11 @@ function personMatchesFilter(
 }
 
 function mergePersonStat(
-  current: PersonDayStat,
-  deltaWorkOrders: number,
-  deltaMinutes: number,
-  deltaAvailable: number
-): PersonDayStat {
+current: PersonDayStat,
+deltaWorkOrders: number,
+deltaMinutes: number,
+deltaAvailable: number)
+: PersonDayStat {
   const completedWorkOrders = current.completedWorkOrders + deltaWorkOrders;
   const completedMinutes = current.completedMinutes + deltaMinutes;
   const availableMinutes = current.availableMinutes + deltaAvailable;
@@ -247,7 +247,7 @@ function mergePersonStat(
     completedWorkOrders,
     completedMinutes,
     availableMinutes,
-    workRate: availableMinutes > 0 ? Math.round((completedMinutes / availableMinutes) * 100) : 0
+    workRate: availableMinutes > 0 ? Math.round(completedMinutes / availableMinutes * 100) : 0
   };
 }
 
@@ -271,9 +271,9 @@ function buildMonthData(selectedMonth: string, works: CompletedJob[]): MonthData
     const personMap = dayPersonMap.get(dayKey) || new Map<string, RawPersonDayAccumulator>();
 
     work.personeller.forEach((person) => {
-      const personKey = person.sicilNo
-        ? `sicil:${person.sicilNo}`
-        : `name:${normalizeText(person.adSoyad || '')}`;
+      const personKey = person.sicilNo ?
+      `sicil:${person.sicilNo}` :
+      `name:${normalizeText(person.adSoyad || '')}`;
 
       if (!personInfoMap.has(personKey)) {
         personInfoMap.set(personKey, {
@@ -312,35 +312,35 @@ function buildMonthData(selectedMonth: string, works: CompletedJob[]): MonthData
 
   monthDates.forEach((date) => {
     const rawPersonMap = dayPersonMap.get(date) || new Map<string, RawPersonDayAccumulator>();
-    const personnel: PersonDayStat[] = Array.from(rawPersonMap.entries())
-      .map(([personKey, raw]) => {
-        const availableMinutes = Array.from(raw.shiftCapacityByKey.values())
-          .reduce((sum, minutes) => sum + minutes, 0);
+    const personnel: PersonDayStat[] = Array.from(rawPersonMap.entries()).
+    map(([personKey, raw]) => {
+      const availableMinutes = Array.from(raw.shiftCapacityByKey.values()).
+      reduce((sum, minutes) => sum + minutes, 0);
 
-        const stat: PersonDayStat = {
-          sicilNo: raw.sicilNo,
-          adSoyad: raw.adSoyad,
-          completedWorkOrders: raw.completedWorkOrders,
-          completedMinutes: raw.completedMinutes,
-          availableMinutes,
-          workRate: availableMinutes > 0
-            ? Math.round((raw.completedMinutes / availableMinutes) * 100)
-            : 0
-        };
+      const stat: PersonDayStat = {
+        sicilNo: raw.sicilNo,
+        adSoyad: raw.adSoyad,
+        completedWorkOrders: raw.completedWorkOrders,
+        completedMinutes: raw.completedMinutes,
+        availableMinutes,
+        workRate: availableMinutes > 0 ?
+        Math.round(raw.completedMinutes / availableMinutes * 100) :
+        0
+      };
 
-        const byDay = personDayMap.get(personKey) || new Map<string, PersonDayStat>();
-        byDay.set(date, stat);
-        personDayMap.set(personKey, byDay);
+      const byDay = personDayMap.get(personKey) || new Map<string, PersonDayStat>();
+      byDay.set(date, stat);
+      personDayMap.set(personKey, byDay);
 
-        const currentTotal = personTotals.get(personKey) || createEmptyPersonDayStat(raw.sicilNo, raw.adSoyad);
-        personTotals.set(
-          personKey,
-          mergePersonStat(currentTotal, stat.completedWorkOrders, stat.completedMinutes, stat.availableMinutes)
-        );
+      const currentTotal = personTotals.get(personKey) || createEmptyPersonDayStat(raw.sicilNo, raw.adSoyad);
+      personTotals.set(
+        personKey,
+        mergePersonStat(currentTotal, stat.completedWorkOrders, stat.completedMinutes, stat.availableMinutes)
+      );
 
-        return stat;
-      })
-      .sort((a, b) => b.workRate - a.workRate || b.completedMinutes - a.completedMinutes);
+      return stat;
+    }).
+    sort((a, b) => b.workRate - a.workRate || b.completedMinutes - a.completedMinutes);
 
     const completedWorkOrders = personnel.reduce((sum, person) => sum + person.completedWorkOrders, 0);
     const completedMinutes = personnel.reduce((sum, person) => sum + person.completedMinutes, 0);
@@ -352,23 +352,23 @@ function buildMonthData(selectedMonth: string, works: CompletedJob[]): MonthData
       completedWorkOrders,
       completedMinutes,
       availableMinutes,
-      workRate: availableMinutes > 0 ? Math.round((completedMinutes / availableMinutes) * 100) : 0,
+      workRate: availableMinutes > 0 ? Math.round(completedMinutes / availableMinutes * 100) : 0,
       personnel
     });
   });
 
-  const completedWorkOrders = Array.from(dayMap.values())
-    .reduce((sum, day) => sum + day.completedWorkOrders, 0);
-  const completedMinutes = Array.from(dayMap.values())
-    .reduce((sum, day) => sum + day.completedMinutes, 0);
-  const availableMinutes = Array.from(dayMap.values())
-    .reduce((sum, day) => sum + day.availableMinutes, 0);
+  const completedWorkOrders = Array.from(dayMap.values()).
+  reduce((sum, day) => sum + day.completedWorkOrders, 0);
+  const completedMinutes = Array.from(dayMap.values()).
+  reduce((sum, day) => sum + day.completedMinutes, 0);
+  const availableMinutes = Array.from(dayMap.values()).
+  reduce((sum, day) => sum + day.availableMinutes, 0);
 
   return {
     monthDates,
     dayMap,
-    personOptions: Array.from(personInfoMap.values())
-      .sort((a, b) => a.adSoyad.localeCompare(b.adSoyad, 'tr')),
+    personOptions: Array.from(personInfoMap.values()).
+    sort((a, b) => a.adSoyad.localeCompare(b.adSoyad, 'tr')),
     personDayMap,
     personTotals,
     overall: {
@@ -376,7 +376,7 @@ function buildMonthData(selectedMonth: string, works: CompletedJob[]): MonthData
       completedWorkOrders,
       completedMinutes,
       availableMinutes,
-      workRate: availableMinutes > 0 ? Math.round((completedMinutes / availableMinutes) * 100) : 0
+      workRate: availableMinutes > 0 ? Math.round(completedMinutes / availableMinutes * 100) : 0
     }
   };
 }
@@ -410,7 +410,7 @@ export default function GunlukPerformansGenelBakis() {
         const data = response.data?.data as CompletedJob[] | undefined;
         setCompletedWorks(Array.isArray(data) ? data : []);
       } catch {
-        toast.error('Performans verileri yuklenemedi');
+        toast.error("Performans verileri yüklenemedi");
       } finally {
         setIsLoading(false);
       }
@@ -439,9 +439,9 @@ export default function GunlukPerformansGenelBakis() {
     }
 
     const todayText = toDateValue(new Date());
-    const defaultDate = monthData.monthDates.includes(todayText)
-      ? todayText
-      : monthData.monthDates[0];
+    const defaultDate = monthData.monthDates.includes(todayText) ?
+    todayText :
+    monthData.monthDates[0];
 
     setSelectedDate(defaultDate);
   }, [monthData.monthDates, selectedDate]);
@@ -452,31 +452,31 @@ export default function GunlukPerformansGenelBakis() {
     }
   }, [selectedDate]);
 
-  const selectedPerson = selectedPersonKey === 'ALL'
-    ? null
-    : monthData.personOptions.find((person) => person.key === selectedPersonKey) || null;
+  const selectedPerson = selectedPersonKey === 'ALL' ?
+  null :
+  monthData.personOptions.find((person) => person.key === selectedPersonKey) || null;
 
-  const scopeSummary = selectedPersonKey === 'ALL'
-    ? {
-      personnelCount: monthData.overall.uniquePersonnelCount,
-      completedWorkOrders: monthData.overall.completedWorkOrders,
-      completedMinutes: monthData.overall.completedMinutes,
-      availableMinutes: monthData.overall.availableMinutes,
-      workRate: monthData.overall.workRate
-    }
-    : (() => {
-      const total = monthData.personTotals.get(selectedPersonKey) || createEmptyPersonDayStat(
-        selectedPerson?.sicilNo || '-',
-        selectedPerson?.adSoyad || '-'
-      );
-      return {
-        personnelCount: total.completedWorkOrders > 0 ? 1 : 0,
-        completedWorkOrders: total.completedWorkOrders,
-        completedMinutes: total.completedMinutes,
-        availableMinutes: total.availableMinutes,
-        workRate: total.workRate
-      };
-    })();
+  const scopeSummary = selectedPersonKey === 'ALL' ?
+  {
+    personnelCount: monthData.overall.uniquePersonnelCount,
+    completedWorkOrders: monthData.overall.completedWorkOrders,
+    completedMinutes: monthData.overall.completedMinutes,
+    availableMinutes: monthData.overall.availableMinutes,
+    workRate: monthData.overall.workRate
+  } :
+  (() => {
+    const total = monthData.personTotals.get(selectedPersonKey) || createEmptyPersonDayStat(
+      selectedPerson?.sicilNo || '-',
+      selectedPerson?.adSoyad || '-'
+    );
+    return {
+      personnelCount: total.completedWorkOrders > 0 ? 1 : 0,
+      completedWorkOrders: total.completedWorkOrders,
+      completedMinutes: total.completedMinutes,
+      availableMinutes: total.availableMinutes,
+      workRate: total.workRate
+    };
+  })();
 
   const selectedDay = selectedDate ? monthData.dayMap.get(selectedDate) || null : null;
   const selectedDayCompletedWorks = useMemo(() => {
@@ -488,16 +488,16 @@ export default function GunlukPerformansGenelBakis() {
     }
 
     return dayWorks.filter((work) =>
-      work.personeller.some((person) => personMatchesFilter(person, selectedPersonKey))
+    work.personeller.some((person) => personMatchesFilter(person, selectedPersonKey))
     );
   }, [monthWorks, selectedDate, selectedPersonKey]);
 
-  const selectedDayPersonDetail = selectedPersonKey === 'ALL'
-    ? null
-    : monthData.personDayMap.get(selectedPersonKey)?.get(selectedDate) || createEmptyPersonDayStat(
-      selectedPerson?.sicilNo || '-',
-      selectedPerson?.adSoyad || '-'
-    );
+  const selectedDayPersonDetail = selectedPersonKey === 'ALL' ?
+  null :
+  monthData.personDayMap.get(selectedPersonKey)?.get(selectedDate) || createEmptyPersonDayStat(
+    selectedPerson?.sicilNo || '-',
+    selectedPerson?.adSoyad || '-'
+  );
 
   const handleCalendarDayClick = (date: string, isFutureDate: boolean) => {
     if (isFutureDate) return;
@@ -521,22 +521,22 @@ export default function GunlukPerformansGenelBakis() {
               type="month"
               className="input"
               value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-            />
+              onChange={(e) => setSelectedMonth(e.target.value)} />
+            
           </div>
           <div className="lg:col-span-1">
-            <label className="label">Kisi Filtresi</label>
+            <label className="label">Kişi Filtresi</label>
             <select
               className="input"
               value={selectedPersonKey}
-              onChange={(e) => setSelectedPersonKey(e.target.value)}
-            >
-              <option value="ALL">Tum Personeller</option>
-              {monthData.personOptions.map((person) => (
-                <option key={person.key} value={person.key}>
+              onChange={(e) => setSelectedPersonKey(e.target.value)}>
+              
+              <option value="ALL">Tüm Personeller</option>
+              {monthData.personOptions.map((person) =>
+              <option key={person.key} value={person.key}>
                   {person.adSoyad} ({person.sicilNo})
                 </option>
-              ))}
+              )}
             </select>
           </div>
           <div className="rounded-lg bg-gray-50 p-3 lg:col-span-1">
@@ -547,20 +547,20 @@ export default function GunlukPerformansGenelBakis() {
             <p className="text-xs text-gray-500">Genel Oran</p>
             <p className="text-xl font-bold text-gray-900">%{scopeSummary.workRate}</p>
             <p className="text-[11px] text-gray-500 mt-1">
-              {selectedPersonKey === 'ALL' ? `${scopeSummary.personnelCount} kisi` : 'Secili kisi'}
+              {selectedPersonKey === 'ALL' ? `${scopeSummary.personnelCount} kişi` : "Seçili kişi"}
             </p>
           </div>
         </div>
-        {isLoading && (
-          <p className="mt-3 text-xs text-blue-600">Veriler yukleniyor...</p>
-        )}
+        {isLoading &&
+        <p className="mt-3 text-xs text-blue-600">Veriler yükleniyor...</p>
+        }
       </div>
 
       <div className="card overflow-hidden border-gray-400 bg-[#f3f4f6]">
         <div className="p-4 md:p-6 space-y-5">
           <div className="flex items-center justify-center min-h-[110px]">
             <div className="text-center">
-              <p className="text-xs tracking-[0.22em] text-gray-600 mb-2">GUNLUK PERFORMANS GENEL BAKIS</p>
+              <p className="text-xs tracking-[0.22em] text-gray-600 mb-2">GÜNLÜK PERFORMANS GENEL BAKIŞ</p>
               <h1 className="text-5xl md:text-7xl font-serif tracking-[0.12em] text-gray-900">
                 {monthHeaderTitle}
               </h1>
@@ -571,68 +571,68 @@ export default function GunlukPerformansGenelBakis() {
             <table className="min-w-[1000px] w-full table-fixed border-collapse border border-gray-500 bg-white">
               <thead>
                 <tr>
-                  {WEEKDAY_FULL.map((dayName) => (
-                    <th
-                      key={dayName}
-                      className="border border-gray-500 px-2 py-2 text-center text-xl font-medium text-gray-700"
-                    >
+                  {WEEKDAY_FULL.map((dayName) =>
+                  <th
+                    key={dayName}
+                    className="border border-gray-500 px-2 py-2 text-center text-xl font-medium text-gray-700">
+                    
                       {dayName}
                     </th>
-                  ))}
+                  )}
                 </tr>
               </thead>
               <tbody>
-                {calendarWeeks.map((week, weekIndex) => (
-                  <tr key={`week-${weekIndex}`}>
+                {calendarWeeks.map((week, weekIndex) =>
+                <tr key={`week-${weekIndex}`}>
                     {week.map((date, dayIndex) => {
-                      if (!date) {
-                        return <td key={`empty-${weekIndex}-${dayIndex}`} className="h-40 border border-gray-400 bg-[#f7f7f7]" />;
-                      }
+                    if (!date) {
+                      return <td key={`empty-${weekIndex}-${dayIndex}`} className="h-40 border border-gray-400 bg-[#f7f7f7]" />;
+                    }
 
-                      const dayData = monthData.dayMap.get(date) || {
-                        date,
-                        personnelCount: 0,
-                        completedWorkOrders: 0,
-                        completedMinutes: 0,
-                        availableMinutes: 0,
-                        workRate: 0,
-                        personnel: []
-                      };
+                    const dayData = monthData.dayMap.get(date) || {
+                      date,
+                      personnelCount: 0,
+                      completedWorkOrders: 0,
+                      completedMinutes: 0,
+                      availableMinutes: 0,
+                      workRate: 0,
+                      personnel: []
+                    };
 
-                      const personDay = selectedPersonKey === 'ALL'
-                        ? null
-                        : monthData.personDayMap.get(selectedPersonKey)?.get(date) || null;
+                    const personDay = selectedPersonKey === 'ALL' ?
+                    null :
+                    monthData.personDayMap.get(selectedPersonKey)?.get(date) || null;
 
-                      const displayRate = selectedPersonKey === 'ALL'
-                        ? dayData.workRate
-                        : (personDay?.workRate || 0);
-                      const displayMinutes = selectedPersonKey === 'ALL'
-                        ? dayData.completedMinutes
-                        : (personDay?.completedMinutes || 0);
-                      const displayCapacity = selectedPersonKey === 'ALL'
-                        ? dayData.availableMinutes
-                        : (personDay?.availableMinutes || 0);
-                      const isFutureDate = date > todayDateKey;
-                      const isSelected = !isFutureDate && selectedDate === date;
-                      const cellToneClass = isFutureDate ? 'bg-gray-100' : getCalendarCellTone(displayRate);
-                      const rateText = isFutureDate ? '--' : `%${displayRate}`;
-                      const rateTextClass = isFutureDate ? 'text-gray-400' : getRateColor(displayRate);
-                      const detailText = isFutureDate
-                        ? 'Gelecek gun'
-                        : `${formatMinutes(displayMinutes)} / ${formatMinutes(displayCapacity)}`;
-                      const bottomCaption = isFutureDate
-                        ? '-'
-                        : (selectedPersonKey === 'ALL'
-                          ? `${dayData.personnelCount} kisi`
-                          : `${personDay?.completedWorkOrders || 0} is`);
-                      return (
-                        <td key={date} className={`h-40 border border-gray-400 p-0 align-top ${cellToneClass}`}>
+                    const displayRate = selectedPersonKey === 'ALL' ?
+                    dayData.workRate :
+                    personDay?.workRate || 0;
+                    const displayMinutes = selectedPersonKey === 'ALL' ?
+                    dayData.completedMinutes :
+                    personDay?.completedMinutes || 0;
+                    const displayCapacity = selectedPersonKey === 'ALL' ?
+                    dayData.availableMinutes :
+                    personDay?.availableMinutes || 0;
+                    const isFutureDate = date > todayDateKey;
+                    const isSelected = !isFutureDate && selectedDate === date;
+                    const cellToneClass = isFutureDate ? 'bg-gray-100' : getCalendarCellTone(displayRate);
+                    const rateText = isFutureDate ? '--' : `%${displayRate}`;
+                    const rateTextClass = isFutureDate ? 'text-gray-400' : getRateColor(displayRate);
+                    const detailText = isFutureDate ?
+                    'Gelecek gün' :
+                    `${formatMinutes(displayMinutes)} / ${formatMinutes(displayCapacity)}`;
+                    const bottomCaption = isFutureDate ?
+                    '-' :
+                    selectedPersonKey === 'ALL' ?
+                    `${dayData.personnelCount} kişi` :
+                    `${personDay?.completedWorkOrders || 0} is`;
+                    return (
+                      <td key={date} className={`h-40 border border-gray-400 p-0 align-top ${cellToneClass}`}>
                           <button
-                            type="button"
-                            onClick={() => handleCalendarDayClick(date, isFutureDate)}
-                            disabled={isFutureDate}
-                            className={`w-full h-full p-2 text-left ${isSelected ? 'ring-2 ring-inset ring-blue-400' : ''} ${isFutureDate ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-                          >
+                          type="button"
+                          onClick={() => handleCalendarDayClick(date, isFutureDate)}
+                          disabled={isFutureDate}
+                          className={`w-full h-full p-2 text-left ${isSelected ? 'ring-2 ring-inset ring-blue-400' : ''} ${isFutureDate ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                          
                             <div className="flex items-start justify-between">
                               <span className="text-4xl leading-none text-gray-900">
                                 {Number.parseInt(date.slice(-2), 10)}
@@ -646,34 +646,34 @@ export default function GunlukPerformansGenelBakis() {
                               </p>
                             </div>
                           </button>
-                        </td>
-                      );
-                    })}
+                        </td>);
+
+                  })}
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
-      {isDayWorksModalOpen && selectedDate && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+      {isDayWorksModalOpen && selectedDate &&
+      <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setIsDayWorksModalOpen(false)} />
             <div className="relative w-full max-w-5xl rounded-xl bg-white shadow-xl border border-gray-200">
               <div className="flex items-start justify-between border-b px-5 py-4">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Tamamlanan Isler</h3>
+                  <h3 className="text-lg font-bold text-gray-900">Tamamlanan İşler</h3>
                   <p className="text-sm text-gray-600">
-                    {selectedDate} - {selectedPerson ? `${selectedPerson.adSoyad} (${selectedPerson.sicilNo})` : 'Tum Personeller'}
+                    {selectedDate} - {selectedPerson ? `${selectedPerson.adSoyad} (${selectedPerson.sicilNo})` : 'Tüm Personeller'}
                   </p>
                 </div>
                 <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setIsDayWorksModalOpen(false)}
-                >
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsDayWorksModalOpen(false)}>
+                
                   Kapat
                 </button>
               </div>
@@ -688,21 +688,21 @@ export default function GunlukPerformansGenelBakis() {
                         <th className="px-3 py-2 text-left text-gray-600">Mudahale</th>
                         <th className="px-3 py-2 text-left text-gray-600">Vardiya</th>
                         <th className="px-3 py-2 text-left text-gray-600">Saat</th>
-                        <th className="px-3 py-2 text-left text-gray-600">Sure</th>
+                        <th className="px-3 py-2 text-left text-gray-600">Süre</th>
                         <th className="px-3 py-2 text-left text-gray-600">Personel</th>
-                        <th className="px-3 py-2 text-left text-gray-600">Aciklama</th>
+                        <th className="px-3 py-2 text-left text-gray-600">Aİşklama</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {selectedDayCompletedWorks.length === 0 ? (
-                        <tr>
+                      {selectedDayCompletedWorks.length === 0 ?
+                    <tr>
                           <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
-                            Bu gunde secili kisi icin tamamlanan is kaydi yok.
+                            Bu günde seçili kişi için tamamlanan iş kaydı yok.
                           </td>
-                        </tr>
-                      ) : (
-                        selectedDayCompletedWorks.map((work) => (
-                          <tr key={work.id}>
+                        </tr> :
+
+                    selectedDayCompletedWorks.map((work) =>
+                    <tr key={work.id}>
                             <td className="px-3 py-2 font-mono text-xs text-gray-700">{work.id}</td>
                             <td className="px-3 py-2 text-gray-800">{work.makina}</td>
                             <td className="px-3 py-2 text-gray-700">{work.mudahaleTuru}</td>
@@ -710,17 +710,17 @@ export default function GunlukPerformansGenelBakis() {
                             <td className="px-3 py-2 text-gray-700">{work.baslangicSaati} - {work.bitisSaati}</td>
                             <td className="px-3 py-2 text-gray-700">{work.sureDakika} dk</td>
                             <td className="px-3 py-2 text-gray-700">
-                              {work.personeller
-                                .filter((person) => selectedPersonKey === 'ALL' || personMatchesFilter(person, selectedPersonKey))
-                                .map((person) => `${person.adSoyad} (${person.sicilNo})`)
-                                .join(', ')}
+                              {work.personeller.
+                        filter((person) => selectedPersonKey === 'ALL' || personMatchesFilter(person, selectedPersonKey)).
+                        map((person) => `${person.adSoyad} (${person.sicilNo})`).
+                        join(', ')}
                             </td>
                             <td className="px-3 py-2 text-gray-700 max-w-xs">
                               <p className="line-clamp-2">{work.aciklama || '-'}</p>
                             </td>
                           </tr>
-                        ))
-                      )}
+                    )
+                    }
                     </tbody>
                   </table>
                 </div>
@@ -728,37 +728,37 @@ export default function GunlukPerformansGenelBakis() {
             </div>
           </div>
         </div>
-      )}
+      }
 
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-700">
-            {selectedDate ? `${selectedDate} Gun Detayi` : 'Gun Detayi'}
+            {selectedDate ? `${selectedDate} Gün Detayı` : 'Gün Detayı'}
           </h2>
         </div>
         <div className="overflow-x-auto">
-          {selectedPersonKey === 'ALL' ? (
-            <table className="w-full text-sm">
+          {selectedPersonKey === 'ALL' ?
+          <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-4 py-3 text-left text-gray-600">Sicil</th>
                   <th className="px-4 py-3 text-left text-gray-600">Ad Soyad</th>
-                  <th className="px-4 py-3 text-left text-gray-600">Is Emri</th>
+                  <th className="px-4 py-3 text-left text-gray-600">İş Emri</th>
                   <th className="px-4 py-3 text-left text-gray-600">Tamamlanan</th>
                   <th className="px-4 py-3 text-left text-gray-600">Kapasite</th>
                   <th className="px-4 py-3 text-left text-gray-600">Oran</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {!selectedDay || selectedDay.personnel.length === 0 ? (
-                  <tr>
+                {!selectedDay || selectedDay.personnel.length === 0 ?
+              <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                      Secilen gunde kayit bulunamadi.
+                      Seçilen günde kayıt bulunamadı.
                     </td>
-                  </tr>
-                ) : (
-                  selectedDay.personnel.map((person) => (
-                    <tr key={`${selectedDay.date}-${person.sicilNo}-${person.adSoyad}`}>
+                  </tr> :
+
+              selectedDay.personnel.map((person) =>
+              <tr key={`${selectedDay.date}-${person.sicilNo}-${person.adSoyad}`}>
                       <td className="px-4 py-3 text-gray-700">{person.sicilNo}</td>
                       <td className="px-4 py-3 text-gray-900 font-medium">{person.adSoyad}</td>
                       <td className="px-4 py-3 text-gray-700">{person.completedWorkOrders}</td>
@@ -768,15 +768,15 @@ export default function GunlukPerformansGenelBakis() {
                         <span className={`font-semibold ${getRateColor(person.workRate)}`}>%{person.workRate}</span>
                       </td>
                     </tr>
-                  ))
-                )}
+              )
+              }
               </tbody>
-            </table>
-          ) : (
-            <div className="p-4">
+            </table> :
+
+          <div className="p-4">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="rounded-lg bg-gray-50 p-3">
-                  <p className="text-xs text-gray-500">Is Emri</p>
+                  <p className="text-xs text-gray-500">İş Emri</p>
                   <p className="text-lg font-semibold text-gray-900">{selectedDayPersonDetail?.completedWorkOrders || 0}</p>
                 </div>
                 <div className="rounded-lg bg-gray-50 p-3">
@@ -797,9 +797,9 @@ export default function GunlukPerformansGenelBakis() {
                 </div>
               </div>
             </div>
-          )}
+          }
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }

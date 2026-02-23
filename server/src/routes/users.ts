@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
+import { isPasswordPolicyCompliant, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy.js';
 
 const router = Router();
 
@@ -440,6 +441,21 @@ router.get('/:id/performance', authenticate, async (req: AuthRequest, res: Respo
 router.post('/', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req: AuthRequest, res: Response) => {
   try {
     const { sicilNo, ad, soyad, email, password, telefon, departman, unvan, uzmanlikAlani, role } = req.body;
+    const normalizedPassword = String(password ?? '').trim();
+
+    if (!normalizedPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sifre gereklidir'
+      });
+    }
+
+    if (!isPasswordPolicyCompliant(normalizedPassword)) {
+      return res.status(400).json({
+        success: false,
+        message: PASSWORD_POLICY_MESSAGE
+      });
+    }
 
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -454,7 +470,7 @@ router.post('/', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req: A
       });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(normalizedPassword, 10);
 
     const user = await prisma.user.create({
       data: {

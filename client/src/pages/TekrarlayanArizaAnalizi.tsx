@@ -54,13 +54,13 @@ interface MachineRow {
 }
 
 function normalizeText(value: string): string {
-  return value
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/Ä±/g, 'i')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim();
+  return value.
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/ı/g, 'i').
+  toLowerCase().
+  replace(/\s+/g, ' ').
+  trim();
 }
 
 function toDateValue(date: Date): string {
@@ -92,7 +92,7 @@ function getFaultLabel(work: CompletedJob): string {
   const aciklama = (work.aciklama || '').trim();
   if (aciklama) return aciklama;
   const mudahale = (work.mudahaleTuru || '').trim();
-  return mudahale || 'Belirsiz Ariza';
+  return mudahale || "Belirsiz Arıza";
 }
 
 function toFaultRecords(works: CompletedJob[]): FaultRecord[] {
@@ -104,7 +104,7 @@ function toFaultRecords(works: CompletedJob[]): FaultRecord[] {
     const date = parseDateValue(work.tarih);
     if (!date) return;
 
-    const makina = (work.makina || '').trim() || 'Belirsiz Makina';
+    const makina = (work.makina || '').trim() || 'Belirsiz Makine';
     const makinaKey = normalizeText(makina) || 'belirsiz-makina';
     const faultLabel = getFaultLabel(work);
     const faultKey = normalizeText(faultLabel) || 'belirsiz-ariza';
@@ -139,11 +139,11 @@ function emptyMachineStats(makina: string, makinaKey: string): MachineStats {
 function analyzeWindow(records: FaultRecord[], endDateValue: string, days: number): WindowResult {
   const endDate = parseDateValue(endDateValue) || new Date();
   const endTimestamp = endDate.getTime();
-  const startTimestamp = endTimestamp - ((days - 1) * DAY_MS);
+  const startTimestamp = endTimestamp - (days - 1) * DAY_MS;
   const startDateValue = toDateValue(new Date(startTimestamp));
 
   const windowRecords = records.filter((record) =>
-    record.timestamp >= startTimestamp && record.timestamp <= endTimestamp
+  record.timestamp >= startTimestamp && record.timestamp <= endTimestamp
   );
 
   const machineMap = new Map<string, {
@@ -187,27 +187,27 @@ function analyzeWindow(records: FaultRecord[], endDateValue: string, days: numbe
     machineMap.set(record.makinaKey, machine);
   });
 
-  const machineStats: MachineStats[] = Array.from(machineMap.values())
-    .map((machine) => {
-      const groups = Array.from(machine.groupMap.values())
-        .sort((a, b) => b.count - a.count || b.lastTimestamp - a.lastTimestamp);
-      const recurringAriza = groups
-        .filter((group) => group.count >= 2)
-        .reduce((sum, group) => sum + group.count, 0);
+  const machineStats: MachineStats[] = Array.from(machineMap.values()).
+  map((machine) => {
+    const groups = Array.from(machine.groupMap.values()).
+    sort((a, b) => b.count - a.count || b.lastTimestamp - a.lastTimestamp);
+    const recurringAriza = groups.
+    filter((group) => group.count >= 2).
+    reduce((sum, group) => sum + group.count, 0);
 
-      return {
-        makina: machine.makina,
-        makinaKey: machine.makinaKey,
-        totalAriza: machine.totalAriza,
-        recurringAriza,
-        repeatRate: machine.totalAriza > 0
-          ? Math.round((recurringAriza / machine.totalAriza) * 100)
-          : 0,
-        totalMinutes: machine.totalMinutes,
-        groups
-      };
-    })
-    .sort((a, b) => b.repeatRate - a.repeatRate || b.recurringAriza - a.recurringAriza || b.totalAriza - a.totalAriza);
+    return {
+      makina: machine.makina,
+      makinaKey: machine.makinaKey,
+      totalAriza: machine.totalAriza,
+      recurringAriza,
+      repeatRate: machine.totalAriza > 0 ?
+      Math.round(recurringAriza / machine.totalAriza * 100) :
+      0,
+      totalMinutes: machine.totalMinutes,
+      groups
+    };
+  }).
+  sort((a, b) => b.repeatRate - a.repeatRate || b.recurringAriza - a.recurringAriza || b.totalAriza - a.totalAriza);
 
   const totalAriza = machineStats.reduce((sum, item) => sum + item.totalAriza, 0);
   const recurringAriza = machineStats.reduce((sum, item) => sum + item.recurringAriza, 0);
@@ -218,7 +218,7 @@ function analyzeWindow(records: FaultRecord[], endDateValue: string, days: numbe
     endDate: endDateValue,
     totalAriza,
     recurringAriza,
-    repeatRate: totalAriza > 0 ? Math.round((recurringAriza / totalAriza) * 100) : 0,
+    repeatRate: totalAriza > 0 ? Math.round(recurringAriza / totalAriza * 100) : 0,
     uniqueMachines: machineStats.length,
     machineStats
   };
@@ -251,12 +251,12 @@ function mergeMachineRows(window30: WindowResult, window90: WindowResult): Machi
     });
   });
 
-  return Array.from(map.values())
-    .sort((a, b) =>
-      b.stats30.repeatRate - a.stats30.repeatRate
-      || b.stats90.repeatRate - a.stats90.repeatRate
-      || b.stats90.totalAriza - a.stats90.totalAriza
-    );
+  return Array.from(map.values()).
+  sort((a, b) =>
+  b.stats30.repeatRate - a.stats30.repeatRate ||
+  b.stats90.repeatRate - a.stats90.repeatRate ||
+  b.stats90.totalAriza - a.stats90.totalAriza
+  );
 }
 
 function rateBadgeClass(rate: number): string {
@@ -279,7 +279,7 @@ export default function TekrarlayanArizaAnalizi() {
         const data = response.data?.data as CompletedJob[] | undefined;
         setCompletedWorks(Array.isArray(data) ? data : []);
       } catch {
-        toast.error('Tamamlanan is verileri yuklenemedi');
+        toast.error("Tamamlanan is verileri yüklenemedi");
       } finally {
         setIsLoading(false);
       }
@@ -314,21 +314,21 @@ export default function TekrarlayanArizaAnalizi() {
   }, [analysis.rows, selectedMachineKey]);
 
   const selectedRow = analysis.rows.find((row) => row.makinaKey === selectedMachineKey) || null;
-  const repeatedFaults30 = selectedRow
-    ? selectedRow.stats30.groups.filter((group) => group.count >= 2)
-    : [];
-  const repeatedFaults90 = selectedRow
-    ? selectedRow.stats90.groups.filter((group) => group.count >= 2)
-    : [];
+  const repeatedFaults30 = selectedRow ?
+  selectedRow.stats30.groups.filter((group) => group.count >= 2) :
+  [];
+  const repeatedFaults90 = selectedRow ?
+  selectedRow.stats90.groups.filter((group) => group.count >= 2) :
+  [];
 
   return (
     <div className="space-y-6">
       <div className="card p-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tekrarlayan Ariza Analizi</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Tekrarlayan Arıza Analizi</h1>
             <p className="text-sm text-gray-600 mt-1">
-              Son 30 ve 90 gunde makina bazli tekrarlayan ariza yogunlugunu gosterir.
+              Son 30 ve 90 günde makina bazlı tekrarlayan arıza yoğunluğunu gösterir.
             </p>
           </div>
           <div className="w-full lg:w-64">
@@ -337,42 +337,42 @@ export default function TekrarlayanArizaAnalizi() {
               type="date"
               className="input"
               value={refDate}
-              onChange={(e) => setRefDate(e.target.value)}
-            />
+              onChange={(e) => setRefDate(e.target.value)} />
+            
           </div>
         </div>
-        {isLoading && (
-          <p className="mt-3 text-xs text-blue-600">Veriler yukleniyor...</p>
-        )}
+        {isLoading &&
+        <p className="mt-3 text-xs text-blue-600">Veriler yükleniyor...</p>
+        }
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="card p-4">
-          <p className="text-xs text-gray-500">30 Gun Tekrar Orani</p>
+          <p className="text-xs text-gray-500">30 Gün Tekrar Oranı</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">%{analysis.window30.repeatRate}</p>
           <p className="text-xs text-gray-500 mt-2">
-            {analysis.window30.recurringAriza} / {analysis.window30.totalAriza} ariza kaydi
+            {analysis.window30.recurringAriza} / {analysis.window30.totalAriza} arıza kaydı
           </p>
         </div>
         <div className="card p-4">
-          <p className="text-xs text-gray-500">90 Gun Tekrar Orani</p>
+          <p className="text-xs text-gray-500">90 Gün Tekrar Oranı</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">%{analysis.window90.repeatRate}</p>
           <p className="text-xs text-gray-500 mt-2">
-            {analysis.window90.recurringAriza} / {analysis.window90.totalAriza} ariza kaydi
+            {analysis.window90.recurringAriza} / {analysis.window90.totalAriza} arıza kaydı
           </p>
         </div>
         <div className="card p-4">
-          <p className="text-xs text-gray-500">Analiz Edilen Makina</p>
+          <p className="text-xs text-gray-500">Analiz Edilen Makine</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{analysis.window90.uniqueMachines}</p>
           <p className="text-xs text-gray-500 mt-2">
-            90 gun penceresi
+            90 gün penceresi
           </p>
         </div>
         <div className="card p-4">
-          <p className="text-xs text-gray-500">Toplam Ariza Kaydi</p>
+          <p className="text-xs text-gray-500">Toplam Arıza Kaydı</p>
           <p className="text-2xl font-bold text-gray-900 mt-1">{analysis.totalArizaKaydi}</p>
           <p className="text-xs text-gray-500 mt-2">
-            Sadece "Ariza" tipindeki is emirleri
+            Sadece "Arıza" tipindeki is emirleri
           </p>
         </div>
       </div>
@@ -380,10 +380,10 @@ export default function TekrarlayanArizaAnalizi() {
       <div className="card overflow-hidden">
         <div className="px-4 py-3 border-b bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-700">
-            Makina Bazli Tekrar Orani (30/90 Gun)
+            Makine Bazlı Tekrar Oranı (30/90 Gün)
           </h2>
           <p className="text-xs text-gray-500 mt-1">
-            30 gun: {analysis.window30.startDate} - {analysis.window30.endDate} | 90 gun: {analysis.window90.startDate} - {analysis.window90.endDate}
+            30 gün: {analysis.window30.startDate} - {analysis.window30.endDate} | 90 gün: {analysis.window90.startDate} - {analysis.window90.endDate}
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -400,21 +400,21 @@ export default function TekrarlayanArizaAnalizi() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {analysis.rows.length === 0 ? (
-                <tr>
+              {analysis.rows.length === 0 ?
+              <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                    Secilen tarihe gore ariza verisi bulunamadi.
+                    Seçilen tarihe göre arıza verisi bulunamadı.
                   </td>
-                </tr>
-              ) : (
-                analysis.rows.map((row) => {
-                  const isSelected = row.makinaKey === selectedMachineKey;
-                  return (
-                    <tr
-                      key={row.makinaKey}
-                      className={`cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
-                      onClick={() => setSelectedMachineKey(row.makinaKey)}
-                    >
+                </tr> :
+
+              analysis.rows.map((row) => {
+                const isSelected = row.makinaKey === selectedMachineKey;
+                return (
+                  <tr
+                    key={row.makinaKey}
+                    className={`cursor-pointer ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                    onClick={() => setSelectedMachineKey(row.makinaKey)}>
+                    
                       <td className="px-4 py-3 font-medium text-gray-900">{row.makina}</td>
                       <td className="px-4 py-3 text-gray-700">{row.stats30.totalAriza}</td>
                       <td className="px-4 py-3 text-gray-700">{row.stats30.recurringAriza}</td>
@@ -430,10 +430,10 @@ export default function TekrarlayanArizaAnalizi() {
                           %{row.stats90.repeatRate}
                         </span>
                       </td>
-                    </tr>
-                  );
-                })
-              )}
+                    </tr>);
+
+              })
+              }
             </tbody>
           </table>
         </div>
@@ -443,18 +443,18 @@ export default function TekrarlayanArizaAnalizi() {
         <div className="card overflow-hidden">
           <div className="px-4 py-3 border-b bg-gray-50">
             <h3 className="text-sm font-semibold text-gray-700">
-              30 Gun Tekrarlayan Arizalar {selectedRow ? `- ${selectedRow.makina}` : ''}
+              30 Gün Tekrarlayan Arızalar {selectedRow ? `- ${selectedRow.makina}` : ''}
             </h3>
           </div>
           <div className="p-4">
-            {selectedRow == null ? (
-              <p className="text-sm text-gray-500">Detay icin bir makina seciniz.</p>
-            ) : repeatedFaults30.length === 0 ? (
-              <p className="text-sm text-gray-500">Bu makina icin 30 gunde tekrarlayan ariza yok.</p>
-            ) : (
-              <div className="space-y-2">
-                {repeatedFaults30.map((group) => (
-                  <div key={`30-${group.faultKey}`} className="rounded-lg border border-gray-200 p-3">
+            {selectedRow == null ?
+            <p className="text-sm text-gray-500">Detay için bir makine seçiniz.</p> :
+            repeatedFaults30.length === 0 ?
+            <p className="text-sm text-gray-500">Bu makine için 30 günde tekrarlayan arıza yok.</p> :
+
+            <div className="space-y-2">
+                {repeatedFaults30.map((group) =>
+              <div key={`30-${group.faultKey}`} className="rounded-lg border border-gray-200 p-3">
                     <p className="text-sm font-medium text-gray-900">{group.faultLabel}</p>
                     <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
                       <span>{group.count} tekrar</span>
@@ -462,27 +462,27 @@ export default function TekrarlayanArizaAnalizi() {
                       <span>Son: {group.lastDate}</span>
                     </div>
                   </div>
-                ))}
+              )}
               </div>
-            )}
+            }
           </div>
         </div>
 
         <div className="card overflow-hidden">
           <div className="px-4 py-3 border-b bg-gray-50">
             <h3 className="text-sm font-semibold text-gray-700">
-              90 Gun Tekrarlayan Arizalar {selectedRow ? `- ${selectedRow.makina}` : ''}
+              90 Gün Tekrarlayan Arızalar {selectedRow ? `- ${selectedRow.makina}` : ''}
             </h3>
           </div>
           <div className="p-4">
-            {selectedRow == null ? (
-              <p className="text-sm text-gray-500">Detay icin bir makina seciniz.</p>
-            ) : repeatedFaults90.length === 0 ? (
-              <p className="text-sm text-gray-500">Bu makina icin 90 gunde tekrarlayan ariza yok.</p>
-            ) : (
-              <div className="space-y-2">
-                {repeatedFaults90.map((group) => (
-                  <div key={`90-${group.faultKey}`} className="rounded-lg border border-gray-200 p-3">
+            {selectedRow == null ?
+            <p className="text-sm text-gray-500">Detay için bir makine seçiniz.</p> :
+            repeatedFaults90.length === 0 ?
+            <p className="text-sm text-gray-500">Bu makine için 90 günde tekrarlayan arıza yok.</p> :
+
+            <div className="space-y-2">
+                {repeatedFaults90.map((group) =>
+              <div key={`90-${group.faultKey}`} className="rounded-lg border border-gray-200 p-3">
                     <p className="text-sm font-medium text-gray-900">{group.faultLabel}</p>
                     <div className="mt-2 flex flex-wrap gap-3 text-xs text-gray-600">
                       <span>{group.count} tekrar</span>
@@ -490,12 +490,12 @@ export default function TekrarlayanArizaAnalizi() {
                       <span>Son: {group.lastDate}</span>
                     </div>
                   </div>
-                ))}
+              )}
               </div>
-            )}
+            }
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }

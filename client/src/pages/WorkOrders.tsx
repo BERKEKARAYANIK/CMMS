@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ElementType } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -15,11 +15,11 @@ import {
   FileCheck2,
   RotateCcw,
   Pencil,
-  Trash2
-} from 'lucide-react';
-import { equipmentApi, shiftsApi, usersApi, workOrdersApi } from '../services/api';
+  Trash2 } from
+'lucide-react';
+import { equipmentApi, usersApi, workOrdersApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import type { Equipment, IsEmriDurum, Oncelik, Shift, User, WorkOrder } from '../types';
+import type { Equipment, IsEmriDurum, Oncelik, User, WorkOrder } from '../types';
 import { IsEmriDurumLabels, OncelikLabels } from '../types';
 import { isBerkeUser, isSystemAdminUser } from '../utils/access';
 
@@ -57,8 +57,6 @@ interface WorkOrderFormData {
   equipmentId: string;
   oncelik: Oncelik;
   atananId: string;
-  shiftId: string;
-  tahminiSure: string;
 }
 
 type ExtendedReportFormData = {
@@ -189,10 +187,10 @@ function isManagerRole(role?: string): boolean {
 }
 
 function normalizeForAuth(value: string | null | undefined): string {
-  return String(value || '')
-    .toLocaleLowerCase('tr-TR')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(value || '').
+  toLocaleLowerCase('tr-TR').
+  replace(/\s+/g, ' ').
+  trim();
 }
 
 function canManageCompletedFlow(user: User | null): boolean {
@@ -205,11 +203,11 @@ function canManageCompletedFlow(user: User | null): boolean {
   const sicilNo = normalizeForAuth(user.sicilNo);
 
   return (
-    ad === 'berke'
-    || fullName === 'berke karayanik'
-    || email.includes('berke')
-    || sicilNo === 'berke'
-  );
+    ad === 'berke' ||
+    fullName === 'berke karayanik' ||
+    email.includes('berke') ||
+    sicilNo === 'berke');
+
 }
 
 function isExtendedDowntimeWorkOrder(workOrder: WorkOrder): boolean {
@@ -227,9 +225,9 @@ function parseReport(content?: string): ExtendedReportFormData {
 
     const normalizeStringArray = (value: unknown, length: number): string[] => {
       if (!Array.isArray(value)) return Array.from({ length }, () => '');
-      return Array.from({ length }, (_, index) => (
-        typeof value[index] === 'string' ? value[index] : ''
-      ));
+      return Array.from({ length }, (_, index) =>
+      typeof value[index] === 'string' ? value[index] : ''
+      );
     };
 
     const normalizeMaterialRows = (value: unknown) => {
@@ -261,10 +259,10 @@ function parseReport(content?: string): ExtendedReportFormData {
     const base = createEmptyReportForm();
     const normalizedActions = normalizeActionRows(parsed.onleyiciAksiyonlar);
     if (
-      typeof parsed.onleyiciAksiyonlar === 'string'
-      && parsed.onleyiciAksiyonlar.trim()
-      && !normalizedActions.some((row) => row.aksiyon.trim())
-    ) {
+    typeof parsed.onleyiciAksiyonlar === 'string' &&
+    parsed.onleyiciAksiyonlar.trim() &&
+    !normalizedActions.some((row) => row.aksiyon.trim()))
+    {
       normalizedActions[0].aksiyon = parsed.onleyiciAksiyonlar.trim();
     }
 
@@ -326,26 +324,22 @@ function WorkOrderModal({
   isLoading,
   equipment,
   users,
-  shifts,
   canAssign
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: WorkOrderFormData) => void;
-  isLoading: boolean;
-  equipment: Equipment[];
-  users: User[];
-  shifts: Shift[];
-  canAssign: boolean;
-}) {
+
+
+
+
+
+
+
+
+}: {isOpen: boolean;onClose: () => void;onSubmit: (data: WorkOrderFormData) => void;isLoading: boolean;equipment: Equipment[];users: User[];canAssign: boolean;}) {
   const [formData, setFormData] = useState<WorkOrderFormData>({
     baslik: '',
     aciklama: '',
     equipmentId: '',
     oncelik: 'NORMAL',
-    atananId: '',
-    shiftId: '',
-    tahminiSure: ''
+    atananId: ''
   });
 
   if (!isOpen) return null;
@@ -355,15 +349,15 @@ function WorkOrderModal({
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-6">Is Girisi</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-6">İş Emri Ata</h2>
 
           <form
             onSubmit={(e) => {
               e.preventDefault();
               onSubmit(formData);
             }}
-            className="space-y-4"
-          >
+            className="space-y-4">
+            
             <div>
               <label className="label">Baslik</label>
               <input
@@ -371,18 +365,18 @@ function WorkOrderModal({
                 value={formData.baslik}
                 onChange={(e) => setFormData({ ...formData, baslik: e.target.value })}
                 className="input"
-                required
-              />
+                required />
+              
             </div>
 
             <div>
-              <label className="label">Aciklama</label>
+              <label className="label">Aİşklama</label>
               <textarea
                 value={formData.aciklama}
                 onChange={(e) => setFormData({ ...formData, aciklama: e.target.value })}
                 className="input"
-                rows={3}
-              />
+                rows={3} />
+              
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -391,14 +385,14 @@ function WorkOrderModal({
                 <select
                   value={formData.equipmentId}
                   onChange={(e) => setFormData({ ...formData, equipmentId: e.target.value })}
-                  className="input"
-                >
-                  <option value="">Seciniz</option>
-                  {equipment.map((eq) => (
-                    <option key={eq.id} value={eq.id}>
+                  className="input">
+                  
+                  <option value="">Seçiniz</option>
+                  {equipment.map((eq) =>
+                  <option key={eq.id} value={eq.id}>
                       {eq.ekipmanKodu} - {eq.ekipmanAdi}
                     </option>
-                  ))}
+                  )}
                 </select>
               </div>
               <div>
@@ -406,74 +400,49 @@ function WorkOrderModal({
                 <select
                   value={formData.oncelik}
                   onChange={(e) => setFormData({ ...formData, oncelik: e.target.value as Oncelik })}
-                  className="input"
-                >
-                  {oncelikOptions.map((o) => (
-                    <option key={o} value={o}>{OncelikLabels[o]}</option>
-                  ))}
+                  className="input">
+                  
+                  {oncelikOptions.map((o) =>
+                  <option key={o} value={o}>{OncelikLabels[o]}</option>
+                  )}
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {canAssign && (
-                <div>
-                  <label className="label">Atanan Personel</label>
-                  <select
-                    value={formData.atananId}
-                    onChange={(e) => setFormData({ ...formData, atananId: e.target.value })}
-                    className="input"
-                  >
-                    <option value="">Seciniz</option>
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.ad} {user.soyad} ({user.sicilNo})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className={canAssign ? '' : 'col-span-2'}>
-                <label className="label">Vardiya</label>
-                <select
-                  value={formData.shiftId}
-                  onChange={(e) => setFormData({ ...formData, shiftId: e.target.value })}
-                  className="input"
-                >
-                  <option value="">Seciniz</option>
-                  {shifts.map((shift) => (
-                    <option key={shift.id} value={shift.id}>{shift.vardiyaAdi}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            {!canAssign && (
-              <p className="text-xs text-gray-500">
-                Atama islemi sadece Berke Karayanik tarafindan yapilabilir.
-              </p>
-            )}
-
+            {canAssign &&
             <div>
-              <label className="label">Tahmini Sure (dk)</label>
-              <input
-                type="number"
-                value={formData.tahminiSure}
-                onChange={(e) => setFormData({ ...formData, tahminiSure: e.target.value })}
-                className="input"
-              />
-            </div>
+                <label className="label">Atanan Personel</label>
+                <select
+                value={formData.atananId}
+                onChange={(e) => setFormData({ ...formData, atananId: e.target.value })}
+                className="input">
+                
+                  <option value="">Seçiniz</option>
+                  {users.map((user) =>
+                <option key={user.id} value={user.id}>
+                      {user.ad} {user.soyad} ({user.sicilNo})
+                    </option>
+                )}
+                </select>
+              </div>
+            }
+            {!canAssign &&
+            <p className="text-xs text-gray-500">
+                Atama işlemi sadece Berke Karayanik tarafından yapılabilir.
+              </p>
+            }
 
             <div className="flex justify-end space-x-3 pt-4">
-              <button type="button" onClick={onClose} className="btn btn-secondary">Iptal</button>
+              <button type="button" onClick={onClose} className="btn btn-secondary">İptal</button>
               <button type="submit" className="btn btn-primary" disabled={isLoading}>
-                {isLoading ? 'Olusturuluyor...' : 'Olustur'}
+                {isLoading ? 'Oluşturuluyor...' : 'Oluştur'}
               </button>
             </div>
           </form>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 function ExtendedReportModal({
@@ -483,14 +452,14 @@ function ExtendedReportModal({
   onClose,
   onSubmit,
   isLoading
-}: {
-  isOpen: boolean;
-  workOrder: WorkOrder | null;
-  readOnly: boolean;
-  onClose: () => void;
-  onSubmit: (data: ExtendedReportFormData) => void;
-  isLoading: boolean;
-}) {
+
+
+
+
+
+
+
+}: {isOpen: boolean;workOrder: WorkOrder | null;readOnly: boolean;onClose: () => void;onSubmit: (data: ExtendedReportFormData) => void;isLoading: boolean;}) {
   const [formData, setFormData] = useState<ExtendedReportFormData>(createEmptyReportForm());
 
   useEffect(() => {
@@ -504,39 +473,39 @@ function ExtendedReportModal({
   const setNedenCevabi = (index: number, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      nedenAnalizi: prev.nedenAnalizi.map((item, i) => (i === index ? value : item))
+      nedenAnalizi: prev.nedenAnalizi.map((item, i) => i === index ? value : item)
     }));
   };
 
   const setKullanilanMalzeme = (index: number, key: 'malzemeAdi' | 'parcaNo' | 'miktar' | 'birimFiyat', value: string) => {
     setFormData((prev) => ({
       ...prev,
-      kullanilanMalzemeler: prev.kullanilanMalzemeler.map((row, i) => (
-        i === index ? { ...row, [key]: value } : row
-      ))
+      kullanilanMalzemeler: prev.kullanilanMalzemeler.map((row, i) =>
+      i === index ? { ...row, [key]: value } : row
+      )
     }));
   };
 
   const setOnleyiciAksiyon = (index: number, key: 'aksiyon' | 'sorumlu' | 'hedefTarih' | 'durum', value: string) => {
     setFormData((prev) => ({
       ...prev,
-      onleyiciAksiyonlar: prev.onleyiciAksiyonlar.map((row, i) => (
-        i === index ? { ...row, [key]: value } : row
-      ))
+      onleyiciAksiyonlar: prev.onleyiciAksiyonlar.map((row, i) =>
+      i === index ? { ...row, [key]: value } : row
+      )
     }));
   };
 
   const setFotografAciklamasi = (index: number, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      fotografAciklamalari: prev.fotografAciklamalari.map((item, i) => (i === index ? value : item))
+      fotografAciklamalari: prev.fotografAciklamalari.map((item, i) => i === index ? value : item)
     }));
   };
 
   const setKategori = (
-    key: 'malzemeParcaKusuru' | 'tasarimHatasi' | 'montajKurulumHatasi' | 'operasyonHatasi' | 'bakimEksikligi' | 'cevreKosullari' | 'diger',
-    checked: boolean
-  ) => {
+  key: 'malzemeParcaKusuru' | 'tasarimHatasi' | 'montajKurulumHatasi' | 'operasyonHatasi' | 'bakimEksikligi' | 'cevreKosullari' | 'diger',
+  checked: boolean) =>
+  {
     setFormData((prev) => ({
       ...prev,
       kokNedenKategorileri: {
@@ -553,11 +522,11 @@ function ExtendedReportModal({
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-6xl p-6">
-          <h2 className="text-xl font-bold text-gray-900 mb-1">Uzayan Durus Analiz Raporu</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Uzayan Duruş Analiz Raporu</h2>
           <p className="text-sm text-gray-600 mb-1">{workOrder.isEmriNo} - {workOrder.baslik}</p>
-          {readOnly && (
-            <p className="text-xs text-emerald-700 mb-4">Bu rapor salt-okunur modda goruntuleniyor.</p>
-          )}
+          {readOnly &&
+          <p className="text-xs text-emerald-700 mb-4">Bu rapor salt-okunur modda goruntuleniyor.</p>
+          }
 
           <div className="max-h-[72vh] overflow-y-auto pr-1 space-y-5">
             <section className="space-y-2">
@@ -570,8 +539,8 @@ function ExtendedReportModal({
                     value={formData.raporNo}
                     onChange={(e) => setFormData({ ...formData, raporNo: e.target.value })}
                     disabled={readOnly}
-                    placeholder="UD-2026-XXX"
-                  />
+                    placeholder="UD-2026-XXX" />
+                  
                 </div>
                 <div>
                   <label className="label">Rapor Tarihi</label>
@@ -580,8 +549,8 @@ function ExtendedReportModal({
                     className="input"
                     value={formData.raporTarihi}
                     onChange={(e) => setFormData({ ...formData, raporTarihi: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
                   <label className="label">Hazirlayan</label>
@@ -589,8 +558,8 @@ function ExtendedReportModal({
                     className="input"
                     value={formData.hazirlayan}
                     onChange={(e) => setFormData({ ...formData, hazirlayan: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
                   <label className="label">Onaylayan</label>
@@ -598,34 +567,34 @@ function ExtendedReportModal({
                     className="input"
                     value={formData.onaylayan}
                     onChange={(e) => setFormData({ ...formData, onaylayan: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
               </div>
             </section>
 
             <section className="space-y-2">
-              <h3 className="text-sm font-bold text-gray-800">1. Ariza Bilgileri</h3>
+              <h3 className="text-sm font-bold text-gray-800">1. Arıza Bilgileri</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div>
-                  <label className="label">Ariza Tipi</label>
+                  <label className="label">Arıza Tipi</label>
                   <input
                     className="input"
                     value={formData.arizaTipi}
                     onChange={(e) => setFormData({ ...formData, arizaTipi: e.target.value })}
                     disabled={readOnly}
-                    placeholder="Mekanik / Elektrik / Hidrolik / Pnomatik / Otomasyon"
-                  />
+                    placeholder="Mekanik / Elektrik / Hidrolik / Pnomatik / Otomasyon" />
+                  
                 </div>
                 <div>
-                  <label className="label">Ariza Tanimi</label>
+                  <label className="label">Arıza Tanımı</label>
                   <textarea
                     className="input"
                     rows={2}
                     value={formData.arizaTanimi}
                     onChange={(e) => setFormData({ ...formData, arizaTanimi: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
               </div>
             </section>
@@ -634,31 +603,31 @@ function ExtendedReportModal({
               <h3 className="text-sm font-bold text-gray-800">2. Zaman Cizelgesi (Saat)</h3>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <div>
-                  <label className="label">Toplam Durus</label>
+                  <label className="label">Toplam Duruş</label>
                   <input
                     className="input"
                     value={formData.toplamDurusSaati}
                     onChange={(e) => setFormData({ ...formData, toplamDurusSaati: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
-                  <label className="label">Tepki Suresi</label>
+                  <label className="label">Tepki Süresi</label>
                   <input
                     className="input"
                     value={formData.tepkiSuresiSaat}
                     onChange={(e) => setFormData({ ...formData, tepkiSuresiSaat: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
-                  <label className="label">Teshis Suresi</label>
+                  <label className="label">Teşhis Süresi</label>
                   <input
                     className="input"
                     value={formData.teshisSuresiSaat}
                     onChange={(e) => setFormData({ ...formData, teshisSuresiSaat: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
                   <label className="label">Yedek Parca Bekleme</label>
@@ -666,17 +635,17 @@ function ExtendedReportModal({
                     className="input"
                     value={formData.yedekParcaBeklemeSaat}
                     onChange={(e) => setFormData({ ...formData, yedekParcaBeklemeSaat: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
-                  <label className="label">Aktif Tamir Suresi</label>
+                  <label className="label">Aktif Tamir Süresi</label>
                   <input
                     className="input"
                     value={formData.aktifTamirSuresiSaat}
                     onChange={(e) => setFormData({ ...formData, aktifTamirSuresiSaat: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
               </div>
             </section>
@@ -684,18 +653,18 @@ function ExtendedReportModal({
             <section className="space-y-2">
               <h3 className="text-sm font-bold text-gray-800">3.1 5 Neden Analizi</h3>
               <div className="space-y-2">
-                {formData.nedenAnalizi.map((value, index) => (
-                  <div key={`neden-${index}`}>
+                {formData.nedenAnalizi.map((value, index) =>
+                <div key={`neden-${index}`}>
                     <label className="label">{index + 1}. Neden</label>
                     <textarea
-                      className="input"
-                      rows={2}
-                      value={value}
-                      onChange={(e) => setNedenCevabi(index, e.target.value)}
-                      disabled={readOnly}
-                    />
+                    className="input"
+                    rows={2}
+                    value={value}
+                    onChange={(e) => setNedenCevabi(index, e.target.value)}
+                    disabled={readOnly} />
+                  
                   </div>
-                ))}
+                )}
               </div>
             </section>
 
@@ -707,8 +676,8 @@ function ExtendedReportModal({
                     type="checkbox"
                     checked={formData.kokNedenKategorileri.malzemeParcaKusuru}
                     onChange={(e) => setKategori('malzemeParcaKusuru', e.target.checked)}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                   Malzeme / Parca Kusuru
                 </label>
                 <label className="inline-flex items-center gap-2">
@@ -716,8 +685,8 @@ function ExtendedReportModal({
                     type="checkbox"
                     checked={formData.kokNedenKategorileri.tasarimHatasi}
                     onChange={(e) => setKategori('tasarimHatasi', e.target.checked)}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                   Tasarim Hatasi
                 </label>
                 <label className="inline-flex items-center gap-2">
@@ -725,8 +694,8 @@ function ExtendedReportModal({
                     type="checkbox"
                     checked={formData.kokNedenKategorileri.montajKurulumHatasi}
                     onChange={(e) => setKategori('montajKurulumHatasi', e.target.checked)}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                   Montaj / Kurulum Hatasi
                 </label>
                 <label className="inline-flex items-center gap-2">
@@ -734,8 +703,8 @@ function ExtendedReportModal({
                     type="checkbox"
                     checked={formData.kokNedenKategorileri.operasyonHatasi}
                     onChange={(e) => setKategori('operasyonHatasi', e.target.checked)}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                   Operasyon Hatasi
                 </label>
                 <label className="inline-flex items-center gap-2">
@@ -743,17 +712,17 @@ function ExtendedReportModal({
                     type="checkbox"
                     checked={formData.kokNedenKategorileri.bakimEksikligi}
                     onChange={(e) => setKategori('bakimEksikligi', e.target.checked)}
-                    disabled={readOnly}
-                  />
-                  Bakim Eksikligi
+                    disabled={readOnly} />
+                  
+                  Bakım Eksikligi
                 </label>
                 <label className="inline-flex items-center gap-2">
                   <input
                     type="checkbox"
                     checked={formData.kokNedenKategorileri.cevreKosullari}
                     onChange={(e) => setKategori('cevreKosullari', e.target.checked)}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                   Cevre Kosullari
                 </label>
                 <label className="inline-flex items-center gap-2 md:col-span-2">
@@ -761,9 +730,9 @@ function ExtendedReportModal({
                     type="checkbox"
                     checked={formData.kokNedenKategorileri.diger}
                     onChange={(e) => setKategori('diger', e.target.checked)}
-                    disabled={readOnly}
-                  />
-                  Diger (Belirtiniz)
+                    disabled={readOnly} />
+                  
+                  Diğer (Belirtiniz)
                 </label>
               </div>
               <input
@@ -777,8 +746,8 @@ function ExtendedReportModal({
                   }
                 })}
                 disabled={readOnly}
-                placeholder="Diger kategori aciklamasi"
-              />
+                placeholder="Diğer kategori açıklaması" />
+              
             </section>
 
             <section>
@@ -788,8 +757,8 @@ function ExtendedReportModal({
                 rows={3}
                 value={formData.kokNedenOzeti}
                 onChange={(e) => setFormData({ ...formData, kokNedenOzeti: e.target.value })}
-                disabled={readOnly}
-              />
+                disabled={readOnly} />
+              
             </section>
 
             <section className="space-y-2">
@@ -801,17 +770,17 @@ function ExtendedReportModal({
                     className="input"
                     value={formData.maliyetYedekParca}
                     onChange={(e) => setFormData({ ...formData, maliyetYedekParca: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
-                  <label className="label">Iscilik (Ic)</label>
+                  <label className="label">İşcilik (Ic)</label>
                   <input
                     className="input"
                     value={formData.maliyetIscilikIc}
                     onChange={(e) => setFormData({ ...formData, maliyetIscilikIc: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
                   <label className="label">Dis Servis</label>
@@ -819,17 +788,17 @@ function ExtendedReportModal({
                     className="input"
                     value={formData.maliyetDisServis}
                     onChange={(e) => setFormData({ ...formData, maliyetDisServis: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
-                  <label className="label">Uretim Kaybi</label>
+                  <label className="label">Üretim Kaybi</label>
                   <input
                     className="input"
                     value={formData.maliyetUretimKaybi}
                     onChange={(e) => setFormData({ ...formData, maliyetUretimKaybi: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
                 <div>
                   <label className="label">Toplam</label>
@@ -837,8 +806,8 @@ function ExtendedReportModal({
                     className="input"
                     value={formData.maliyetToplam}
                     onChange={(e) => setFormData({ ...formData, maliyetToplam: e.target.value })}
-                    disabled={readOnly}
-                  />
+                    disabled={readOnly} />
+                  
                 </div>
               </div>
             </section>
@@ -857,8 +826,8 @@ function ExtendedReportModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {formData.kullanilanMalzemeler.map((row, index) => (
-                      <tr key={`malzeme-${index}`} className="border-t">
+                    {formData.kullanilanMalzemeler.map((row, index) =>
+                    <tr key={`malzeme-${index}`} className="border-t">
                         <td className="px-2 py-1">{index + 1}</td>
                         <td className="px-2 py-1">
                           <input className="input" value={row.malzemeAdi} onChange={(e) => setKullanilanMalzeme(index, 'malzemeAdi', e.target.value)} disabled={readOnly} />
@@ -873,7 +842,7 @@ function ExtendedReportModal({
                           <input className="input" value={row.birimFiyat} onChange={(e) => setKullanilanMalzeme(index, 'birimFiyat', e.target.value)} disabled={readOnly} />
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -893,8 +862,8 @@ function ExtendedReportModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {formData.onleyiciAksiyonlar.map((row, index) => (
-                      <tr key={`aksiyon-${index}`} className="border-t">
+                    {formData.onleyiciAksiyonlar.map((row, index) =>
+                    <tr key={`aksiyon-${index}`} className="border-t">
                         <td className="px-2 py-1">{index + 1}</td>
                         <td className="px-2 py-1">
                           <input className="input" value={row.aksiyon} onChange={(e) => setOnleyiciAksiyon(index, 'aksiyon', e.target.value)} disabled={readOnly} />
@@ -909,7 +878,7 @@ function ExtendedReportModal({
                           <input className="input" value={row.durum} onChange={(e) => setOnleyiciAksiyon(index, 'durum', e.target.value)} disabled={readOnly} />
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -918,18 +887,18 @@ function ExtendedReportModal({
             <section className="space-y-2">
               <h3 className="text-sm font-bold text-gray-800">7. Fotograf Dokumantasyonu</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {formData.fotografAciklamalari.map((aciklama, index) => (
-                  <div key={`foto-${index}`}>
-                    <label className="label">Fotograf {index + 1} Aciklamasi</label>
+                {formData.fotografAciklamalari.map((aciklama, index) =>
+                <div key={`foto-${index}`}>
+                    <label className="label">Fotograf {index + 1} Açıklamasi</label>
                     <textarea
-                      className="input"
-                      rows={2}
-                      value={aciklama}
-                      onChange={(e) => setFotografAciklamasi(index, e.target.value)}
-                      disabled={readOnly}
-                    />
+                    className="input"
+                    rows={2}
+                    value={aciklama}
+                    onChange={(e) => setFotografAciklamasi(index, e.target.value)}
+                    disabled={readOnly} />
+                  
                   </div>
-                ))}
+                )}
               </div>
             </section>
 
@@ -940,8 +909,8 @@ function ExtendedReportModal({
                 rows={3}
                 value={formData.sonucDegerlendirme}
                 onChange={(e) => setFormData({ ...formData, sonucDegerlendirme: e.target.value })}
-                disabled={readOnly}
-              />
+                disabled={readOnly} />
+              
             </section>
 
             <section className="space-y-2">
@@ -970,26 +939,26 @@ function ExtendedReportModal({
           </div>
 
           <div className="flex justify-end space-x-3 pt-5">
-            {readOnly ? (
-              <button type="button" onClick={onClose} className="btn btn-secondary">Kapat</button>
-            ) : (
-              <>
-                <button type="button" onClick={onClose} className="btn btn-secondary">Iptal</button>
+            {readOnly ?
+            <button type="button" onClick={onClose} className="btn btn-secondary">Kapat</button> :
+
+            <>
+                <button type="button" onClick={onClose} className="btn btn-secondary">İptal</button>
                 <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={isLoading}
-                  onClick={() => onSubmit(formData)}
-                >
-                  {isLoading ? 'Gonderiliyor...' : 'Onaya Gonder'}
+                type="button"
+                className="btn btn-primary"
+                disabled={isLoading}
+                onClick={() => onSubmit(formData)}>
+                
+                  {isLoading ? 'Gönderiliyor...' : 'Onaya Gonder'}
                 </button>
               </>
-            )}
+            }
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 function WorkOrderCard({
@@ -1007,22 +976,22 @@ function WorkOrderCard({
   reportPendingId,
   reportDeletingId,
   reopeningId
-}: {
-  workOrder: WorkOrder;
-  currentUser: User | null;
-  onStatusChange: (id: number, durum: IsEmriDurum) => void;
-  onCancelAssignment: (workOrder: WorkOrder) => void;
-  onOpenReport: (workOrder: WorkOrder) => void;
-  onViewReport: (workOrder: WorkOrder) => void;
-  onApprove: (id: number) => void;
-  onDeleteReport: (workOrder: WorkOrder) => void;
-  onReopenFromCompleted: (workOrder: WorkOrder) => void;
-  approvingId: number | null;
-  assignmentCancelingId: number | null;
-  reportPendingId: number | null;
-  reportDeletingId: number | null;
-  reopeningId: number | null;
-}) {
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+}: {workOrder: WorkOrder;currentUser: User | null;onStatusChange: (id: number, durum: IsEmriDurum, aciklama?: string) => void;onCancelAssignment: (workOrder: WorkOrder) => void;onOpenReport: (workOrder: WorkOrder) => void;onViewReport: (workOrder: WorkOrder) => void;onApprove: (id: number) => void;onDeleteReport: (workOrder: WorkOrder) => void;onReopenFromCompleted: (workOrder: WorkOrder) => void;approvingId: number | null;assignmentCancelingId: number | null;reportPendingId: number | null;reportDeletingId: number | null;reopeningId: number | null;}) {
   const Icon = durumIcons[workOrder.durum];
   const isExtended = isExtendedDowntimeWorkOrder(workOrder);
   const hasReportContent = Boolean(workOrder.tamamlanmaNotlari && workOrder.tamamlanmaNotlari.trim());
@@ -1033,142 +1002,160 @@ function WorkOrderCard({
   const canDeleteReport = Boolean(currentUser && (isBerkeUser(currentUser) || isSystemAdminUser(currentUser)));
   const canWorkOnOrder = Boolean(currentUser && (workOrder.atananId === currentUser.id || isManagerRole(currentUser.role)));
   const hasAssignee = Boolean(workOrder.atananId);
+  const latestActionNote = workOrder.loglar?.[0]?.aciklama?.trim() || '';
   const canShowDeleteReportButton = canDeleteReport && (
-    workOrder.durum === 'BEKLEMEDE'
-    || workOrder.durum === 'DEVAM_EDIYOR'
-    || workOrder.durum === 'ONAY_BEKLIYOR'
-    || workOrder.durum === 'TAMAMLANDI'
-  );
+  workOrder.durum === 'BEKLEMEDE' ||
+  workOrder.durum === 'DEVAM_EDIYOR' ||
+  workOrder.durum === 'ONAY_BEKLIYOR' ||
+  workOrder.durum === 'TAMAMLANDI');
+
 
   return (
-    <div className={`card p-4 border-l-4 ${oncelikColors[workOrder.oncelik].replace('bg-', 'border-').replace('-100', '-500')}`}>
-      <div className="flex items-start justify-between mb-3">
+    <div className={`card p-3 border-l-4 ${oncelikColors[workOrder.oncelik].replace('bg-', 'border-').replace('-100', '-500')}`}>
+      <div className="flex items-start justify-between mb-2">
         <div>
           <p className="font-mono text-xs text-gray-500">{workOrder.isEmriNo}</p>
-          <h3 className="font-semibold text-gray-900">{workOrder.baslik}</h3>
-          {isExtended && <p className="text-xs text-amber-700 mt-1">Uzayan Durus Akisi Aktif</p>}
+          <h3 className="text-sm font-semibold text-gray-900 truncate" title={workOrder.baslik}>
+            {workOrder.baslik}
+          </h3>
+          {isExtended && <p className="text-xs text-amber-700 mt-1">Uzayan Duruş Akışı Aktif</p>}
         </div>
-        <span className={`badge ${durumColors[workOrder.durum]}`}>
+        <span className={`badge text-[11px] ${durumColors[workOrder.durum]}`}>
           <Icon className="w-3 h-3 mr-1" />
           {IsEmriDurumLabels[workOrder.durum]}
         </span>
       </div>
 
-      {workOrder.equipment && (
-        <p className="text-sm text-gray-600 mb-2">
+      {workOrder.equipment &&
+      <p className="text-xs text-gray-600 mb-1">
           <span className="font-medium">Ekipman:</span> {workOrder.equipment.ekipmanAdi}
         </p>
-      )}
+      }
 
-      <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
+      <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
         <span>{workOrder.atanan ? `${workOrder.atanan.ad} ${workOrder.atanan.soyad}` : 'Atanmadi'}</span>
         <span>{format(new Date(workOrder.createdAt), 'dd MMM HH:mm', { locale: tr })}</span>
       </div>
 
       <div className="flex items-center space-x-2">
-        <span className={`badge ${oncelikColors[workOrder.oncelik]}`}>{OncelikLabels[workOrder.oncelik]}</span>
+        <span className={`badge text-[11px] ${oncelikColors[workOrder.oncelik]}`}>{OncelikLabels[workOrder.oncelik]}</span>
       </div>
 
-      {workOrder.durum !== 'TAMAMLANDI' && workOrder.durum !== 'IPTAL' && (
-        <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
-          {workOrder.durum === 'BEKLEMEDE' && canAssign && (
-            <button onClick={() => onStatusChange(workOrder.id, 'ATANDI')} className="btn btn-secondary text-xs">Ata</button>
-          )}
-          {hasAssignee && canWorkOnOrder && (workOrder.durum === 'ATANDI' || workOrder.durum === 'BEKLEMEDE') && (
-            <button onClick={() => onStatusChange(workOrder.id, 'DEVAM_EDIYOR')} className="btn btn-primary text-xs">Basla</button>
-          )}
-          {workOrder.durum === 'ATANDI' && hasAssignee && canAssign && (
-            <button
-              onClick={() => onCancelAssignment(workOrder)}
-              className="btn btn-secondary text-xs"
-              disabled={assignmentCancelingId === workOrder.id}
-            >
-              {assignmentCancelingId === workOrder.id ? 'Iptal Ediliyor...' : 'Atamayi Iptal Et'}
-            </button>
-          )}
-          {!isExtended && canWorkOnOrder && workOrder.durum === 'DEVAM_EDIYOR' && (
-            <button onClick={() => onStatusChange(workOrder.id, 'TAMAMLANDI')} className="btn btn-success text-xs">Tamamla</button>
-          )}
-          {isExtended && workOrder.durum === 'DEVAM_EDIYOR' && (
-            <button
-              onClick={() => onOpenReport(workOrder)}
-              className="btn btn-primary text-xs"
-              disabled={!canFillReport || reportPendingId === workOrder.id}
-            >
-              {reportPendingId === workOrder.id ? 'Gonderiliyor...' : 'Raporu Doldur / Onaya Gonder'}
-            </button>
-          )}
-          {isExtended && workOrder.durum === 'ONAY_BEKLIYOR' && (
-            <button
-              onClick={() => onViewReport(workOrder)}
-              className="btn btn-secondary text-xs"
-              disabled={!hasReportContent}
-            >
-              Raporu Oku
-            </button>
-          )}
-          {isExtended && workOrder.durum === 'ONAY_BEKLIYOR' && (
-            <button
-              onClick={() => onApprove(workOrder.id)}
-              className="btn btn-success text-xs"
-              disabled={!canApprove || approvingId === workOrder.id}
-            >
-              {approvingId === workOrder.id ? 'Onaylaniyor...' : 'Tamamlamayi Onayla'}
-            </button>
-          )}
+      {latestActionNote &&
+      <div className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5">
+          <p className="text-[11px] font-semibold text-amber-900">Not / Geri Gonderme Sebebi</p>
+          <p className="mt-0.5 text-xs text-amber-900 whitespace-pre-wrap break-words">{latestActionNote}</p>
         </div>
-      )}
+      }
 
-      {workOrder.durum === 'TAMAMLANDI' && (
-        <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
-          {isExtended && hasReportContent && (
-            <button
-              onClick={() => onViewReport(workOrder)}
-              className="btn btn-secondary text-xs"
-            >
+      {workOrder.durum !== 'TAMAMLANDI' && workOrder.durum !== 'IPTAL' &&
+      <div className="mt-3 pt-3 border-t flex flex-wrap gap-1.5">
+          {workOrder.durum === 'BEKLEMEDE' && canAssign &&
+        <button onClick={() => onStatusChange(workOrder.id, 'ATANDI')} className="btn btn-secondary px-2 py-1 text-[11px]">Ata</button>
+        }
+          {hasAssignee && canWorkOnOrder && (workOrder.durum === 'ATANDI' || workOrder.durum === 'BEKLEMEDE') &&
+        <button onClick={() => onStatusChange(workOrder.id, 'DEVAM_EDIYOR')} className="btn btn-primary px-2 py-1 text-[11px]">Başla</button>
+        }
+          {workOrder.durum === 'ATANDI' && hasAssignee && canAssign &&
+        <button
+          onClick={() => onCancelAssignment(workOrder)}
+          className="btn btn-secondary px-2 py-1 text-[11px]"
+          disabled={assignmentCancelingId === workOrder.id}>
+          
+              {assignmentCancelingId === workOrder.id ? 'İptal Ediliyor...' : 'Atamayı İptal Et'}
+            </button>
+        }
+          {!isExtended && canWorkOnOrder && workOrder.durum === 'DEVAM_EDIYOR' &&
+        <button onClick={() => onStatusChange(workOrder.id, 'ONAY_BEKLIYOR')} className="btn btn-success px-2 py-1 text-[11px]">Tamamla</button>
+        }
+          {!isExtended && workOrder.durum === 'ONAY_BEKLIYOR' && canAssign &&
+        <button
+          onClick={() => onStatusChange(workOrder.id, 'TAMAMLANDI')}
+          className="btn btn-success px-2 py-1 text-[11px]">
+          
+              Tamamlamayı Onayla
+            </button>
+        }
+          {isExtended && workOrder.durum === 'DEVAM_EDIYOR' &&
+        <button
+          onClick={() => onOpenReport(workOrder)}
+          className="btn btn-primary px-2 py-1 text-[11px]"
+          disabled={!canFillReport || reportPendingId === workOrder.id}>
+          
+              {reportPendingId === workOrder.id ? 'Gönderiliyor...' : 'Raporu Doldur / Onaya Gonder'}
+            </button>
+        }
+          {isExtended && workOrder.durum === 'ONAY_BEKLIYOR' &&
+        <button
+          onClick={() => onViewReport(workOrder)}
+          className="btn btn-secondary px-2 py-1 text-[11px]"
+          disabled={!hasReportContent}>
+          
               Raporu Oku
             </button>
-          )}
+        }
+          {isExtended && workOrder.durum === 'ONAY_BEKLIYOR' &&
+        <button
+          onClick={() => onApprove(workOrder.id)}
+          className="btn btn-success px-2 py-1 text-[11px]"
+          disabled={!canApprove || approvingId === workOrder.id}>
+          
+              {approvingId === workOrder.id ? 'Onaylanıyor...' : 'Tamamlamayı Onayla'}
+            </button>
+        }
+        </div>
+      }
 
-          {isExtended && hasReportContent && canManageCompleted && (
-            <button
-              onClick={() => onOpenReport(workOrder)}
-              className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-60"
-              disabled={reportPendingId === workOrder.id}
-            >
+      {workOrder.durum === 'TAMAMLANDI' &&
+      <div className="mt-3 pt-3 border-t flex flex-wrap gap-1.5">
+          {isExtended && hasReportContent &&
+        <button
+          onClick={() => onViewReport(workOrder)}
+          className="btn btn-secondary px-2 py-1 text-[11px]">
+          
+              Raporu Oku
+            </button>
+        }
+
+          {isExtended && hasReportContent && canManageCompleted &&
+        <button
+          onClick={() => onOpenReport(workOrder)}
+          className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-900 hover:bg-blue-100 disabled:opacity-60"
+          disabled={reportPendingId === workOrder.id}>
+          
               <Pencil className="mr-1 h-3.5 w-3.5" />
-              Raporu Duzenle
+              Raporu Düzenle
             </button>
-          )}
+        }
 
-          {canManageCompleted && (
-            <button
-              onClick={() => onReopenFromCompleted(workOrder)}
-              className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
-              disabled={reopeningId === workOrder.id}
-            >
+          {canManageCompleted &&
+        <button
+          onClick={() => onReopenFromCompleted(workOrder)}
+          className="inline-flex items-center rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+          disabled={reopeningId === workOrder.id}>
+          
               <RotateCcw className="mr-1 h-3.5 w-3.5" />
-              {reopeningId === workOrder.id ? 'Gonderiliyor...' : 'Geri Yolla'}
+              {reopeningId === workOrder.id ? 'Gönderiliyor...' : 'Geri Yolla'}
             </button>
-          )}
+        }
 
         </div>
-      )}
+      }
 
-      {canShowDeleteReportButton && (
-        <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
+      {canShowDeleteReportButton &&
+      <div className="mt-3 pt-3 border-t flex flex-wrap gap-1.5">
           <button
-            onClick={() => onDeleteReport(workOrder)}
-            className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-900 hover:bg-red-100 disabled:opacity-60"
-            disabled={reportDeletingId === workOrder.id}
-          >
+          onClick={() => onDeleteReport(workOrder)}
+          className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-2 py-1 text-xs font-medium text-red-900 hover:bg-red-100 disabled:opacity-60"
+          disabled={reportDeletingId === workOrder.id}>
+          
             <Trash2 className="mr-1 h-3.5 w-3.5" />
             {reportDeletingId === workOrder.id ? 'Siliniyor...' : 'Formu Sil'}
           </button>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }
 
 export default function WorkOrders() {
@@ -1215,43 +1202,34 @@ export default function WorkOrders() {
     }
   });
 
-  const { data: shifts } = useQuery({
-    queryKey: ['shifts-list'],
-    queryFn: async () => {
-      const response = await shiftsApi.getAll();
-      return response.data.data as Shift[];
-    }
-  });
-
   const createMutation = useMutation({
-    mutationFn: (data: WorkOrderFormData) => workOrdersApi.create({
-      ...data,
-      tahminiSure: data.tahminiSure ? Number.parseInt(data.tahminiSure, 10) : undefined
-    }),
+    mutationFn: (data: WorkOrderFormData) => workOrdersApi.create(data),
     onSuccess: () => {
-      toast.success('Is emri olusturuldu');
+      toast.success('İş emri oluşturuldu');
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
       setIsModalOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Hata olustu');
+      toast.error(error.response?.data?.message || "Hata oluştu");
     }
   });
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, durum }: { id: number; durum: IsEmriDurum }) => workOrdersApi.updateStatus(id, durum),
+    mutationFn: (
+    { id, durum, aciklama }: {id: number;durum: IsEmriDurum;aciklama?: string;}) =>
+    workOrdersApi.updateStatus(id, durum, aciklama),
     onSuccess: () => {
-      toast.success('Durum guncellendi');
+      toast.success('Durum güncellendi');
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Durum guncellenemedi');
+      toast.error(error.response?.data?.message || 'Durum güncellenemedi');
     }
   });
 
   const submitReportMutation = useMutation({
-    mutationFn: ({ id, reportContent }: { id: number; reportContent: string }) =>
-      workOrdersApi.submitForApproval(id, reportContent),
+    mutationFn: ({ id, reportContent }: {id: number;reportContent: string;}) =>
+    workOrdersApi.submitForApproval(id, reportContent),
     onSuccess: () => {
       toast.success('Rapor onaya gonderildi');
       setReportWorkOrder(null);
@@ -1259,18 +1237,18 @@ export default function WorkOrders() {
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Onaya gonderme basarisiz');
+      toast.error(error.response?.data?.message || 'Onaya gonderme başarısız');
     }
   });
 
   const approveMutation = useMutation({
     mutationFn: (id: number) => workOrdersApi.approveCompletion(id),
     onSuccess: () => {
-      toast.success('Is tamamlanmasi onaylandi');
+      toast.success('İş tamamlanmasi onaylandi');
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Onay islemi basarisiz');
+      toast.error(error.response?.data?.message || "Onay işlemi başarısız");
     }
   });
 
@@ -1282,7 +1260,7 @@ export default function WorkOrders() {
       if (updatedWorkOrder) {
         queryClient.setQueriesData({ queryKey: ['work-orders'] }, (oldData: WorkOrder[] | undefined) => {
           if (!Array.isArray(oldData)) return oldData;
-          return oldData.map((item) => (item.id === workOrder.id ? { ...item, ...updatedWorkOrder } : item));
+          return oldData.map((item) => item.id === workOrder.id ? { ...item, ...updatedWorkOrder } : item);
         });
       } else {
         queryClient.invalidateQueries({ queryKey: ['work-orders'] });
@@ -1304,7 +1282,7 @@ export default function WorkOrders() {
         return oldData.filter((item) => item.id !== workOrder.id);
       });
 
-      setReportWorkOrder((prev) => (prev?.id === workOrder.id ? null : prev));
+      setReportWorkOrder((prev) => prev?.id === workOrder.id ? null : prev);
       setIsReportReadOnly(false);
 
       toast.success(response?.data?.message || 'Form silindi');
@@ -1319,19 +1297,19 @@ export default function WorkOrders() {
     mutationFn: (id: number) => workOrdersApi.updateStatus(
       id,
       'DEVAM_EDIYOR',
-      'Tamamlanan is emri yonetici tarafindan duzeltme icin geri yollandi'
+      "Tamamlanan iş emri yönetici tarafından düzeltme için geri yollandı"
     ),
     onSuccess: () => {
-      toast.success('Is emri geri yollandi');
+      toast.success('İş emri geri yollandı');
       queryClient.invalidateQueries({ queryKey: ['work-orders'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Is emri geri yollanamadi');
+      toast.error(error.response?.data?.message || 'İş emri geri yollanamadı');
     }
   });
 
   const handleReopenFromCompleted = (workOrder: WorkOrder) => {
-    if (!confirm(`${workOrder.isEmriNo} kaydi DEVAM_EDIYOR durumuna geri yollansin mi?`)) return;
+    if (!confirm(`${workOrder.isEmriNo} kaydı DEVAM_EDIYOR durumuna geri yollansın mi?`)) return;
     reopenMutation.mutate(workOrder.id);
   };
 
@@ -1341,17 +1319,35 @@ export default function WorkOrders() {
   };
 
   const handleCancelAssignment = (workOrder: WorkOrder) => {
-    if (!confirm(`${workOrder.isEmriNo} icin atama iptal edilsin mi?`)) return;
+    if (!confirm(`${workOrder.isEmriNo} için atama iptal edilsin mi?`)) return;
     cancelAssignmentMutation.mutate(workOrder);
   };
 
-  const kanbanColumns: { key: IsEmriDurum; label: string; color: string }[] = [
-    { key: 'BEKLEMEDE', label: 'Beklemede', color: 'bg-gray-500' },
-    { key: 'ATANDI', label: 'Atandi', color: 'bg-blue-500' },
-    { key: 'DEVAM_EDIYOR', label: 'Devam Ediyor', color: 'bg-yellow-500' },
-    { key: 'ONAY_BEKLIYOR', label: 'Onay Bekliyor', color: 'bg-amber-500' },
-    { key: 'TAMAMLANDI', label: 'Tamamlandi', color: 'bg-green-500' }
-  ];
+  const handleStatusChange = (id: number, durum: IsEmriDurum) => {
+    if (durum === 'ONAY_BEKLIYOR') {
+      const yorum = window.prompt('Yapilan is notunu giriniz:');
+      if (!yorum || !yorum.trim()) {
+        toast.error('Onaya gondermek için not zorunludur');
+        return;
+      }
+      statusMutation.mutate({
+        id,
+        durum,
+        aciklama: `Is sonu notu: ${yorum.trim()}`
+      });
+      return;
+    }
+
+    statusMutation.mutate({ id, durum });
+  };
+
+  const kanbanColumns: {key: IsEmriDurum;label: string;color: string;}[] = [
+  { key: 'BEKLEMEDE', label: 'Beklemede', color: 'bg-gray-500' },
+  { key: 'ATANDI', label: 'Atandi', color: 'bg-blue-500' },
+  { key: 'DEVAM_EDIYOR', label: 'Devam Ediyor', color: 'bg-yellow-500' },
+  { key: 'ONAY_BEKLIYOR', label: 'Onay Bekliyor', color: 'bg-amber-500' },
+  { key: 'TAMAMLANDI', label: 'Tamamlandi', color: 'bg-green-500' }];
+
 
   const groupedOrders = useMemo(() => kanbanColumns.reduce((acc, col) => {
     acc[col.key] = workOrders?.filter((wo) => wo.durum === col.key) || [];
@@ -1361,10 +1357,10 @@ export default function WorkOrders() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Is Emirleri</h1>
+        <h1 className="text-2xl font-bold text-gray-900">İş Emirleri</h1>
         <button onClick={() => setIsModalOpen(true)} className="btn btn-primary inline-flex items-center">
           <Plus className="w-5 h-5 mr-2" />
-          Is Girisi
+          İş Emri Ata
         </button>
       </div>
 
@@ -1374,76 +1370,76 @@ export default function WorkOrders() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Is emri no veya baslik ara..."
+              placeholder="İş emri no veya baslik ara..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input pl-10"
-            />
+              className="input pl-10" />
+            
           </div>
           <select value={filterDurum} onChange={(e) => setFilterDurum(e.target.value)} className="input w-full md:w-44">
-            <option value="">Tum Durumlar</option>
-            {durumOptions.map((d) => (
-              <option key={d} value={d}>{IsEmriDurumLabels[d]}</option>
-            ))}
+            <option value="">Tüm Durumlar</option>
+            {durumOptions.map((d) =>
+            <option key={d} value={d}>{IsEmriDurumLabels[d]}</option>
+            )}
           </select>
           <select value={filterOncelik} onChange={(e) => setFilterOncelik(e.target.value)} className="input w-full md:w-40">
-            <option value="">Tum Oncelikler</option>
-            {oncelikOptions.map((o) => (
-              <option key={o} value={o}>{OncelikLabels[o]}</option>
-            ))}
+            <option value="">Tüm Oncelikler</option>
+            {oncelikOptions.map((o) =>
+            <option key={o} value={o}>{OncelikLabels[o]}</option>
+            )}
           </select>
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
+      {isLoading ?
+      <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600" />
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
-          {kanbanColumns.map((column) => (
-            <div key={column.key} className="bg-gray-100 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-4">
+        </div> :
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          {kanbanColumns.map((column) =>
+        <div key={column.key} className="bg-gray-100 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
                   <div className={`w-3 h-3 rounded-full ${column.color} mr-2`} />
-                  <h3 className="font-semibold text-gray-900">{column.label}</h3>
+                  <h3 className="text-sm font-semibold text-gray-900">{column.label}</h3>
                 </div>
-                <span className="badge badge-gray">{groupedOrders[column.key].length}</span>
+                <span className="badge badge-gray text-[11px]">{groupedOrders[column.key].length}</span>
               </div>
-              <div className="space-y-3">
-                {groupedOrders[column.key].map((wo) => (
-                  <WorkOrderCard
-                    key={wo.id}
-                    workOrder={wo}
-                    currentUser={currentUser}
-                    onStatusChange={(id, durum) => statusMutation.mutate({ id, durum })}
-                    onCancelAssignment={handleCancelAssignment}
-                    onOpenReport={(selectedWorkOrder) => {
-                      setIsReportReadOnly(false);
-                      setReportWorkOrder(selectedWorkOrder);
-                    }}
-                    onViewReport={(selectedWorkOrder) => {
-                      setIsReportReadOnly(true);
-                      setReportWorkOrder(selectedWorkOrder);
-                    }}
-                    onApprove={(id) => approveMutation.mutate(id)}
-                    onDeleteReport={handleDeleteReport}
-                    onReopenFromCompleted={handleReopenFromCompleted}
-                    approvingId={approveMutation.isPending ? (approveMutation.variables ?? null) : null}
-                    assignmentCancelingId={cancelAssignmentMutation.isPending ? (cancelAssignmentMutation.variables?.id ?? null) : null}
-                    reportPendingId={submitReportMutation.isPending ? (submitReportMutation.variables?.id ?? null) : null}
-                    reportDeletingId={deleteReportMutation.isPending ? (deleteReportMutation.variables?.id ?? null) : null}
-                    reopeningId={reopenMutation.isPending ? (reopenMutation.variables ?? null) : null}
-                  />
-                ))}
-                {groupedOrders[column.key].length === 0 && (
-                  <p className="text-sm text-gray-500 text-center py-4">Is emri yok</p>
-                )}
+              <div className="space-y-2">
+                {groupedOrders[column.key].map((wo) =>
+            <WorkOrderCard
+              key={wo.id}
+              workOrder={wo}
+              currentUser={currentUser}
+              onStatusChange={handleStatusChange}
+              onCancelAssignment={handleCancelAssignment}
+              onOpenReport={(selectedWorkOrder) => {
+                setIsReportReadOnly(false);
+                setReportWorkOrder(selectedWorkOrder);
+              }}
+              onViewReport={(selectedWorkOrder) => {
+                setIsReportReadOnly(true);
+                setReportWorkOrder(selectedWorkOrder);
+              }}
+              onApprove={(id) => approveMutation.mutate(id)}
+              onDeleteReport={handleDeleteReport}
+              onReopenFromCompleted={handleReopenFromCompleted}
+              approvingId={approveMutation.isPending ? approveMutation.variables ?? null : null}
+              assignmentCancelingId={cancelAssignmentMutation.isPending ? cancelAssignmentMutation.variables?.id ?? null : null}
+              reportPendingId={submitReportMutation.isPending ? submitReportMutation.variables?.id ?? null : null}
+              reportDeletingId={deleteReportMutation.isPending ? deleteReportMutation.variables?.id ?? null : null}
+              reopeningId={reopenMutation.isPending ? reopenMutation.variables ?? null : null} />
+
+            )}
+                {groupedOrders[column.key].length === 0 &&
+            <p className="text-sm text-gray-500 text-center py-4">İş emri yok</p>
+            }
               </div>
             </div>
-          ))}
+        )}
         </div>
-      )}
+      }
 
       <WorkOrderModal
         isOpen={isModalOpen}
@@ -1452,9 +1448,8 @@ export default function WorkOrders() {
         isLoading={createMutation.isPending}
         equipment={equipment || []}
         users={users || []}
-        shifts={shifts || []}
-        canAssign={canAssignWorkOrders}
-      />
+        canAssign={canAssignWorkOrders} />
+      
 
       <ExtendedReportModal
         isOpen={Boolean(reportWorkOrder)}
@@ -1471,8 +1466,8 @@ export default function WorkOrders() {
             reportContent: serializeReport(data)
           });
         }}
-        isLoading={submitReportMutation.isPending}
-      />
-    </div>
-  );
+        isLoading={submitReportMutation.isPending} />
+      
+    </div>);
+
 }

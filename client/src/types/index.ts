@@ -1,17 +1,17 @@
 export type Role = 'ADMIN' | 'BAKIM_MUDURU' | 'BAKIM_SEFI' | 'TEKNISYEN' | 'OPERATOR';
 export type Departman =
-  | 'MEKANIK'
-  | 'ELEKTRIK'
-  | 'YARDIMCI_ISLETMELER'
-  | 'URETIM'
-  | 'YONETIM'
-  | 'ELEKTRIK BAKIM ANA BINA'
-  | 'ELEKTRIK BAKIM EK BINA'
-  | 'MEKANIK BAKIM'
-  | 'ISK ELEKTRIK BAKIM'
-  | 'ISK MEKANIK BAKIM'
-  | 'ISK YARDIMCI TESISLER'
-  | 'YARDIMCI TESISLER';
+'MEKANIK' |
+'ELEKTRIK' |
+'YARDIMCI_ISLETMELER' |
+'URETIM' |
+'YONETIM' |
+'ELEKTRIK BAKIM ANA BINA' |
+'ELEKTRIK BAKIM EK BINA' |
+'MEKANIK BAKIM' |
+'ISK ELEKTRIK BAKIM' |
+'ISK MEKANIK BAKIM' |
+'ISK YARDIMCI TESISLER' |
+'YARDIMCI TESISLER';
 export type IsEmriDurum = 'BEKLEMEDE' | 'ATANDI' | 'DEVAM_EDIYOR' | 'ONAY_BEKLIYOR' | 'TAMAMLANDI' | 'IPTAL';
 export type Oncelik = 'ACIL' | 'YUKSEK' | 'NORMAL' | 'DUSUK';
 export type KritiklikSeviyesi = 'A' | 'B' | 'C';
@@ -99,6 +99,13 @@ export interface WorkOrder {
   preventiveMaintenanceId?: number;
   createdAt: string;
   updatedAt: string;
+  loglar?: Array<{
+    id: number;
+    islem: string;
+    aciklama?: string | null;
+    createdAt: string;
+    user?: Pick<User, 'id' | 'ad' | 'soyad'>;
+  }>;
   equipment?: Equipment;
   talepEden?: User;
   atanan?: User;
@@ -220,22 +227,22 @@ export interface PersonnelPerformanceData {
 export const DepartmanLabels: Record<Departman, string> = {
   MEKANIK: 'Mekanik',
   ELEKTRIK: 'Elektrik',
-  YARDIMCI_ISLETMELER: 'Yardimci Isletmeler',
-  URETIM: 'Uretim',
-  YONETIM: 'Yonetim',
-  'ELEKTRIK BAKIM ANA BINA': 'Elektrik Bakim Ana Bina',
-  'ELEKTRIK BAKIM EK BINA': 'Elektrik Bakim Ek Bina',
-  'MEKANIK BAKIM': 'Mekanik Bakim',
-  'ISK ELEKTRIK BAKIM': 'ISK Elektrik Bakim',
-  'ISK MEKANIK BAKIM': 'ISK Mekanik Bakim',
-  'ISK YARDIMCI TESISLER': 'ISK Yardimci Tesisler',
-  'YARDIMCI TESISLER': 'Yardimci Tesisler'
+  YARDIMCI_ISLETMELER: "Yardımcı İşletmeler",
+  URETIM: 'Üretim',
+  YONETIM: 'Yönetim',
+  'ELEKTRIK BAKIM ANA BINA': 'Elektrik Bakım Ana Bina',
+  'ELEKTRIK BAKIM EK BINA': 'Elektrik Bakım Ek Bina',
+  'MEKANIK BAKIM': 'Mekanik Bakım',
+  'ISK ELEKTRIK BAKIM': 'ISK Elektrik Bakım',
+  'ISK MEKANIK BAKIM': 'ISK Mekanik Bakım',
+  'ISK YARDIMCI TESISLER': 'ISK Yardımcı Tesisler',
+  'YARDIMCI TESISLER': 'Yardımcı Tesisler'
 };
 
 export const RoleLabels: Record<Role, string> = {
-  ADMIN: 'Sistem Yoneticisi',
-  BAKIM_MUDURU: 'Bakim Muduru',
-  BAKIM_SEFI: 'Bakim Sefi',
+  ADMIN: 'Sistem Yöneticisi',
+  BAKIM_MUDURU: 'Bakım Muduru',
+  BAKIM_SEFI: 'Bakım Sefi',
   TEKNISYEN: 'Teknisyen',
   OPERATOR: 'Operator'
 };
@@ -253,7 +260,7 @@ export const IsEmriDurumLabels: Record<IsEmriDurum, string> = {
   DEVAM_EDIYOR: 'Devam Ediyor',
   ONAY_BEKLIYOR: 'Onay Bekliyor',
   TAMAMLANDI: 'Tamamlandi',
-  IPTAL: 'Iptal'
+  IPTAL: 'İptal'
 };
 
 export const PeriyotTipiLabels: Record<PeriyotTipi, string> = {

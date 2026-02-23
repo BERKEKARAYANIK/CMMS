@@ -5678,7 +5678,7 @@ export const ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR: Record<IsgYearKey, Record<IsgM
             {
               "date": "2026-02-07",
               "person": "HILMI CAN ERDEM",
-              "detail": "18 BMK Down table'dan sonra paket sayma sehpasina malzemenin dik gelmemesi icin profil kaynatilmis sik sik kaynak kiriliyor parca dusuyor, kalici cozum bulunmasi lazim, o bolgede is kazasi da olmustur.",
+              "detail": "18 BMK Down table'dan sonra paket sayma sehpasina malzemenin dik gelmemesi için profil kaynatilmis sik sik kaynak kiriliyor parca dusuyor, kalici cozum bulunmasi lazim, o bolgede is kazasi da olmustur.",
               "missingField": "Giderilmedi (Devam Ediyor)",
               "sourceRowNo": 524
             },
@@ -5692,7 +5692,7 @@ export const ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR: Record<IsgYearKey, Record<IsgM
             {
               "date": "2026-02-07",
               "person": "HILMI CAN ERDEM",
-              "detail": "19 BMK Karsima tamponuna malzemenin agzini bozmamasi icin sapan baglanilmis yakin tarihte is kazasi oldu, elektrik-mekanik ve isletme birimleri tarafindan kalici cozum bulunmasi",
+              "detail": "19 BMK Karsima tamponuna malzemenin agzini bozmamasi için sapan baglanilmis yakin tarihte is kazasi oldu, elektrik-mekanik ve isletme birimleri tarafindan kalici cozum bulunmasi",
               "missingField": "Giderilmedi (Devam Ediyor)",
               "sourceRowNo": 526
             },
@@ -6149,7 +6149,7 @@ export const ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR: Record<IsgYearKey, Record<IsgM
             {
               "date": "2026-02-07",
               "person": "HILMI CAN ERDEM",
-              "detail": "19 BMK Karsima tamponuna malzemenin agzini bozmamasi icin sapan baglanilmis yakin tarihte is kazasi oldu, elektrik-mekanik ve isletme birimleri tarafindan kalici cozum bulunmasi",
+              "detail": "19 BMK Karsima tamponuna malzemenin agzini bozmamasi için sapan baglanilmis yakin tarihte is kazasi oldu, elektrik-mekanik ve isletme birimleri tarafindan kalici cozum bulunmasi",
               "missingField": "Giderilmedi (Devam Ediyor)",
               "sourceRowNo": 528
             },
@@ -6721,7 +6721,7 @@ export const ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR: Record<IsgYearKey, Record<IsgM
             {
               "date": "2026-02-07",
               "person": "HILMI CAN ERDEM",
-              "detail": "19 BMK Karsima tamponuna malzemenin agzini bozmamasi icin sapan baglanilmis yakin tarihte is kazasi oldu, elektrik-mekanik ve isletme birimleri tarafindan kalici cozum bulunmasi",
+              "detail": "19 BMK Karsima tamponuna malzemenin agzini bozmamasi için sapan baglanilmis yakin tarihte is kazasi oldu, elektrik-mekanik ve isletme birimleri tarafindan kalici cozum bulunmasi",
               "missingField": "Giderilmedi (Devam Ediyor)",
               "sourceRowNo": 527
             },

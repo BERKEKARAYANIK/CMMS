@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ModuleType, AppData, MotorState, MachineConfigs, HistoryEntry } from '../modules/bakimTakipMerkezi/types';
 import { INITIAL_DATA, INITIAL_CONFIGS, MACHINE_COUNT } from '../modules/bakimTakipMerkezi/constants';
 import Dashboard from '../modules/bakimTakipMerkezi/components/Dashboard';
@@ -14,12 +14,12 @@ import { appStateApi } from '../services/api';
 import { APP_STATE_KEYS } from '../constants/appState';
 
 const LEGACY_MODULE_MAP: Record<string, ModuleType> = {
-  'AK?M?LASYON': ModuleType.ACCUMULATION,
-  'R?LE YOLU': ModuleType.RELAY_WAY,
-  'H?ZALAMA': ModuleType.ALIGNMENT,
-  'AK?oM?oLASYON': ModuleType.ACCUMULATION,
-  'R?-LE YOLU': ModuleType.RELAY_WAY,
-  'HZ?ZALAMA': ModuleType.ALIGNMENT
+  'AK\u00dcM\u00dcLASYON': ModuleType.ACCUMULATION,
+  AKUMULASYON: ModuleType.ACCUMULATION,
+  'R\u00d6LE YOLU': ModuleType.RELAY_WAY,
+  'ROLE YOLU': ModuleType.RELAY_WAY,
+  'H\u0130ZALAMA': ModuleType.ALIGNMENT,
+  HIZALAMA: ModuleType.ALIGNMENT
 };
 
 const normalizeModuleKey = (key: string): ModuleType | null => {
@@ -39,7 +39,7 @@ const buildDataFromConfigs = (configs: MachineConfigs): AppData => {
           id: `M${i + 1}`,
           name: `Motor Ünitesi ${i + 1}`,
           history: []
-        } as MotorState)
+        }) as MotorState
       ),
       [ModuleType.RELAY_WAY]: Array.from(
         { length: config[ModuleType.RELAY_WAY] },
@@ -48,7 +48,7 @@ const buildDataFromConfigs = (configs: MachineConfigs): AppData => {
           id: `M${i + 1}`,
           name: `Motor Ünitesi ${i + 1}`,
           history: []
-        } as MotorState)
+        }) as MotorState
       ),
       [ModuleType.ALIGNMENT]: Array.from(
         { length: config[ModuleType.ALIGNMENT] },
@@ -57,7 +57,7 @@ const buildDataFromConfigs = (configs: MachineConfigs): AppData => {
           id: `M${i + 1}`,
           name: `Motor Ünitesi ${i + 1}`,
           history: []
-        } as MotorState)
+        }) as MotorState
       ),
       [ModuleType.DC_MOTOR]: Array.from(
         { length: config[ModuleType.DC_MOTOR] },
@@ -66,7 +66,7 @@ const buildDataFromConfigs = (configs: MachineConfigs): AppData => {
           id: `M${i + 1}`,
           name: `Motor Ünitesi ${i + 1}`,
           history: []
-        } as MotorState)
+        }) as MotorState
       )
     };
   }
@@ -127,19 +127,19 @@ const normalizeData = (raw: unknown, configs: MachineConfigs): AppData => {
           name: item?.name || fallbackName,
           history: Array.isArray(item?.history) ? item?.history : [],
           maintenanceMonths: Array.isArray(item?.maintenanceMonths) ? item?.maintenanceMonths : [],
-          monthlyReports: item?.monthlyReports && typeof item.monthlyReports === 'object'
-            ? (item.monthlyReports as Record<string, string[]>)
-            : {},
-          dcMotorReports: item?.dcMotorReports && typeof item.dcMotorReports === 'object'
-            ? (item.dcMotorReports as Record<string, {
-                date: string;
-                technician: string;
-                assessment: string;
-                data: ChecklistData;
-                task: MaintenanceTask;
-                timestamp: string;
-              }>)
-            : {}
+          monthlyReports: item?.monthlyReports && typeof item.monthlyReports === 'object' ?
+          item.monthlyReports as Record<string, string[]> :
+          {},
+          dcMotorReports: item?.dcMotorReports && typeof item.dcMotorReports === 'object' ?
+          item.dcMotorReports as Record<string, {
+            date: string;
+            technician: string;
+            assessment: string;
+            data: ChecklistData;
+            task: MaintenanceTask;
+            timestamp: string;
+          }> :
+          {}
         } as MotorState;
       });
 
@@ -203,18 +203,18 @@ const BakimTakipMerkezi: React.FC = () => {
       try {
         setIsStateLoading(true);
         const response = await appStateApi.getMany([
-          APP_STATE_KEYS.bakimTakipConfigs,
-          APP_STATE_KEYS.bakimTakipData,
-          APP_STATE_KEYS.bakimTakipHiddenMachines
-        ]);
+        APP_STATE_KEYS.bakimTakipConfigs,
+        APP_STATE_KEYS.bakimTakipData,
+        APP_STATE_KEYS.bakimTakipHiddenMachines]
+        );
         const payload = (response.data?.data || {}) as Record<string, unknown>;
         const loadedConfigs = normalizeConfigs(payload[APP_STATE_KEYS.bakimTakipConfigs] ?? INITIAL_CONFIGS);
         const loadedData = normalizeData(payload[APP_STATE_KEYS.bakimTakipData], loadedConfigs);
-        const loadedHidden = Array.isArray(payload[APP_STATE_KEYS.bakimTakipHiddenMachines])
-          ? (payload[APP_STATE_KEYS.bakimTakipHiddenMachines] as unknown[])
-            .map((value) => Number(value))
-            .filter((value) => Number.isFinite(value))
-          : [];
+        const loadedHidden = Array.isArray(payload[APP_STATE_KEYS.bakimTakipHiddenMachines]) ?
+        (payload[APP_STATE_KEYS.bakimTakipHiddenMachines] as unknown[]).
+        map((value) => Number(value)).
+        filter((value) => Number.isFinite(value)) :
+        [];
 
         setConfigs(loadedConfigs);
         setData(loadedData);
@@ -237,17 +237,17 @@ const BakimTakipMerkezi: React.FC = () => {
 
     const timeout = window.setTimeout(() => {
       void Promise.all([
-        appStateApi.set(APP_STATE_KEYS.bakimTakipConfigs, configs),
-        appStateApi.set(APP_STATE_KEYS.bakimTakipData, data),
-        appStateApi.set(APP_STATE_KEYS.bakimTakipHiddenMachines, hiddenMachines)
-      ]);
+      appStateApi.set(APP_STATE_KEYS.bakimTakipConfigs, configs),
+      appStateApi.set(APP_STATE_KEYS.bakimTakipData, data),
+      appStateApi.set(APP_STATE_KEYS.bakimTakipHiddenMachines, hiddenMachines)]
+      );
     }, 400);
 
     return () => window.clearTimeout(timeout);
   }, [configs, data, hiddenMachines, isStateHydrated]);
 
-  const visibleMachineIds = Array.from({ length: MACHINE_COUNT }, (_, i) => i + 1)
-    .filter((id) => !hiddenMachines.includes(id));
+  const visibleMachineIds = Array.from({ length: MACHINE_COUNT }, (_, i) => i + 1).
+  filter((id) => !hiddenMachines.includes(id));
 
   const visibleMachineIdsForModule = (module: ModuleType | null) => {
     if (!module) return visibleMachineIds;
@@ -292,7 +292,7 @@ const BakimTakipMerkezi: React.FC = () => {
         const newMotors = Array.from({ length: diff }, (_, i) => ({
           ...INITIAL_DATA[1][module][0],
           id: `M${currentMotors.length + i + 1}`
-        } as MotorState));
+        }) as MotorState);
         newData[machineId][module] = [...currentMotors, ...newMotors];
       } else if (count < currentMotors.length) {
         newData[machineId][module] = currentMotors.slice(0, count);
@@ -423,9 +423,9 @@ const BakimTakipMerkezi: React.FC = () => {
       }
 
       const maintenanceMonths = Array.isArray(motor.maintenanceMonths) ? [...motor.maintenanceMonths] : [];
-      const updatedMonths = monthReports.length > 0
-        ? maintenanceMonths
-        : maintenanceMonths.filter((label) => label !== monthLabel);
+      const updatedMonths = monthReports.length > 0 ?
+      maintenanceMonths :
+      maintenanceMonths.filter((label) => label !== monthLabel);
 
       const dcMotorReports = { ...(motor.dcMotorReports || {}) };
       delete dcMotorReports[reportId];
@@ -443,11 +443,11 @@ const BakimTakipMerkezi: React.FC = () => {
   };
 
   const toggleMachineHidden = (machineId: number) => {
-    setHiddenMachines((prev) => (
-      prev.includes(machineId)
-        ? prev.filter((id) => id !== machineId)
-        : [...prev, machineId]
-    ));
+    setHiddenMachines((prev) =>
+    prev.includes(machineId) ?
+    prev.filter((id) => id !== machineId) :
+    [...prev, machineId]
+    );
   };
 
   return (
@@ -459,78 +459,78 @@ const BakimTakipMerkezi: React.FC = () => {
         </div>
         <button
           onClick={() => setView('settings')}
-          className="btn btn-secondary inline-flex items-center"
-        >
+          className="btn btn-secondary inline-flex items-center">
+          
           <Settings className="w-4 h-4 mr-2" />
           Ayarlar
         </button>
       </div>
 
       <div className="card p-4">
-        {isStateLoading && (
-          <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
-            Bakim takip verileri yukleniyor...
+        {isStateLoading &&
+        <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+            Bakım takip verileri yükleniyor...
           </div>
-        )}
-        {view === 'dashboard' && (
-          <Dashboard data={data} onSelectModule={handleModuleSelect} machineIds={visibleMachineIds} />
-        )}
-        {view === 'matrix' && activeModule && (
-          <MatrixView
-            moduleType={activeModule}
-            data={data}
-            machineIds={visibleMachineIdsForModule(activeModule)}
-            onSelectMachine={handleMachineSelect}
-            onBack={() => setView('dashboard')}
-          />
-        )}
-        {view === 'machine' && activeModule && activeMachineId && (
-          <MachineDetail
-            machineId={activeMachineId}
-            moduleType={activeModule}
-            motors={data[activeMachineId][activeModule]}
-            onBack={() => setView('matrix')}
-            onSelectMotor={(idx) => setActiveMotorIndex(idx)}
-            onNavigate={handleNavigateMachine}
-            onUpdateMotorName={updateMotorName}
-            onDeleteReport={handleDeleteDcMotorReport}
-          />
-        )}
-        {view === 'machine' && activeModule === ModuleType.DC_MOTOR && activeMachineId && activeMotorIndex !== null && (
-          <div className="card p-4">
+        }
+        {view === 'dashboard' &&
+        <Dashboard data={data} onSelectModule={handleModuleSelect} machineIds={visibleMachineIds} />
+        }
+        {view === 'matrix' && activeModule &&
+        <MatrixView
+          moduleType={activeModule}
+          data={data}
+          machineIds={visibleMachineIdsForModule(activeModule)}
+          onSelectMachine={handleMachineSelect}
+          onBack={() => setView('dashboard')} />
+
+        }
+        {view === 'machine' && activeModule && activeMachineId &&
+        <MachineDetail
+          machineId={activeMachineId}
+          moduleType={activeModule}
+          motors={data[activeMachineId][activeModule]}
+          onBack={() => setView('matrix')}
+          onSelectMotor={(idx) => setActiveMotorIndex(idx)}
+          onNavigate={handleNavigateMachine}
+          onUpdateMotorName={updateMotorName}
+          onDeleteReport={handleDeleteDcMotorReport} />
+
+        }
+        {view === 'machine' && activeModule === ModuleType.DC_MOTOR && activeMachineId && activeMotorIndex !== null &&
+        <div className="card p-4">
             <MaintenanceForm
-              task={buildDcMotorTask(
-                activeMachineId,
-                data[activeMachineId][activeModule][activeMotorIndex],
-                activeMotorIndex
-              )}
-              onBack={() => setActiveMotorIndex(null)}
-              onSave={handleDcMotorSave}
-            />
+            task={buildDcMotorTask(
+              activeMachineId,
+              data[activeMachineId][activeModule][activeMotorIndex],
+              activeMotorIndex
+            )}
+            onBack={() => setActiveMotorIndex(null)}
+            onSave={handleDcMotorSave} />
+          
           </div>
-        )}
-        {view === 'settings' && (
-          <SettingsView
-            configs={configs}
-            data={data}
-            hiddenMachines={hiddenMachines}
-            onUpdateConfig={handleUpdateConfig}
-            onUpdateMotorName={updateMotorNameFromSettings}
-            onToggleMachineHidden={toggleMachineHidden}
-            onBack={() => setView('dashboard')}
-          />
-        )}
+        }
+        {view === 'settings' &&
+        <SettingsView
+          configs={configs}
+          data={data}
+          hiddenMachines={hiddenMachines}
+          onUpdateConfig={handleUpdateConfig}
+          onUpdateMotorName={updateMotorNameFromSettings}
+          onToggleMachineHidden={toggleMachineHidden}
+          onBack={() => setView('dashboard')} />
+
+        }
       </div>
 
-      {activeMotorIndex !== null && activeMachineId && activeModule && activeModule !== ModuleType.DC_MOTOR && (
-        <MotorModal
-          motor={data[activeMachineId][activeModule][activeMotorIndex]}
-          onClose={() => setActiveMotorIndex(null)}
-          onUpdate={updateMotorData}
-        />
-      )}
-    </div>
-  );
+      {activeMotorIndex !== null && activeMachineId && activeModule && activeModule !== ModuleType.DC_MOTOR &&
+      <MotorModal
+        motor={data[activeMachineId][activeModule][activeMotorIndex]}
+        onClose={() => setActiveMotorIndex(null)}
+        onUpdate={updateMotorData} />
+
+      }
+    </div>);
+
 };
 
 export default BakimTakipMerkezi;

@@ -14,14 +14,14 @@ import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
 const MIN_DURUS_DAKIKASI = 45;
 const BERKE_DEPARTMENT_FILTER_OPTIONS = [
-  'ELEKTRIK BAKIM ANA BINA',
-  'ELEKTRIK BAKIM EK BINA',
-  'MEKANIK BAKIM',
-  'ISK ELEKTRIK BAKIM',
-  'ISK MEKANIK BAKIM',
-  'ISK YARDIMCI TESISLER',
-  'YARDIMCI TESISLER'
-] as const;
+'ELEKTRIK BAKIM ANA BINA',
+'ELEKTRIK BAKIM EK BINA',
+'MEKANIK BAKIM',
+'ISK ELEKTRIK BAKIM',
+'ISK MEKANIK BAKIM',
+'ISK YARDIMCI TESISLER',
+'YARDIMCI TESISLER'] as
+const;
 
 const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
   'ELEKTRIK': 'ELEKTRIK BAKIM ANA BINA',
@@ -43,35 +43,35 @@ const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
 };
 
 function normalizeForAuth(value: string | undefined | null): string {
-  return String(value || '')
-    .toLocaleLowerCase('tr-TR')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(value || '').
+  toLocaleLowerCase('tr-TR').
+  replace(/\s+/g, ' ').
+  trim();
 }
 
 function normalizeForSearch(value: string | undefined | null): string {
-  return String(value || '')
-    .toLocaleLowerCase('tr-TR')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/Ä±/g, 'i')
-    .replace(/ÄŸ/g, 'g')
-    .replace(/Ã¼/g, 'u')
-    .replace(/ÅŸ/g, 's')
-    .replace(/Ã¶/g, 'o')
-    .replace(/Ã§/g, 'c')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(value || '').
+  toLocaleLowerCase('tr-TR').
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/ı/g, 'i').
+  replace(/ğ/g, 'g').
+  replace(/ü/g, 'u').
+  replace(/ş/g, 's').
+  replace(/ö/g, 'o').
+  replace(/ç/g, 'c').
+  replace(/\s+/g, ' ').
+  trim();
 }
 
 function normalizeDepartment(value: unknown): string {
-  const key = String(value || '')
-    .toLocaleUpperCase('tr-TR')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const key = String(value || '').
+  toLocaleUpperCase('tr-TR').
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/[^A-Z0-9]+/g, ' ').
+  replace(/\s+/g, ' ').
+  trim();
 
   if (!key) return '';
   return DEPARTMENT_ALIAS_MAP[key] || key;
@@ -97,8 +97,8 @@ function calculateDurationMinutes(startText: string, endText: string): number | 
   const endMatch = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(endText);
   if (!startMatch || !endMatch) return null;
 
-  const startMinutes = (Number.parseInt(startMatch[1], 10) * 60) + Number.parseInt(startMatch[2], 10);
-  let endMinutes = (Number.parseInt(endMatch[1], 10) * 60) + Number.parseInt(endMatch[2], 10);
+  const startMinutes = Number.parseInt(startMatch[1], 10) * 60 + Number.parseInt(startMatch[2], 10);
+  let endMinutes = Number.parseInt(endMatch[1], 10) * 60 + Number.parseInt(endMatch[2], 10);
 
   if (endMinutes < startMinutes) {
     endMinutes += 24 * 60;
@@ -117,11 +117,11 @@ function canManageCompletedJobs(user: User | null): boolean {
   const sicilNo = normalizeForAuth(user.sicilNo);
 
   return (
-    ad === 'berke'
-    || fullName === 'berke karayanik'
-    || email.includes('berke')
-    || sicilNo === 'berke'
-  );
+    ad === 'berke' ||
+    fullName === 'berke karayanik' ||
+    email.includes('berke') ||
+    sicilNo === 'berke');
+
 }
 
 type CompletedRow = {
@@ -139,8 +139,8 @@ export default function TamamlananIsler() {
   const isBerkeViewer = Boolean(currentUser && isBerkeUser(currentUser));
   const canManage = canManageCompletedJobs(currentUser);
   const canAssignWorkOrders = Boolean(
-    currentUser
-    && (isSystemAdminUser(currentUser) || isBerkeUser(currentUser))
+    currentUser && (
+    isSystemAdminUser(currentUser) || isBerkeUser(currentUser))
   );
   const [isLoading, setIsLoading] = useState(true);
   const [isler, setIsler] = useState<CompletedJob[]>([]);
@@ -200,7 +200,7 @@ export default function TamamlananIsler() {
         const data = response.data?.data as CompletedJob[] | undefined;
         setIsler(Array.isArray(data) ? data : []);
       } catch {
-        toast.error('Tamamlanan isler yuklenemedi');
+        toast.error("Tamamlanan işler yüklenemedi");
       } finally {
         setIsLoading(false);
       }
@@ -209,12 +209,12 @@ export default function TamamlananIsler() {
     void loadCompletedJobs();
   }, [currentUser?.id]);
 
-  const selectedIs = selectedIsId
-    ? isler.find((is) => is.id === selectedIsId) || null
-    : null;
-  const selectedEditIs = editIsId
-    ? isler.find((is) => is.id === editIsId) || null
-    : null;
+  const selectedIs = selectedIsId ?
+  isler.find((is) => is.id === selectedIsId) || null :
+  null;
+  const selectedEditIs = editIsId ?
+  isler.find((is) => is.id === editIsId) || null :
+  null;
   const editSureDakika = useMemo(
     () => calculateDurationMinutes(editBaslangicSaati, editBitisSaati),
     [editBaslangicSaati, editBitisSaati]
@@ -244,7 +244,7 @@ export default function TamamlananIsler() {
 
   const openEditModal = (is: CompletedJob) => {
     if (!canManage) {
-      toast.error('Duzenleme yetkisi sadece Berke Karayanik kullanicisinda');
+      toast.error("Düzenleme yetkisi sadece Berke Karayanik kullanıcısında");
       return;
     }
 
@@ -262,12 +262,12 @@ export default function TamamlananIsler() {
 
   const handleEditKaydet = async () => {
     if (!canManage) {
-      toast.error('Duzenleme yetkisi sadece Berke Karayanik kullanicisinda');
+      toast.error("Düzenleme yetkisi sadece Berke Karayanik kullanıcısında");
       return;
     }
 
     if (!editIsId) {
-      toast.error('Duzenlenecek kayit bulunamadi');
+      toast.error("Düzenlenecek kayıt bulunamadı");
       return;
     }
 
@@ -278,12 +278,12 @@ export default function TamamlananIsler() {
     const malzeme = editMalzeme.trim();
 
     if (!editTarih || !vardiya || !makina || !mudahaleTuru || !editBaslangicSaati || !editBitisSaati || !aciklama) {
-      toast.error('Tum zorunlu alanlari doldurun');
+      toast.error('Tüm zorunlu alanlari doldurun');
       return;
     }
 
     if (editSureDakika === null || editSureDakika < 0) {
-      toast.error('Saat araligi gecersiz');
+      toast.error("Saat aralığı gecersiz");
       return;
     }
 
@@ -306,11 +306,11 @@ export default function TamamlananIsler() {
         throw new Error('Invalid response');
       }
 
-      setIsler((prev) => prev.map((is) => (is.id === updated.id ? updated : is)));
-      toast.success('Tamamlanan is guncellendi');
+      setIsler((prev) => prev.map((is) => is.id === updated.id ? updated : is));
+      toast.success('Tamamlanan is güncellendi');
       forceCloseEditModal();
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Tamamlanan is guncellenemedi');
+      toast.error(error?.response?.data?.message || 'Tamamlanan is güncellenemedi');
     } finally {
       setIsEditKaydediliyor(false);
     }
@@ -318,12 +318,12 @@ export default function TamamlananIsler() {
 
   const openAnalizModal = (is: CompletedJob) => {
     if (!canAssignWorkOrders) {
-      toast.error('Is emri atamasi sadece sistem yoneticisi veya Berke Karayanik tarafindan yapilabilir');
+      toast.error('İş emri ataması sadece sistem yöneticisi veya Berke Karayanik tarafından yapılabilir');
       return;
     }
 
     if ((Number(is.sureDakika) || 0) <= MIN_DURUS_DAKIKASI) {
-      toast.error(`Sadece ${MIN_DURUS_DAKIKASI} dk ustu duruslar icin is emri olusturulabilir`);
+      toast.error(`Sadece ${MIN_DURUS_DAKIKASI} dk üstü duruşlar için iş emri oluşturulabilir`);
       return;
     }
 
@@ -331,7 +331,7 @@ export default function TamamlananIsler() {
       is.analizAtamasi?.backendWorkOrderId || is.analizAtamasi?.backendWorkOrderNo
     );
     if (hasBackendWorkOrder) {
-      toast.error('Bu durus icin analiz is emri zaten olusturuldu');
+      toast.error("Bu duruş için analiz iş emri zaten oluşturuldu");
       return;
     }
 
@@ -350,17 +350,17 @@ export default function TamamlananIsler() {
 
   const handleAnalizAtamaKaydet = async () => {
     if (!canAssignWorkOrders) {
-      toast.error('Is emri atamasi sadece sistem yoneticisi veya Berke Karayanik tarafindan yapilabilir');
+      toast.error('İş emri ataması sadece sistem yöneticisi veya Berke Karayanik tarafından yapılabilir');
       return;
     }
 
     if (!selectedIs) {
-      toast.error('Durus kaydi bulunamadi');
+      toast.error("Duruş kaydı bulunamadı");
       return;
     }
 
     if ((Number(selectedIs.sureDakika) || 0) <= MIN_DURUS_DAKIKASI) {
-      toast.error(`Bu kayit ${MIN_DURUS_DAKIKASI} dk ustu degil`);
+      toast.error(`Bu kayıt ${MIN_DURUS_DAKIKASI} dk üstü degil`);
       return;
     }
 
@@ -368,18 +368,18 @@ export default function TamamlananIsler() {
       selectedIs.analizAtamasi?.backendWorkOrderId || selectedIs.analizAtamasi?.backendWorkOrderNo
     );
     if (hasBackendWorkOrder) {
-      toast.error('Bu durus icin analiz is emri zaten olusturuldu');
+      toast.error("Bu duruş için analiz iş emri zaten oluşturuldu");
       return;
     }
 
     if (!atananSicilNo) {
-      toast.error('Lutfen atayacagin kisiyi sec');
+      toast.error("Lütfen atayacağın kişiyi seç");
       return;
     }
 
     const secilenPersonel = atamaPersonelListesi.find((personel) => personel.sicilNo === atananSicilNo);
     if (!secilenPersonel) {
-      toast.error('Secilen kisi Ayarlar personel listesinde bulunamadi');
+      toast.error('Seçilen kişi Ayarlar personel listesinde bulunamadı');
       return;
     }
 
@@ -390,32 +390,32 @@ export default function TamamlananIsler() {
     try {
       const notText = analizNotu.trim();
       const aciklama = [
-        `${selectedIs.id} numarali durusta durus suresi ${selectedIs.sureDakika} dk olarak kaydedildi.`,
-        `${selectedIs.makina} / ${selectedIs.vardiya}.`,
-        `Saat: ${selectedIs.baslangicSaati} - ${selectedIs.bitisSaati}.`,
-        'Talep: Durus raporu cikar ve kok neden analizi yap.',
-        notText ? `Ek not: ${notText}` : ''
-      ]
-        .filter(Boolean)
-        .join(' ');
+      `${selectedIs.id} numaralı duruşta duruş süresi ${selectedIs.sureDakika} dk olarak kaydedildi.`,
+      `${selectedIs.makina} / ${selectedIs.vardiya}.`,
+      `Saat: ${selectedIs.baslangicSaati} - ${selectedIs.bitisSaati}.`,
+      'Talep: Duruş raporu cikar ve kok neden analizi yap.',
+      notText ? `Ek not: ${notText}` : ''].
+
+      filter(Boolean).
+      join(' ');
 
       const createPayload: Record<string, string | number> = {
-        baslik: `[UDR] Uzayan Durus Analizi - ${selectedIs.makina}`,
+        baslik: `[UDR] Uzayan Duruş Analizi - ${selectedIs.makina}`,
         aciklama,
         oncelik: 'YUKSEK',
         tahminiSure: Number(selectedIs.sureDakika) || 120
       };
 
-      // Ayarlar listesinde olup aktif hesap bulunamayan personeller icin is emri atamasiz acilir.
+      // Ayarlar listesinde olup aktif hesap bulunamayan personeller için is emri atamasiz acilir.
       if (atananKullanici) {
         createPayload.atananId = String(atananKullanici.id);
       }
 
       const createResponse = await workOrdersApi.create(createPayload);
 
-      const createdWorkOrder = createResponse.data?.data as { id?: number; isEmriNo?: string } | undefined;
+      const createdWorkOrder = createResponse.data?.data as {id?: number;isEmriNo?: string;} | undefined;
       if (!createdWorkOrder?.id && !createdWorkOrder?.isEmriNo) {
-        throw new Error('Is emri olusturuldu fakat cevap verisi okunamadi');
+        throw new Error('İş emri oluşturuldu fakat cevap verisi okunamadi');
       }
       createdWorkOrderId = createdWorkOrder?.id ?? null;
 
@@ -429,30 +429,30 @@ export default function TamamlananIsler() {
         atamaTarihi: nowIso
       };
       const isAtamaYapildi = Boolean(atananKullanici);
-      const successText = createdWorkOrder?.isEmriNo
-        ? (
-            isAtamaYapildi
-              ? `${secilenPersonel.adSoyad} icin ${createdWorkOrder.isEmriNo} olusturuldu`
-              : `${createdWorkOrder.isEmriNo} olusturuldu (atanan hesap aktif olmadigi icin BEKLEMEDE)`
-          )
-        : (
-            isAtamaYapildi
-              ? `${secilenPersonel.adSoyad} icin analiz is emri olusturuldu`
-              : 'Analiz is emri olusturuldu (atanan hesap aktif olmadigi icin BEKLEMEDE)'
-          );
+      const successText = createdWorkOrder?.isEmriNo ?
+
+      isAtamaYapildi ?
+      `${secilenPersonel.adSoyad} için ${createdWorkOrder.isEmriNo} oluşturuldu` :
+      `${createdWorkOrder.isEmriNo} oluşturuldu (atanan hesap aktif olmadigi için BEKLEMEDE)` :
+
+
+      isAtamaYapildi ?
+      `${secilenPersonel.adSoyad} için analiz iş emri oluşturuldu` :
+      'Analiz iş emri oluşturuldu (atanan hesap aktif olmadigi için BEKLEMEDE)';
+
       const updateResponse = await jobEntriesApi.updateCompletedAnalysis(selectedIs.id, {
         analizAtamasi: localAnalizAtamasi
       });
 
       const updated = updateResponse.data?.data as CompletedJob | undefined;
       if (updated) {
-        setIsler((prev) => prev.map((is) => (is.id === updated.id ? updated : is)));
+        setIsler((prev) => prev.map((is) => is.id === updated.id ? updated : is));
       } else {
-        setIsler((prev) => prev.map((is) => (
-          is.id === selectedIs.id
-            ? { ...is, analizAtamasi: localAnalizAtamasi }
-            : is
-        )));
+        setIsler((prev) => prev.map((is) =>
+        is.id === selectedIs.id ?
+        { ...is, analizAtamasi: localAnalizAtamasi } :
+        is
+        ));
       }
 
       toast.success(successText);
@@ -465,16 +465,16 @@ export default function TamamlananIsler() {
           await workOrdersApi.delete(createdWorkOrderId);
           rolledBack = true;
         } catch {
+
+
+
           // best effort rollback
+        }if (rolledBack) {toast.error(backendMessage || "Aktarim kaydı yazilamadigi için iş emri oluşturma işlemi geri alındı");return;
         }
-        if (rolledBack) {
-          toast.error(backendMessage || 'Aktarim kaydi yazilamadigi icin is emri olusturma islemi geri alindi');
-          return;
-        }
-        toast.error(backendMessage || 'Is emri olusturuldu ancak aktarim kaydi kalici yazilamadi');
+        toast.error(backendMessage || 'İş emri oluşturuldu ancak aktarim kaydı kalici yazilamadi');
         return;
       }
-      toast.error(backendMessage || 'Is emri olusturulamadi');
+      toast.error(backendMessage || "İş emri oluşturulamadı");
     } finally {
       setIsAtamaKaydediliyor(false);
     }
@@ -482,40 +482,40 @@ export default function TamamlananIsler() {
 
   const handleSil = async (id: string) => {
     if (!canManage) {
-      toast.error('Bu islem icin yetkiniz yok');
+      toast.error("Bu işlem için yetkiniz yok");
       return;
     }
 
-    if (!confirm('Bu is emrini silmek istediginize emin misiniz?')) return;
+    if (!confirm('Bu iş emrini silmek istediğinize emin misiniz?')) return;
 
     try {
       await jobEntriesApi.deleteCompleted(id);
       setIsler((prev) => prev.filter((is) => is.id !== id));
-      toast.success('Is emri silindi');
+      toast.success('İş emri silindi');
     } catch (error: any) {
-      toast.error(error?.response?.data?.message || 'Is emri silinemedi');
+      toast.error(error?.response?.data?.message || 'İş emri silinemedi');
     }
   };
 
-  const satirlar = useMemo<CompletedRow[]>(() => (
-    isler.flatMap((is) => {
-      const personeller = is.personeller.length > 0
-        ? is.personeller
-        : [{ sicilNo: '-', adSoyad: '-', bolum: '-' }];
-      return personeller.map((personel) => ({
-        is,
-        personel,
-        normalizedBolum: normalizeDepartment(personel.bolum) || personel.bolum || '-'
-      }));
-    })
-  ), [isler]);
+  const satirlar = useMemo<CompletedRow[]>(() =>
+  isler.flatMap((is) => {
+    const personeller = is.personeller.length > 0 ?
+    is.personeller :
+    [{ sicilNo: '-', adSoyad: '-', bolum: '-' }];
+    return personeller.map((personel) => ({
+      is,
+      personel,
+      normalizedBolum: normalizeDepartment(personel.bolum) || personel.bolum || '-'
+    }));
+  }),
+  [isler]);
 
   const bolumSecenekleri = useMemo(() => {
     const fromRecords = Array.from(
       new Set(
-        satirlar
-          .map(({ normalizedBolum }) => normalizedBolum)
-          .filter((bolum) => bolum && bolum !== '-')
+        satirlar.
+        map(({ normalizedBolum }) => normalizedBolum).
+        filter((bolum) => bolum && bolum !== '-')
       )
     ).sort((a, b) => a.localeCompare(b, 'tr-TR'));
 
@@ -526,13 +526,13 @@ export default function TamamlananIsler() {
 
   const filteredSatirlar = useMemo(() => satirlar.filter(({ is, personel, normalizedBolum }) => {
     const searchText = normalizeForSearch(search);
-    const matchSearch = !searchText
-      || normalizeForSearch(is.id).includes(searchText)
-      || normalizeForSearch(is.makina).includes(searchText)
-      || normalizeForSearch(is.aciklama).includes(searchText)
-      || normalizeForSearch(personel.adSoyad).includes(searchText)
-      || normalizeForSearch(personel.sicilNo).includes(searchText)
-      || normalizeForSearch(normalizedBolum).includes(searchText);
+    const matchSearch = !searchText ||
+    normalizeForSearch(is.id).includes(searchText) ||
+    normalizeForSearch(is.makina).includes(searchText) ||
+    normalizeForSearch(is.aciklama).includes(searchText) ||
+    normalizeForSearch(personel.adSoyad).includes(searchText) ||
+    normalizeForSearch(personel.sicilNo).includes(searchText) ||
+    normalizeForSearch(normalizedBolum).includes(searchText);
 
     const matchTarih = !filterTarih || is.tarih === filterTarih;
     const matchBolum = !isBerkeViewer || !filterBolum || normalizedBolum === filterBolum;
@@ -558,11 +558,11 @@ export default function TamamlananIsler() {
     const excelData: Record<string, string | number>[] = [];
 
     filteredSatirlar.forEach(({ is, personel, normalizedBolum }) => {
-      const analizDurumu = (Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI
-        ? (is.analizAtamasi
-          ? `${is.analizAtamasi.atananAdSoyad} (${is.analizAtamasi.atananSicilNo})${is.analizAtamasi.backendWorkOrderNo ? ` - ${is.analizAtamasi.backendWorkOrderNo}` : ''}`
-          : 'Atama bekliyor')
-        : 'Gerekli degil';
+      const analizDurumu = (Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI ?
+      is.analizAtamasi ?
+      `${is.analizAtamasi.atananAdSoyad} (${is.analizAtamasi.atananSicilNo})${is.analizAtamasi.backendWorkOrderNo ? ` - ${is.analizAtamasi.backendWorkOrderNo}` : ''}` :
+      'Atama bekliyor' :
+      'Gerekli degil';
 
       excelData.push({
         ID: is.id,
@@ -570,38 +570,38 @@ export default function TamamlananIsler() {
         Vardiya: is.vardiya,
         'Ad Soyad': personel.adSoyad,
         'Sicil No': personel.sicilNo,
-        Bolum: normalizedBolum,
+        Bölüm: normalizedBolum,
         Makina: is.makina,
-        'Mudahale Turu': is.mudahaleTuru,
-        Baslangic: is.baslangicSaati,
-        Bitis: is.bitisSaati,
-        'Sure (dk)': is.sureDakika,
+        'Müdahale Türü': is.mudahaleTuru,
+        Başlangıç: is.baslangicSaati,
+        Bitiş: is.bitisSaati,
+        "Süre (dk)": is.sureDakika,
         Aciklama: is.aciklama,
         Malzeme: is.malzeme || '',
-        'Analiz Is Emri': analizDurumu
+        'Analiz İş Emri': analizDurumu
       });
     });
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tamamlanan Isler');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tamamlanan İşler');
 
     worksheet['!cols'] = [
-      { wch: 15 },
-      { wch: 12 },
-      { wch: 25 },
-      { wch: 20 },
-      { wch: 10 },
-      { wch: 18 },
-      { wch: 20 },
-      { wch: 18 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 10 },
-      { wch: 40 },
-      { wch: 25 },
-      { wch: 36 }
-    ];
+    { wch: 15 },
+    { wch: 12 },
+    { wch: 25 },
+    { wch: 20 },
+    { wch: 10 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 10 },
+    { wch: 40 },
+    { wch: 25 },
+    { wch: 36 }];
+
 
     XLSX.writeFile(workbook, `tamamlanan_isler_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
     toast.success('Excel dosyasi indirildi');
@@ -610,12 +610,12 @@ export default function TamamlananIsler() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Tamamlanan Isler</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Tamamlanan İşler</h1>
         <button
           onClick={handleExport}
           className="btn btn-primary inline-flex items-center"
-          disabled={filteredSatirlar.length === 0}
-        >
+          disabled={filteredSatirlar.length === 0}>
+          
           <Download className="w-5 h-5 mr-2" />
           Excel'e Aktar
         </button>
@@ -627,37 +627,37 @@ export default function TamamlananIsler() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="ID, makina, personel veya aciklama ara..."
+              placeholder="ID, makina, personel veya açıklama ara..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input pl-10"
-            />
+              className="input pl-10" />
+            
           </div>
           <input
             type="date"
             value={filterTarih}
             onChange={(e) => setFilterTarih(e.target.value)}
             className="input w-full md:w-44"
-            placeholder="Tarih filtrele"
-          />
-          {isBerkeViewer && (
-            <select
-              value={filterBolum}
-              onChange={(e) => setFilterBolum(e.target.value)}
-              className="input w-full md:w-64"
-            >
-              <option value="">Tum Bolumler</option>
-              {bolumSecenekleri.map((bolum) => (
-                <option key={bolum} value={bolum}>{bolum}</option>
-              ))}
+            placeholder="Tarih filtrele" />
+          
+          {isBerkeViewer &&
+          <select
+            value={filterBolum}
+            onChange={(e) => setFilterBolum(e.target.value)}
+            className="input w-full md:w-64">
+            
+              <option value="">Tüm Bölümler</option>
+              {bolumSecenekleri.map((bolum) =>
+            <option key={bolum} value={bolum}>{bolum}</option>
+            )}
             </select>
-          )}
+          }
           <select
             value={filterVardiya}
             onChange={(e) => setFilterVardiya(e.target.value)}
-            className="input w-full md:w-44"
-          >
-            <option value="">Tum Vardiyalar</option>
+            className="input w-full md:w-44">
+            
+            <option value="">Tüm Vardiyalar</option>
             <option value="VARDIYA 1">Vardiya 1</option>
             <option value="VARDIYA 2">Vardiya 2</option>
             <option value="VARDIYA 3">Vardiya 3</option>
@@ -675,34 +675,34 @@ export default function TamamlananIsler() {
                 <th className="px-3 py-3 text-left font-semibold">Vardiya</th>
                 <th className="px-3 py-3 text-left font-semibold">Ad Soyad</th>
                 <th className="px-3 py-3 text-left font-semibold">Sicil No</th>
-                <th className="px-3 py-3 text-left font-semibold">Bolum</th>
+                <th className="px-3 py-3 text-left font-semibold">Bölüm</th>
                 <th className="px-3 py-3 text-left font-semibold">Makina</th>
-                <th className="px-3 py-3 text-left font-semibold">Mudahale Turu</th>
-                <th className="px-3 py-3 text-left font-semibold">Baslangic</th>
-                <th className="px-3 py-3 text-left font-semibold">Bitis</th>
-                <th className="px-3 py-3 text-left font-semibold">Sure (dk)</th>
-                <th className="px-3 py-3 text-left font-semibold">Aciklama</th>
+                <th className="px-3 py-3 text-left font-semibold">Müdahale Türü</th>
+                <th className="px-3 py-3 text-left font-semibold">Başlangıç</th>
+                <th className="px-3 py-3 text-left font-semibold">Bitiş</th>
+                <th className="px-3 py-3 text-left font-semibold">Süre (dk)</th>
+                <th className="px-3 py-3 text-left font-semibold">Müdahale Açıklaması</th>
                 <th className="px-3 py-3 text-left font-semibold">Malzeme</th>
-                <th className="px-3 py-3 text-left font-semibold">Analiz Gorevi</th>
-                <th className="px-3 py-3 text-center font-semibold">Islem</th>
+                <th className="px-3 py-3 text-left font-semibold">Analiz Görevi</th>
+                <th className="px-3 py-3 text-center font-semibold">İşlem</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {isLoading ? (
-                <tr>
+              {isLoading ?
+              <tr>
                   <td colSpan={15} className="px-3 py-8 text-center text-gray-500">
-                    Yukleniyor...
+                    Yükleniyor...
                   </td>
-                </tr>
-              ) : filteredSatirlar.length === 0 ? (
-                <tr>
+                </tr> :
+              filteredSatirlar.length === 0 ?
+              <tr>
                   <td colSpan={15} className="px-3 py-8 text-center text-gray-500">
-                    Kayitli is emri bulunmamaktadir
+                    Kayıtli iş emri bulunmamaktadir
                   </td>
-                </tr>
-              ) : (
-                filteredSatirlar.map(({ is, personel, normalizedBolum }, index) => (
-                  <tr key={`${is.id}-${personel.sicilNo}-${index}`} className="hover:bg-gray-50">
+                </tr> :
+
+              filteredSatirlar.map(({ is, personel, normalizedBolum }, index) =>
+              <tr key={`${is.id}-${personel.sicilNo}-${index}`} className="align-top hover:bg-gray-50">
                     <td className="px-3 py-2 font-mono text-xs">{is.id}</td>
                     <td className="px-3 py-2">{format(parseDateKey(is.tarih), 'dd.MM.yyyy')}</td>
                     <td className="px-3 py-2 text-xs">{is.vardiya}</td>
@@ -716,62 +716,62 @@ export default function TamamlananIsler() {
                     <td className="px-3 py-2 font-mono">{is.baslangicSaati}</td>
                     <td className="px-3 py-2 font-mono">{is.bitisSaati}</td>
                     <td className="px-3 py-2 font-mono">{is.sureDakika}</td>
-                    <td className="px-3 py-2 max-w-xs truncate" title={is.aciklama}>{is.aciklama}</td>
+                    <td className="px-3 py-2 max-w-sm whitespace-pre-wrap break-words" title={is.aciklama}>{is.aciklama}</td>
                     <td className="px-3 py-2 max-w-xs truncate" title={is.malzeme}>{is.malzeme || '-'}</td>
                     <td className="px-3 py-2">
-                      {(Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI ? (
-                        is.analizAtamasi && (is.analizAtamasi.backendWorkOrderId || is.analizAtamasi.backendWorkOrderNo) ? (
-                          <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800">
+                      {(Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI ?
+                  is.analizAtamasi && (is.analizAtamasi.backendWorkOrderId || is.analizAtamasi.backendWorkOrderNo) ?
+                  <div className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs text-emerald-800">
                             <p className="font-semibold">Atandi</p>
                             <p>{is.analizAtamasi.atananAdSoyad}</p>
                             <p className="text-[11px]">{is.analizAtamasi.atananSicilNo}</p>
-                            {is.analizAtamasi.backendWorkOrderNo && (
-                              <p className="text-[11px]">Is Emri: {is.analizAtamasi.backendWorkOrderNo}</p>
-                            )}
+                            {is.analizAtamasi.backendWorkOrderNo &&
+                    <p className="text-[11px]">İş Emri: {is.analizAtamasi.backendWorkOrderNo}</p>
+                    }
                             <p className="text-[11px] text-emerald-900/55">
                               Aktarim: {is.analizAtamasi.atananAdSoyad} / {formatDateTime(is.analizAtamasi.atamaTarihi)}
                             </p>
-                          </div>
-                        ) : canAssignWorkOrders ? (
-                          <button
-                            type="button"
-                            onClick={() => openAnalizModal(is)}
-                            className="rounded bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600"
-                          >
-                            Is Emrine Aktar
-                          </button>
-                        ) : (
-                          <span className="text-xs text-gray-400">Sadece Yetkili Kullanici</span>
-                        )
-                      ) : (
-                        <span className="text-xs text-gray-400">Gerekli degil</span>
-                      )}
+                          </div> :
+                  canAssignWorkOrders ?
+                  <button
+                    type="button"
+                    onClick={() => openAnalizModal(is)}
+                    className="rounded bg-amber-500 px-3 py-1 text-xs font-semibold text-white hover:bg-amber-600">
+                    
+                            İş Emrine Aktar
+                          </button> :
+
+                  <span className="text-xs text-gray-400">Sadece Yetkili Kullanıcı</span> :
+
+
+                  <span className="text-xs text-gray-400">Gerekli degil</span>
+                  }
                     </td>
                     <td className="px-3 py-2 text-center">
-                      {canManage ? (
-                        <div className="flex items-center justify-center gap-1">
+                      {canManage ?
+                  <div className="flex items-center justify-center gap-1">
                           <button
-                            onClick={() => openEditModal(is)}
-                            className="text-blue-600 hover:text-blue-800 p-1"
-                            title="Duzenle"
-                          >
+                      onClick={() => openEditModal(is)}
+                      className="text-blue-600 hover:text-blue-800 p-1"
+                      title="Duzenle">
+                      
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => void handleSil(is.id)}
-                            className="text-red-500 hover:text-red-700 p-1"
-                            title="Sil"
-                          >
+                      onClick={() => void handleSil(is.id)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                      title="Sil">
+                      
                             <Trash2 className="w-4 h-4" />
                           </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400">-</span>
-                      )}
+                        </div> :
+
+                  <span className="text-xs text-gray-400">-</span>
+                  }
                     </td>
                   </tr>
-                ))
-              )}
+              )
+              }
             </tbody>
           </table>
         </div>
@@ -780,49 +780,49 @@ export default function TamamlananIsler() {
       <div className="card p-4">
         <div className="flex flex-wrap gap-6 text-sm">
           <div>
-            <span className="text-gray-500">Toplam Is Emri:</span>
+            <span className="text-gray-500">Toplam İş Emri:</span>
             <span className="ml-2 font-semibold">{filteredIsler.length}</span>
           </div>
           <div>
-            <span className="text-gray-500">Toplam Sure:</span>
+            <span className="text-gray-500">Toplam Süre:</span>
             <span className="ml-2 font-semibold">{filteredIsler.reduce((sum, is) => sum + is.sureDakika, 0)} dk</span>
           </div>
           <div>
-            <span className="text-gray-500">Toplam Personel Girisi:</span>
+            <span className="text-gray-500">Toplam Personel Girişi:</span>
             <span className="ml-2 font-semibold">{filteredSatirlar.length}</span>
           </div>
           <div>
-            <span className="text-gray-500">{MIN_DURUS_DAKIKASI} dk Ustu Durus:</span>
+            <span className="text-gray-500">{MIN_DURUS_DAKIKASI} dk Üstü Duruş:</span>
             <span className="ml-2 font-semibold">{uzunDurusKayitlari.length}</span>
           </div>
           <div>
-            <span className="text-gray-500">Analiz Atanan Kayit:</span>
+            <span className="text-gray-500">Analiz Atanan Kayıt:</span>
             <span className="ml-2 font-semibold">{analizAtananKayitlar.length} / {uzunDurusKayitlari.length}</span>
           </div>
         </div>
       </div>
 
-      {!canManage && (
-        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Bu hesapta tamamlanan isler sadece kendi bolumune gore listelenir.
+      {!canManage &&
+      <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Bu hesapta tamamlanan işler sadece kendi bolumune göre listelenir.
         </div>
-      )}
+      }
 
-      {isEditModalOpen && canManage && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+      {isEditModalOpen && canManage &&
+      <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={closeEditModal} />
             <div className="relative w-full max-w-2xl rounded-xl border border-gray-200 bg-white shadow-xl">
               <div className="border-b px-5 py-4">
-                <h2 className="text-lg font-bold text-gray-900">Tamamlanan Isi Duzenle</h2>
+                <h2 className="text-lg font-bold text-gray-900">Tamamlanan İşi Düzenle</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  Kayit ID: {editIsId || '-'}
+                  Kayıt ID: {editIsId || '-'}
                 </p>
-                {selectedEditIs && (
-                  <p className="mt-1 text-xs text-gray-500">
+                {selectedEditIs &&
+              <p className="mt-1 text-xs text-gray-500">
                     Personeller: {selectedEditIs.personeller.map((personel) => personel.adSoyad).join(', ') || '-'}
                   </p>
-                )}
+              }
               </div>
 
               <div className="space-y-4 px-5 py-4">
@@ -830,128 +830,128 @@ export default function TamamlananIsler() {
                   <div>
                     <label className="label">Tarih</label>
                     <input
-                      type="date"
-                      value={editTarih}
-                      onChange={(event) => setEditTarih(event.target.value)}
-                      className="input"
-                      disabled={isEditKaydediliyor}
-                    />
+                    type="date"
+                    value={editTarih}
+                    onChange={(event) => setEditTarih(event.target.value)}
+                    className="input"
+                    disabled={isEditKaydediliyor} />
+                  
                   </div>
                   <div>
                     <label className="label">Vardiya</label>
                     <input
-                      type="text"
-                      value={editVardiya}
-                      onChange={(event) => setEditVardiya(event.target.value)}
-                      className="input"
-                      placeholder="VARDIYA 1 (07:00-15:00)"
-                      disabled={isEditKaydediliyor}
-                    />
+                    type="text"
+                    value={editVardiya}
+                    onChange={(event) => setEditVardiya(event.target.value)}
+                    className="input"
+                    placeholder="VARDIYA 1 (07:00-15:00)"
+                    disabled={isEditKaydediliyor} />
+                  
                   </div>
                   <div>
                     <label className="label">Makina</label>
                     <input
-                      type="text"
-                      value={editMakina}
-                      onChange={(event) => setEditMakina(event.target.value)}
-                      className="input"
-                      disabled={isEditKaydediliyor}
-                    />
+                    type="text"
+                    value={editMakina}
+                    onChange={(event) => setEditMakina(event.target.value)}
+                    className="input"
+                    disabled={isEditKaydediliyor} />
+                  
                   </div>
                   <div>
-                    <label className="label">Mudahale Turu</label>
+                    <label className="label">Müdahale Türü</label>
                     <input
-                      type="text"
-                      value={editMudahaleTuru}
-                      onChange={(event) => setEditMudahaleTuru(event.target.value)}
-                      className="input"
-                      disabled={isEditKaydediliyor}
-                    />
+                    type="text"
+                    value={editMudahaleTuru}
+                    onChange={(event) => setEditMudahaleTuru(event.target.value)}
+                    className="input"
+                    disabled={isEditKaydediliyor} />
+                  
                   </div>
                   <div>
-                    <label className="label">Baslangic Saati</label>
+                    <label className="label">Başlangıç Saati</label>
                     <input
-                      type="time"
-                      value={editBaslangicSaati}
-                      onChange={(event) => setEditBaslangicSaati(event.target.value)}
-                      className="input"
-                      disabled={isEditKaydediliyor}
-                    />
+                    type="time"
+                    value={editBaslangicSaati}
+                    onChange={(event) => setEditBaslangicSaati(event.target.value)}
+                    className="input"
+                    disabled={isEditKaydediliyor} />
+                  
                   </div>
                   <div>
-                    <label className="label">Bitis Saati</label>
+                    <label className="label">Bitiş Saati</label>
                     <input
-                      type="time"
-                      value={editBitisSaati}
-                      onChange={(event) => setEditBitisSaati(event.target.value)}
-                      className="input"
-                      disabled={isEditKaydediliyor}
-                    />
+                    type="time"
+                    value={editBitisSaati}
+                    onChange={(event) => setEditBitisSaati(event.target.value)}
+                    className="input"
+                    disabled={isEditKaydediliyor} />
+                  
                   </div>
                   <div>
-                    <label className="label">Sure (dk)</label>
+                    <label className="label">Süre (dk)</label>
                     <input
-                      type="number"
-                      value={editSureDakika ?? ''}
-                      readOnly
-                      className="input bg-gray-100"
-                    />
+                    type="number"
+                    value={editSureDakika ?? ''}
+                    readOnly
+                    className="input bg-gray-100" />
+                  
                   </div>
                 </div>
 
                 <div>
-                  <label className="label">Aciklama</label>
+                  <label className="label">Aİşklama</label>
                   <textarea
-                    value={editAciklama}
-                    onChange={(event) => setEditAciklama(event.target.value)}
-                    rows={4}
-                    className="input resize-none"
-                    disabled={isEditKaydediliyor}
-                  />
+                  value={editAciklama}
+                  onChange={(event) => setEditAciklama(event.target.value)}
+                  rows={4}
+                  className="input resize-none"
+                  disabled={isEditKaydediliyor} />
+                
                 </div>
 
                 <div>
                   <label className="label">Malzeme</label>
                   <textarea
-                    value={editMalzeme}
-                    onChange={(event) => setEditMalzeme(event.target.value)}
-                    rows={2}
-                    className="input resize-none"
-                    disabled={isEditKaydediliyor}
-                  />
+                  value={editMalzeme}
+                  onChange={(event) => setEditMalzeme(event.target.value)}
+                  rows={2}
+                  className="input resize-none"
+                  disabled={isEditKaydediliyor} />
+                
                 </div>
               </div>
 
               <div className="flex justify-end gap-3 border-t px-5 py-4">
                 <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={closeEditModal}
-                  disabled={isEditKaydediliyor}
-                >
-                  Iptal
+                type="button"
+                className="btn btn-secondary"
+                onClick={closeEditModal}
+                disabled={isEditKaydediliyor}>
+                
+                  İptal
                 </button>
                 <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void handleEditKaydet()}
-                  disabled={isEditKaydediliyor || editSureDakika === null}
-                >
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void handleEditKaydet()}
+                disabled={isEditKaydediliyor || editSureDakika === null}>
+                
                   {isEditKaydediliyor ? 'Kaydediliyor...' : 'Kaydet'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      }
 
-      {isAnalizModalOpen && selectedIs && canAssignWorkOrders && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+      {isAnalizModalOpen && selectedIs && canAssignWorkOrders &&
+      <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={closeAnalizModal} />
             <div className="relative w-full max-w-xl rounded-xl border border-gray-200 bg-white shadow-xl">
               <div className="border-b px-5 py-4">
-                <h2 className="text-lg font-bold text-gray-900">Uzayan Durus Is Emri Ac</h2>
+                <h2 className="text-lg font-bold text-gray-900">Uzayan Duruş İş Emri Aç</h2>
                 <p className="mt-1 text-sm text-gray-600">
                   {selectedIs.id} - {selectedIs.makina} ({selectedIs.sureDakika} dk)
                 </p>
@@ -959,62 +959,62 @@ export default function TamamlananIsler() {
 
               <div className="space-y-4 px-5 py-4">
                 <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Bu kayit {MIN_DURUS_DAKIKASI} dakika ustu oldugu icin uzayan durus analizi is emri acilabilir.
+                  Bu kayıt {MIN_DURUS_DAKIKASI} dakika üstü olduğu için uzayan duruş analizi iş emri açılabilir.
                 </div>
 
                 <div>
-                  <label className="label">Atanacak Kisi</label>
+                  <label className="label">Atanacak Kişi</label>
                   <select
-                    value={atananSicilNo}
-                    onChange={(event) => setAtananSicilNo(event.target.value)}
-                    className="input"
-                    disabled={isAtamaKaydediliyor || kullanicilarYukleniyor || ayarlarPersonellerYukleniyor}
-                  >
-                    <option value="">Seciniz...</option>
-                    {atamaPersonelListesi.map((personel) => (
-                      <option key={personel.sicilNo} value={personel.sicilNo}>
-                        {(personel.adSoyad || `${personel.ad} ${personel.soyad}`.trim())} ({personel.sicilNo}) - {personel.bolum}
+                  value={atananSicilNo}
+                  onChange={(event) => setAtananSicilNo(event.target.value)}
+                  className="input"
+                  disabled={isAtamaKaydediliyor || kullanicilarYukleniyor || ayarlarPersonellerYukleniyor}>
+                  
+                    <option value="">Seçiniz...</option>
+                    {atamaPersonelListesi.map((personel) =>
+                  <option key={personel.sicilNo} value={personel.sicilNo}>
+                        {personel.adSoyad || `${personel.ad} ${personel.soyad}`.trim()} ({personel.sicilNo}) - {personel.bolum}
                       </option>
-                    ))}
+                  )}
                   </select>
                 </div>
 
                 <div>
                   <label className="label">Ek Not (Opsiyonel)</label>
                   <textarea
-                    value={analizNotu}
-                    onChange={(event) => setAnalizNotu(event.target.value)}
-                    rows={3}
-                    className="input resize-none"
-                    placeholder="Analiz icin ek not yazabilirsiniz..."
-                    disabled={isAtamaKaydediliyor}
-                  />
+                  value={analizNotu}
+                  onChange={(event) => setAnalizNotu(event.target.value)}
+                  rows={3}
+                  className="input resize-none"
+                  placeholder="Analiz için ek not yazabilirsiniz..."
+                  disabled={isAtamaKaydediliyor} />
+                
                 </div>
               </div>
 
               <div className="flex justify-end gap-3 border-t px-5 py-4">
                 <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={closeAnalizModal}
-                  disabled={isAtamaKaydediliyor}
-                >
-                  Iptal
+                type="button"
+                className="btn btn-secondary"
+                onClick={closeAnalizModal}
+                disabled={isAtamaKaydediliyor}>
+                
+                  İptal
                 </button>
                 <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={() => void handleAnalizAtamaKaydet()}
-                  disabled={isAtamaKaydediliyor || !atananSicilNo}
-                >
-                  {isAtamaKaydediliyor ? 'Olusturuluyor...' : 'Is Emri Ac'}
+                type="button"
+                className="btn btn-primary"
+                onClick={() => void handleAnalizAtamaKaydet()}
+                disabled={isAtamaKaydediliyor || !atananSicilNo}>
+                
+                  {isAtamaKaydediliyor ? 'Oluşturuluyor...' : 'İş Emri Aç'}
                 </button>
               </div>
             </div>
           </div>
         </div>
-      )}
+      }
 
-    </div>
-  );
+    </div>);
+
 }

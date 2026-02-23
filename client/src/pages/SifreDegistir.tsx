@@ -3,6 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { Save } from 'lucide-react';
 import { authApi } from '../services/api';
+import { isPasswordPolicyCompliant, PASSWORD_POLICY_TEXT } from '../utils/passwordPolicy';
 
 export default function SifreDegistir() {
   const [currentPassword, setCurrentPassword] = useState('');
@@ -30,6 +31,10 @@ export default function SifreDegistir() {
     }
     if (newPassword !== confirmPassword) {
       toast.error('Yeni şifreler eşleşmiyor');
+      return;
+    }
+    if (!isPasswordPolicyCompliant(newPassword)) {
+      toast.error(PASSWORD_POLICY_TEXT);
       return;
     }
     mutation.mutate();

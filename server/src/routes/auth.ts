@@ -15,6 +15,11 @@ import {
   AUTH_COOKIE_NAME,
   JWT_SECRET
 } from '../config.js';
+import {
+  buildDefaultUserPassword,
+  isPasswordPolicyCompliant,
+  PASSWORD_POLICY_MESSAGE
+} from '../utils/passwordPolicy.js';
 
 const router = Router();
 
@@ -61,16 +66,6 @@ function matchesLoginIdentifier(user: LoginUser, loginId: string): boolean {
     || fullName === normalizedLogin
     || compactValue(fullName) === compactLogin
   );
-}
-
-function buildDefaultUserPassword(ad: string, soyad: string): string {
-  const parts = normalizeAuthText(`${ad} ${soyad}`)
-    .split(' ')
-    .map((part) => part.replace(/[^a-z0-9]/g, ''))
-    .filter(Boolean);
-
-  const initials = parts.map((part) => part.charAt(0).toLowerCase()).join('');
-  return `${initials || 'user'}123456`;
 }
 
 router.post('/login', async (req, res) => {
@@ -175,6 +170,13 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
       });
     }
 
+    if (!isPasswordPolicyCompliant(String(newPassword))) {
+      return res.status(400).json({
+        success: false,
+        message: PASSWORD_POLICY_MESSAGE
+      });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
     });
@@ -194,7 +196,7 @@ router.post('/change-password', authenticate, async (req: AuthRequest, res: Resp
       });
     }
 
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(String(newPassword), 10);
     await prisma.user.update({
       where: { id: user.id },
       data: { password: hashedPassword }
@@ -225,10 +227,17 @@ router.post('/admin/set-user-password', authenticate, async (req: AuthRequest, r
     const { userId, newPassword } = req.body as { userId?: number; newPassword?: string };
     const parsedUserId = Number.parseInt(String(userId ?? ''), 10);
 
-    if (!parsedUserId || parsedUserId <= 0 || !newPassword || newPassword.trim().length < 6) {
+    if (!parsedUserId || parsedUserId <= 0 || !newPassword) {
       return res.status(400).json({
         success: false,
-        message: 'Gecerli kullanici ve en az 6 karakter yeni sifre gereklidir'
+        message: 'Gecerli kullanici ve yeni sifre gereklidir'
+      });
+    }
+
+    if (!isPasswordPolicyCompliant(String(newPassword).trim())) {
+      return res.status(400).json({
+        success: false,
+        message: PASSWORD_POLICY_MESSAGE
       });
     }
 
@@ -331,7 +340,7 @@ router.post('/admin/reset-all-passwords', authenticate, async (req: AuthRequest,
       data: {
         count: users.length,
         loginPattern: 'adsoyad',
-        passwordPattern: 'bas_harfler + 123456'
+        passwordPattern: 'bas_harfler(Ilk buyuk) + 123456'
       },
       message: `${users.length} kullanicinin sifresi varsayilan formata guncellendi`
     });

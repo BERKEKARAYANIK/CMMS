@@ -75,27 +75,41 @@ async function generateWorkOrderNumber(): Promise<string> {
 router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const { durum, oncelik, shiftId, atananId, equipmentId, startDate, endDate, search } = req.query;
-    const where: any = {};
+    const currentUser = req.user!;
+    const filters: any[] = [
+      {
+        OR: [
+          { talepEdenId: currentUser.id },
+          { atananId: currentUser.id }
+        ]
+      }
+    ];
 
-    if (durum) where.durum = durum;
-    if (oncelik) where.oncelik = oncelik;
-    if (shiftId) where.shiftId = Number.parseInt(shiftId as string, 10);
-    if (atananId) where.atananId = Number.parseInt(atananId as string, 10);
-    if (equipmentId) where.equipmentId = Number.parseInt(equipmentId as string, 10);
+    if (durum) filters.push({ durum });
+    if (oncelik) filters.push({ oncelik });
+    if (shiftId) filters.push({ shiftId: Number.parseInt(shiftId as string, 10) });
+    if (atananId) filters.push({ atananId: Number.parseInt(atananId as string, 10) });
+    if (equipmentId) filters.push({ equipmentId: Number.parseInt(equipmentId as string, 10) });
 
     if (startDate && endDate) {
-      where.createdAt = {
-        gte: new Date(startDate as string),
-        lte: new Date(endDate as string)
-      };
+      filters.push({
+        createdAt: {
+          gte: new Date(startDate as string),
+          lte: new Date(endDate as string)
+        }
+      });
     }
 
     if (search) {
-      where.OR = [
-        { isEmriNo: { contains: search as string } },
-        { baslik: { contains: search as string } }
-      ];
+      filters.push({
+        OR: [
+          { isEmriNo: { contains: search as string } },
+          { baslik: { contains: search as string } }
+        ]
+      });
     }
+
+    const where = filters.length === 1 ? filters[0] : { AND: filters };
 
     const workOrders = await prisma.isEmri.findMany({
       where,
@@ -111,6 +125,24 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
         },
         shift: {
           select: { id: true, vardiyaAdi: true, renk: true }
+        },
+        loglar: {
+          where: {
+            aciklama: {
+              not: null
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            islem: true,
+            aciklama: true,
+            createdAt: true,
+            user: {
+              select: { id: true, ad: true, soyad: true }
+            }
+          }
         }
       },
       orderBy: [
@@ -134,6 +166,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
 
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    const currentUser = req.user!;
     const workOrder = await prisma.isEmri.findUnique({
       where: { id: Number.parseInt(req.params.id, 10) },
       include: {
@@ -163,6 +196,14 @@ router.get('/:id', authenticate, async (req: AuthRequest, res: Response) => {
       return res.status(404).json({
         success: false,
         message: 'Is emri bulunamadi'
+      });
+    }
+
+    const canView = workOrder.talepEdenId === currentUser.id || workOrder.atananId === currentUser.id;
+    if (!canView) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu is emrini goruntuleme yetkiniz yok'
       });
     }
 
@@ -603,6 +644,7 @@ router.patch('/:id/status', authenticate, async (req: AuthRequest, res: Response
     }
 
     const isReopenFromCompleted = currentOrder.durum === 'TAMAMLANDI' && durum !== 'TAMAMLANDI';
+    const isApprovalCompletion = currentOrder.durum === 'ONAY_BEKLIYOR' && durum === 'TAMAMLANDI';
     if (isReopenFromCompleted && !canManageCompletedWorkOrders(currentUser)) {
       return res.status(403).json({
         success: false,
@@ -610,7 +652,7 @@ router.patch('/:id/status', authenticate, async (req: AuthRequest, res: Response
       });
     }
 
-    const isWorkingStatusChange = !isReopenFromCompleted && durum !== 'ATANDI';
+    const isWorkingStatusChange = !isReopenFromCompleted && !isApprovalCompletion && durum !== 'ATANDI';
     if (isWorkingStatusChange && !canWorkOnWorkOrder(currentOrder, currentUser)) {
       return res.status(403).json({
         success: false,
@@ -622,6 +664,37 @@ router.patch('/:id/status', authenticate, async (req: AuthRequest, res: Response
       return res.status(400).json({
         success: false,
         message: 'Is emri atanmadan baslatilamaz'
+      });
+    }
+
+    if (durum === 'ONAY_BEKLIYOR') {
+      const trimmedComment = String(aciklama || '').trim();
+      if (!trimmedComment) {
+        return res.status(400).json({
+          success: false,
+          message: 'Is sonu notu zorunludur'
+        });
+      }
+
+      if (currentOrder.atananId && currentOrder.atananId !== currentUser.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Is sonu notu sadece isi alan personel tarafindan girilebilir'
+        });
+      }
+    }
+
+    if (durum === 'TAMAMLANDI' && !isApprovalCompletion) {
+      return res.status(400).json({
+        success: false,
+        message: 'Isi tamamlamak icin once ONAY BEKLIYOR durumuna gonderin'
+      });
+    }
+
+    if (isApprovalCompletion && !canAssignWorkOrders(currentUser)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tamamlama onayi sadece sistem yoneticisi veya Berke Karayanik tarafindan verilebilir'
       });
     }
 

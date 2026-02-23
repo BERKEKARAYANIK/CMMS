@@ -26,20 +26,21 @@ import { queryClient } from '../queryClient';
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, enabled: true },
-  { name: 'Is Girisi', href: '/is-emri-girisi', icon: FilePlus, enabled: true },
+  { name: 'İş Girişi', href: '/is-emri-girisi', icon: FilePlus, enabled: true },
   { name: 'Dc Motor Bakım İş Girişi', href: '/dc-motor-bakim', icon: ClipboardList, enabled: true },
-  { name: 'Tamamlanan Isler', href: '/tamamlanan-isler', icon: CheckSquare, enabled: true },
-  { name: 'Planlanan Isler', href: '/planlanan-isler', icon: ListChecks, enabled: true },
-  { name: 'Bakim Takip Merkezi', href: '/bakim-takip-merkezi', icon: LayoutDashboard, enabled: true },
+  { name: 'Tamamlanan İşler', href: '/tamamlanan-isler', icon: CheckSquare, enabled: true },
+  { name: 'Planlanan İşler', href: '/planlanan-isler', icon: ListChecks, enabled: true },
+  { name: 'Bakım Takip Merkezi', href: '/bakim-takip-merkezi', icon: LayoutDashboard, enabled: true },
   { name: 'Personel', href: '/personnel', icon: Users, enabled: true },
-  { name: 'Gunluk Performans Genel Bakis', href: '/gunluk-performans-genel-bakis', icon: BarChart3, enabled: true },
-  { name: 'Tekrarlayan Ariza Analizi', href: '/tekrarlayan-ariza-analizi', icon: BarChart3, enabled: true },
+  { name: 'Günlük Performans Genel Bakış', href: '/gunluk-performans-genel-bakis', icon: BarChart3, enabled: true },
+  { name: 'Tekrarlayan Arıza Analizi', href: '/tekrarlayan-ariza-analizi', icon: BarChart3, enabled: false },
   { name: 'Vardiyalar', href: '/shifts', icon: Calendar, enabled: false },
   { name: 'Demirbaş Formları', href: '/demirbas', icon: Package, enabled: true },
-  { name: 'Is Sagligi ve Guvenligi', href: '/isg', icon: Shield, enabled: true },
+  { name: 'İş Sağlığı ve Güvenliği', href: '/isg', icon: Shield, enabled: true },
+  { name: 'Duruş Analizi', href: '/durus-analizi', icon: BarChart3, enabled: true },
   { name: 'Ekipmanlar', href: '/equipment', icon: Settings, enabled: false },
-  { name: 'Is Emri Takibi', href: '/work-orders', icon: ClipboardList, enabled: true },
-  { name: 'Periyodik Bakim', href: '/preventive-maintenance', icon: Wrench, enabled: true },
+  { name: 'İş Emri Takibi', href: '/work-orders', icon: ClipboardList, enabled: true },
+  { name: 'Periyodik Bakım', href: '/preventive-maintenance', icon: Wrench, enabled: false },
   { name: 'Raporlar', href: '/reports', icon: BarChart3, enabled: false }
 ];
 
@@ -53,10 +54,19 @@ export default function Layout() {
   const isSystemAdmin = isSystemAdminUser(user);
   const isBerke = isBerkeUser(user);
   const berkeOnlyPaths = new Set([
+    '/dc-motor-bakim',
     '/personnel',
-    '/gunluk-performans-genel-bakis'
+    '/gunluk-performans-genel-bakis',
+    '/tekrarlayan-ariza-analizi',
+    '/shifts',
+    '/equipment',
+    '/reports',
+    '/preventive-maintenance'
   ]);
-  const visibleNavigation = navigation.filter((item) => !berkeOnlyPaths.has(item.href) || isBerke);
+  const visibleNavigation = navigation.filter((item) => {
+    if (berkeOnlyPaths.has(item.href) && !isBerke) return false;
+    return true;
+  });
 
   const handleLogout = async () => {
     try {
@@ -91,7 +101,7 @@ export default function Layout() {
       >
         <div className="flex items-center justify-between h-16 px-4 bg-gray-800">
           <div className="leading-tight">
-            <span className="block text-base font-semibold text-white">ERW Bakim</span>
+            <span className="block text-base font-semibold text-white">ERW Bakım</span>
             <span className="block text-xs text-gray-300">Kontrol Merkezi</span>
           </div>
           <button
@@ -148,7 +158,7 @@ export default function Layout() {
           ) : (
             <div
               className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-500 opacity-60 cursor-not-allowed"
-              title="Sadece sistem yoneticisi"
+              title="Sadece sistem yöneticisi"
             >
               <settingsNav.icon className="w-5 h-5 mr-3" />
               {settingsNav.name}
@@ -162,7 +172,7 @@ export default function Layout() {
           <div className="flex items-center h-16 px-4 bg-gray-800">
             <Wrench className="w-8 h-8 text-primary-500" />
             <div className="ml-2 leading-tight">
-              <span className="block text-lg font-semibold text-white">ERW Bakim</span>
+              <span className="block text-lg font-semibold text-white">ERW Bakım</span>
               <span className="block text-xs text-gray-300">Kontrol Merkezi</span>
             </div>
           </div>
@@ -213,7 +223,7 @@ export default function Layout() {
             ) : (
               <div
                 className="flex items-center px-3 py-2 rounded-lg text-sm font-medium text-gray-500 opacity-60 cursor-not-allowed"
-                title="Sadece sistem yoneticisi"
+                title="Sadece sistem yöneticisi"
               >
                 <settingsNav.icon className="w-5 h-5 mr-3" />
                 {settingsNav.name}
@@ -221,7 +231,7 @@ export default function Layout() {
             )}
           </div>
           <div className="p-4 border-t border-gray-800">
-            <p className="text-xs text-gray-500">ERW Bakim Kontrol Merkezi</p>
+            <p className="text-xs text-gray-500">ERW Bakım Kontrol Merkezi</p>
             <p className="text-xs text-gray-600">v1.0.0</p>
           </div>
         </div>
@@ -239,7 +249,7 @@ export default function Layout() {
 
             <div className="flex-1 lg:ml-0 ml-4">
               <h1 className="text-lg font-semibold text-gray-900">
-                ERW Bakim Kontrol Merkezi
+                ERW Bakım Kontrol Merkezi
               </h1>
             </div>
 
@@ -276,14 +286,14 @@ export default function Layout() {
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
                       <Cog className="w-4 h-4 mr-2" />
-                      Sifre Degistir
+                      Şifre Değiştir
                     </button>
                     <button
                       onClick={handleLogout}
                       className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-50"
                     >
                       <LogOut className="w-4 h-4 mr-2" />
-                      Cikis Yap
+                      Çıkış Yap
                     </button>
                   </div>
                 </>

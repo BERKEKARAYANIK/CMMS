@@ -8,33 +8,34 @@ import type {
   PersonnelPerformanceData,
   PersonnelPerformanceSummary,
   Role,
-  User
-} from '../types';
+  User } from
+'../types';
 import { DepartmanLabels, RoleLabels } from '../types';
 import { type Personel } from '../data/lists';
 import type { CompletedJob } from '../types/jobEntries';
 import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
+import { isPasswordPolicyCompliant, PASSWORD_POLICY_TEXT } from '../utils/passwordPolicy';
 
 const departmanOptions: Departman[] = [
-  'ELEKTRIK BAKIM ANA BINA',
-  'ELEKTRIK BAKIM EK BINA',
-  'MEKANIK BAKIM',
-  'ISK ELEKTRIK BAKIM',
-  'ISK MEKANIK BAKIM',
-  'ISK YARDIMCI TESISLER',
-  'YARDIMCI TESISLER',
-  'YONETIM'
-];
+'ELEKTRIK BAKIM ANA BINA',
+'ELEKTRIK BAKIM EK BINA',
+'MEKANIK BAKIM',
+'ISK ELEKTRIK BAKIM',
+'ISK MEKANIK BAKIM',
+'ISK YARDIMCI TESISLER',
+'YARDIMCI TESISLER',
+'YONETIM'];
+
 const roleOptions: Role[] = ['ADMIN', 'BAKIM_MUDURU', 'BAKIM_SEFI', 'TEKNISYEN', 'OPERATOR'];
 
 function mapBolumToDepartman(bolum: string): Departman {
-  const normalized = bolum
-    .toLocaleUpperCase('tr-TR')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const normalized = bolum.
+  toLocaleUpperCase('tr-TR').
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/[^A-Z0-9]+/g, ' ').
+  replace(/\s+/g, ' ').
+  trim();
 
   const hasIsk = normalized.startsWith('ISK ');
   if (normalized.includes('YARDIMCI')) {
@@ -86,16 +87,16 @@ function formatMinutes(totalMinutes: number): string {
 }
 
 function normalizeText(value: string): string {
-  return value
-    .toLocaleLowerCase('tr-TR')
-    .replace(/ç/g, 'c')
-    .replace(/ğ/g, 'g')
-    .replace(/ı/g, 'i')
-    .replace(/ö/g, 'o')
-    .replace(/ş/g, 's')
-    .replace(/ü/g, 'u')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return value.
+  toLocaleLowerCase('tr-TR').
+  replace(/ç/g, 'c').
+  replace(/ğ/g, 'g').
+  replace(/ı/g, 'i').
+  replace(/ö/g, 'o').
+  replace(/ş/g, 's').
+  replace(/ü/g, 'u').
+  replace(/\s+/g, ' ').
+  trim();
 }
 
 function parseTimeToMinutes(value: string): number | null {
@@ -106,7 +107,7 @@ function parseTimeToMinutes(value: string): number | null {
   const minute = Number.parseInt(match[2], 10);
 
   if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
-  return (hour * 60) + minute;
+  return hour * 60 + minute;
 }
 
 function calculateDurationMinutes(startTime: string, endTime: string): number {
@@ -119,7 +120,7 @@ function calculateDurationMinutes(startTime: string, endTime: string): number {
     return end - start;
   }
 
-  return (24 * 60 - start) + end;
+  return 24 * 60 - start + end;
 }
 
 function extractShiftCode(value: string): string | null {
@@ -135,7 +136,7 @@ function extractShiftCode(value: string): string | null {
   return fallback ? fallback[1] : null;
 }
 
-function extractShiftTimeRange(value: string): { start: string; end: string } | null {
+function extractShiftTimeRange(value: string): {start: string;end: string;} | null {
   const match = /(\d{2}[:.]\d{2})\s*-\s*(\d{2}[:.]\d{2})/.exec(value);
   if (!match) return null;
 
@@ -177,9 +178,9 @@ function createEmptySummary(): PersonnelPerformanceSummary {
 }
 
 function summarizeFromLocalWorks(
-  works: CompletedJob[],
-  includeDateInCapacityKey: boolean
-): PersonnelPerformanceSummary {
+works: CompletedJob[],
+includeDateInCapacityKey: boolean)
+: PersonnelPerformanceSummary {
   if (works.length === 0) return createEmptySummary();
 
   const completedWorkOrders = works.length;
@@ -195,14 +196,14 @@ function summarizeFromLocalWorks(
     }
   });
 
-  const availableMinutes = Array.from(capacityByKey.values())
-    .reduce((sum, duration) => sum + duration, 0);
+  const availableMinutes = Array.from(capacityByKey.values()).
+  reduce((sum, duration) => sum + duration, 0);
 
   return {
     completedWorkOrders,
     completedMinutes,
     availableMinutes,
-    workRate: availableMinutes > 0 ? Math.round((completedMinutes / availableMinutes) * 100) : 0,
+    workRate: availableMinutes > 0 ? Math.round(completedMinutes / availableMinutes * 100) : 0,
     averageCompletionMinutes: completedWorkOrders > 0 ? Math.round(completedMinutes / completedWorkOrders) : 0
   };
 }
@@ -214,20 +215,20 @@ interface LocalPerformanceAggregate {
 }
 
 function buildLocalPerformance(
-  user: User,
-  selectedDate: string,
-  selectedMonth: string,
-  completedWorks: CompletedJob[]
-): LocalPerformanceAggregate {
+user: User,
+selectedDate: string,
+selectedMonth: string,
+completedWorks: CompletedJob[])
+: LocalPerformanceAggregate {
   const targetName = normalizeText(`${user.ad} ${user.soyad}`);
   const targetSicilNo = user.sicilNo.trim();
 
   const personnelWorks = completedWorks.filter((work) =>
-    work.personeller.some((person) => {
-      const sicilMatch = person.sicilNo?.trim() === targetSicilNo;
-      const nameMatch = normalizeText(person.adSoyad || '') === targetName;
-      return sicilMatch || nameMatch;
-    })
+  work.personeller.some((person) => {
+    const sicilMatch = person.sicilNo?.trim() === targetSicilNo;
+    const nameMatch = normalizeText(person.adSoyad || '') === targetName;
+    return sicilMatch || nameMatch;
+  })
   );
 
   const dailyWorks = personnelWorks.filter((work) => work.tarih === selectedDate);
@@ -266,32 +267,32 @@ function buildLocalPerformance(
 }
 
 function mergeSummary(
-  apiSummary: PersonnelPerformanceSummary,
-  localSummary: PersonnelPerformanceSummary
-): PersonnelPerformanceSummary {
+apiSummary: PersonnelPerformanceSummary,
+localSummary: PersonnelPerformanceSummary)
+: PersonnelPerformanceSummary {
   const completedWorkOrders = apiSummary.completedWorkOrders + localSummary.completedWorkOrders;
   const completedMinutes = apiSummary.completedMinutes + localSummary.completedMinutes;
   const availableMinutes = Math.max(apiSummary.availableMinutes, localSummary.availableMinutes);
   const weightedAvgTotal =
-    (apiSummary.averageCompletionMinutes * apiSummary.completedWorkOrders) +
-    (localSummary.averageCompletionMinutes * localSummary.completedWorkOrders);
+  apiSummary.averageCompletionMinutes * apiSummary.completedWorkOrders +
+  localSummary.averageCompletionMinutes * localSummary.completedWorkOrders;
 
   return {
     completedWorkOrders,
     completedMinutes,
     availableMinutes,
-    workRate: availableMinutes > 0 ? Math.round((completedMinutes / availableMinutes) * 100) : 0,
+    workRate: availableMinutes > 0 ? Math.round(completedMinutes / availableMinutes * 100) : 0,
     averageCompletionMinutes: completedWorkOrders > 0 ? Math.round(weightedAvgTotal / completedWorkOrders) : 0
   };
 }
 
 function mergePerformanceWithLocal(
-  apiData: PersonnelPerformanceData,
-  user: User,
-  selectedDate: string,
-  selectedMonth: string,
-  completedWorks: CompletedJob[]
-): PersonnelPerformanceData {
+apiData: PersonnelPerformanceData,
+user: User,
+selectedDate: string,
+selectedMonth: string,
+completedWorks: CompletedJob[])
+: PersonnelPerformanceData {
   const local = buildLocalPerformance(user, selectedDate, selectedMonth, completedWorks);
 
   return {
@@ -302,8 +303,8 @@ function mergePerformanceWithLocal(
       const codeKey = extractShiftCode(shift.shiftName);
       const timeKey = `time:${shift.shiftStart}-${shift.shiftEnd}`;
       const localShift =
-        (codeKey ? local.shifts.get(`code:${codeKey}`) : undefined) ||
-        local.shifts.get(timeKey);
+      (codeKey ? local.shifts.get(`code:${codeKey}`) : undefined) ||
+      local.shifts.get(timeKey);
 
       if (!localShift) {
         return shift;
@@ -338,13 +339,13 @@ function PersonnelModal({
   user,
   onSubmit,
   isLoading
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  user: User | null;
-  onSubmit: (data: PersonnelFormData) => void;
-  isLoading: boolean;
-}) {
+
+
+
+
+
+
+}: {isOpen: boolean;onClose: () => void;user: User | null;onSubmit: (data: PersonnelFormData) => void;isLoading: boolean;}) {
   const [formData, setFormData] = useState<PersonnelFormData>({
     sicilNo: '',
     ad: '',
@@ -382,7 +383,7 @@ function PersonnelModal({
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
           <h2 className="text-xl font-bold text-gray-900 mb-6">
-            {user ? 'Personel Duzenle' : 'Yeni Personel Ekle'}
+            {user ? "Personel Düzenle" : 'Yeni Personel Ekle'}
           </h2>
 
           <form
@@ -390,8 +391,8 @@ function PersonnelModal({
               e.preventDefault();
               onSubmit(formData);
             }}
-            className="space-y-4"
-          >
+            className="space-y-4">
+            
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="label">Sicil No</label>
@@ -401,8 +402,8 @@ function PersonnelModal({
                   onChange={(e) => setFormData({ ...formData, sicilNo: e.target.value })}
                   className="input"
                   required
-                  disabled={!!user}
-                />
+                  disabled={!!user} />
+                
               </div>
               <div>
                 <label className="label">Email</label>
@@ -411,8 +412,8 @@ function PersonnelModal({
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="input"
-                  required
-                />
+                  required />
+                
               </div>
             </div>
 
@@ -424,8 +425,8 @@ function PersonnelModal({
                   value={formData.ad}
                   onChange={(e) => setFormData({ ...formData, ad: e.target.value })}
                   className="input"
-                  required
-                />
+                  required />
+                
               </div>
               <div>
                 <label className="label">Soyad</label>
@@ -434,24 +435,24 @@ function PersonnelModal({
                   value={formData.soyad}
                   onChange={(e) => setFormData({ ...formData, soyad: e.target.value })}
                   className="input"
-                  required
-                />
+                  required />
+                
               </div>
             </div>
 
-            {!user && (
-              <div>
-                <label className="label">Sifre</label>
+            {!user &&
+            <div>
+                <label className="label">Şifre</label>
                 <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="input"
-                  required={!user}
-                  minLength={6}
-                />
+                type="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                className="input"
+                required={!user}
+                minLength={8} />
+              
               </div>
-            )}
+            }
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -460,8 +461,8 @@ function PersonnelModal({
                   type="text"
                   value={formData.telefon}
                   onChange={(e) => setFormData({ ...formData, telefon: e.target.value })}
-                  className="input"
-                />
+                  className="input" />
+                
               </div>
               <div>
                 <label className="label">Unvan</label>
@@ -469,8 +470,8 @@ function PersonnelModal({
                   type="text"
                   value={formData.unvan}
                   onChange={(e) => setFormData({ ...formData, unvan: e.target.value })}
-                  className="input"
-                />
+                  className="input" />
+                
               </div>
             </div>
 
@@ -480,11 +481,11 @@ function PersonnelModal({
                 <select
                   value={formData.departman}
                   onChange={(e) => setFormData({ ...formData, departman: e.target.value as Departman })}
-                  className="input"
-                >
-                  {departmanOptions.map((d) => (
-                    <option key={d} value={d}>{DepartmanLabels[d]}</option>
-                  ))}
+                  className="input">
+                  
+                  {departmanOptions.map((d) =>
+                  <option key={d} value={d}>{DepartmanLabels[d]}</option>
+                  )}
                 </select>
               </div>
               <div>
@@ -492,29 +493,29 @@ function PersonnelModal({
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as Role })}
-                  className="input"
-                >
-                  {roleOptions.map((r) => (
-                    <option key={r} value={r}>{RoleLabels[r]}</option>
-                  ))}
+                  className="input">
+                  
+                  {roleOptions.map((r) =>
+                  <option key={r} value={r}>{RoleLabels[r]}</option>
+                  )}
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="label">Uzmanlik Alani</label>
+              <label className="label">Uzmanlık Alanı</label>
               <input
                 type="text"
                 value={formData.uzmanlikAlani}
                 onChange={(e) => setFormData({ ...formData, uzmanlikAlani: e.target.value })}
                 className="input"
-                placeholder="Orn: Hidrolik, PLC, Kaynak"
-              />
+                placeholder="Örn: Hidrolik, PLC, Kaynak" />
+              
             </div>
 
             <div className="flex justify-end space-x-3 pt-4">
               <button type="button" onClick={onClose} className="btn btn-secondary">
-                Iptal
+                İptal
               </button>
               <button type="submit" className="btn btn-primary" disabled={isLoading}>
                 {isLoading ? 'Kaydediliyor...' : 'Kaydet'}
@@ -523,19 +524,19 @@ function PersonnelModal({
           </form>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 function SummaryCard({
   title,
   summary,
   progressColor
-}: {
-  title: string;
-  summary: PersonnelPerformanceSummary;
-  progressColor: string;
-}) {
+
+
+
+
+}: {title: string;summary: PersonnelPerformanceSummary;progressColor: string;}) {
   return (
     <div className="card p-4">
       <div className="flex items-center justify-between">
@@ -546,13 +547,13 @@ function SummaryCard({
       <div className="mt-3 h-2 w-full rounded-full bg-gray-200">
         <div
           className={`h-2 rounded-full ${progressColor}`}
-          style={{ width: `${clampPercent(summary.workRate)}%` }}
-        />
+          style={{ width: `${clampPercent(summary.workRate)}%` }} />
+        
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
         <div className="rounded-lg bg-gray-50 p-3">
-          <p className="text-gray-500">Tamamlanan is emri</p>
+          <p className="text-gray-500">Tamamlanan iş emri</p>
           <p className="text-lg font-semibold text-gray-900">{summary.completedWorkOrders}</p>
         </div>
         <div className="rounded-lg bg-gray-50 p-3">
@@ -564,12 +565,12 @@ function SummaryCard({
           <p className="text-lg font-semibold text-gray-900">{formatMinutes(summary.availableMinutes)}</p>
         </div>
         <div className="rounded-lg bg-gray-50 p-3">
-          <p className="text-gray-500">Ort. is suresi</p>
+          <p className="text-gray-500">Ort. iş süresi</p>
           <p className="text-lg font-semibold text-gray-900">{formatMinutes(summary.averageCompletionMinutes)}</p>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 function PersonnelPerformanceModal({
@@ -577,12 +578,12 @@ function PersonnelPerformanceModal({
   onClose,
   user,
   completedWorks
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  user: User | null;
-  completedWorks: CompletedJob[];
-}) {
+
+
+
+
+
+}: {isOpen: boolean;onClose: () => void;user: User | null;completedWorks: CompletedJob[];}) {
   const [selectedDate, setSelectedDate] = useState(toDateValue(new Date()));
   const [selectedMonth, setSelectedMonth] = useState(toMonthValue(new Date()));
 
@@ -638,8 +639,8 @@ function PersonnelPerformanceModal({
                 type="date"
                 className="input"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-              />
+                onChange={(e) => setSelectedDate(e.target.value)} />
+              
             </div>
             <div>
               <label className="label">Ay</label>
@@ -647,43 +648,43 @@ function PersonnelPerformanceModal({
                 type="month"
                 className="input"
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-              />
+                onChange={(e) => setSelectedMonth(e.target.value)} />
+              
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="py-8 text-center text-gray-500">Performans yukleniyor...</div>
-          ) : isError ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {isLoading ?
+          <div className="py-8 text-center text-gray-500">Performans yükleniyor...</div> :
+          isError ?
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               Performans verisi alinamadi.
-            </div>
-          ) : performanceData ? (
-            <>
+            </div> :
+          performanceData ?
+          <>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <SummaryCard
-                  title={`Gunluk (${performanceData.period.date})`}
-                  summary={performanceData.daily}
-                  progressColor="bg-green-500"
-                />
+                title={`Günlük (${performanceData.period.date})`}
+                summary={performanceData.daily}
+                progressColor="bg-green-500" />
+              
                 <SummaryCard
-                  title={`Aylik (${performanceData.period.month})`}
-                  summary={performanceData.monthly}
-                  progressColor="bg-blue-500"
-                />
+                title={`Aylık (${performanceData.period.month})`}
+                summary={performanceData.monthly}
+                progressColor="bg-blue-500" />
+              
               </div>
 
               <div className="card p-4">
-                <h3 className="text-base font-semibold text-gray-900">Vardiya Bazli Gunluk Dakika Orani</h3>
+                <h3 className="text-base font-semibold text-gray-900">Vardiya Bazlı Günlük Dakika Orani</h3>
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {performanceData.shifts.map((shift) => (
-                    <div key={shift.shiftId} className="rounded-xl border border-gray-200 p-3">
+                  {performanceData.shifts.map((shift) =>
+                <div key={shift.shiftId} className="rounded-xl border border-gray-200 p-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span
-                            className="inline-block h-3 w-3 rounded-full"
-                            style={{ backgroundColor: shift.color }}
-                          />
+                        className="inline-block h-3 w-3 rounded-full"
+                        style={{ backgroundColor: shift.color }} />
+                      
                           <p className="font-medium text-gray-900">{shift.shiftName}</p>
                         </div>
                         <span className="text-xs text-gray-500">
@@ -698,24 +699,24 @@ function PersonnelPerformanceModal({
 
                       <div className="mt-2 h-2 w-full rounded-full bg-gray-200">
                         <div
-                          className="h-2 rounded-full bg-emerald-500"
-                          style={{ width: `${clampPercent(shift.workRate)}%` }}
-                        />
+                      className="h-2 rounded-full bg-emerald-500"
+                      style={{ width: `${clampPercent(shift.workRate)}%` }} />
+                    
                       </div>
 
                       <div className="mt-3 space-y-1 text-sm text-gray-600">
-                        <p>{shift.completedWorkOrders} tamamlanan is emri</p>
+                        <p>{shift.completedWorkOrders} tamamlanan iş emri</p>
                         <p>{formatMinutes(shift.completedMinutes)} / {formatMinutes(shift.availableMinutes)}</p>
-                        {!shift.isScheduled && (
-                          <p className="text-amber-600">Bu gunde vardiya atamasi yok</p>
-                        )}
+                        {!shift.isScheduled &&
+                    <p className="text-amber-600">Bu günde vardiya ataması yok</p>
+                    }
                       </div>
                     </div>
-                  ))}
+                )}
                 </div>
               </div>
-            </>
-          ) : null}
+            </> :
+          null}
 
           <div className="flex justify-end pt-2">
             <button type="button" className="btn btn-secondary" onClick={onClose}>
@@ -724,8 +725,8 @@ function PersonnelPerformanceModal({
           </div>
         </div>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 export default function Personnel() {
@@ -760,7 +761,7 @@ export default function Personnel() {
         const data = response.data?.data as CompletedJob[] | undefined;
         setCompletedWorks(Array.isArray(data) ? data : []);
       } catch {
-        toast.error('Tamamlanan is verileri yuklenemedi');
+        toast.error("Tamamlanan is verileri yüklenemedi");
       }
     };
 
@@ -811,9 +812,9 @@ export default function Personnel() {
   const filteredUsers = displayUsers.filter((user) => {
     const searchLower = search.toLowerCase();
     const matchesSearch = !search ||
-      user.ad.toLowerCase().includes(searchLower) ||
-      user.soyad.toLowerCase().includes(searchLower) ||
-      user.sicilNo.toLowerCase().includes(searchLower);
+    user.ad.toLowerCase().includes(searchLower) ||
+    user.soyad.toLowerCase().includes(searchLower) ||
+    user.sicilNo.toLowerCase().includes(searchLower);
 
     const matchesDepartman = !filterDepartman || user.departman === filterDepartman;
 
@@ -823,30 +824,35 @@ export default function Personnel() {
   const createMutation = useMutation({
     mutationFn: (data: PersonnelFormData) => usersApi.create(data),
     onSuccess: () => {
-      toast.success('Personel olusturuldu');
+      toast.success('Personel oluşturuldu');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setIsModalOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Hata olustu');
+      toast.error(error.response?.data?.message || "Hata oluştu");
     }
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<PersonnelFormData> }) =>
-      usersApi.update(id, data),
+    mutationFn: ({ id, data }: {id: number;data: Partial<PersonnelFormData>;}) =>
+    usersApi.update(id, data),
     onSuccess: () => {
-      toast.success('Personel guncellendi');
+      toast.success('Personel güncellendi');
       queryClient.invalidateQueries({ queryKey: ['users'] });
       setIsModalOpen(false);
       setSelectedUser(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Hata olustu');
+      toast.error(error.response?.data?.message || "Hata oluştu");
     }
   });
 
   const handleSubmit = (data: PersonnelFormData) => {
+    if (!selectedUser && !isPasswordPolicyCompliant(String(data.password || '').trim())) {
+      toast.error(PASSWORD_POLICY_TEXT);
+      return;
+    }
+
     if (selectedUser) {
       updateMutation.mutate({ id: selectedUser.id, data });
     } else {
@@ -871,7 +877,7 @@ export default function Personnel() {
       toast.success(user.aktif ? 'Personel pasif yapildi' : 'Personel aktif yapildi');
       queryClient.invalidateQueries({ queryKey: ['users'] });
     } catch {
-      toast.error('Islem basarisiz');
+      toast.error('İşlem başarısız');
     }
   };
 
@@ -879,9 +885,9 @@ export default function Personnel() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Personel Yonetimi</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Personel Yönetimi</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Satira tiklayarak personelin gunluk, aylik ve vardiya bazli calisma oranini goruntuleyin.
+            Satıra tıklayarak personelin günlük, aylık ve vardiya bazlı çalışma oranını görüntüleyin.
           </p>
         </div>
         <button
@@ -889,8 +895,8 @@ export default function Personnel() {
             setSelectedUser(null);
             setIsModalOpen(true);
           }}
-          className="btn btn-primary inline-flex items-center"
-        >
+          className="btn btn-primary inline-flex items-center">
+          
           <Plus className="w-5 h-5 mr-2" />
           Yeni Personel
         </button>
@@ -905,18 +911,18 @@ export default function Personnel() {
               placeholder="Ad, soyad veya sicil no ara..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="input pl-10"
-            />
+              className="input pl-10" />
+            
           </div>
           <select
             value={filterDepartman}
             onChange={(e) => setFilterDepartman(e.target.value)}
-            className="input w-full md:w-48"
-          >
-            <option value="">Tum Departmanlar</option>
-            {departmanOptions.map((d) => (
-              <option key={d} value={d}>{DepartmanLabels[d]}</option>
-            ))}
+            className="input w-full md:w-48">
+            
+            <option value="">Tüm Departmanlar</option>
+            {departmanOptions.map((d) =>
+            <option key={d} value={d}>{DepartmanLabels[d]}</option>
+            )}
           </select>
         </div>
       </div>
@@ -932,29 +938,29 @@ export default function Personnel() {
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Unvan</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Rol</th>
                 <th className="px-4 py-3 text-left text-sm font-medium text-gray-600">Durum</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">Islemler</th>
+                <th className="px-4 py-3 text-right text-sm font-medium text-gray-600">İşlemler</th>
               </tr>
             </thead>
             <tbody className="divide-y">
-              {isLoading ? (
-                <tr>
+              {isLoading ?
+              <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                    Yukleniyor...
+                    Yükleniyor...
                   </td>
-                </tr>
-              ) : filteredUsers.length === 0 ? (
-                <tr>
+                </tr> :
+              filteredUsers.length === 0 ?
+              <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
-                    Personel bulunamadi
+                    Personel bulunamadı
                   </td>
-                </tr>
-              ) : (
-                filteredUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className={`${user.id > 0 ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50'}`}
-                    onClick={() => handleOpenPerformance(user)}
-                  >
+                </tr> :
+
+              filteredUsers.map((user) =>
+              <tr
+                key={user.id}
+                className={`${user.id > 0 ? 'cursor-pointer hover:bg-gray-50' : 'hover:bg-gray-50'}`}
+                onClick={() => handleOpenPerformance(user)}>
+                
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">
                       {user.sicilNo}
                     </td>
@@ -983,34 +989,34 @@ export default function Personnel() {
                     <td className="px-4 py-3">
                       <div className="flex justify-end space-x-2">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (user.id > 0) handleEdit(user);
-                          }}
-                          className={`p-2 text-gray-600 rounded-lg ${user.id > 0 ? 'hover:text-primary-600 hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
-                          title="Duzenle"
-                        >
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (user.id > 0) handleEdit(user);
+                      }}
+                      className={`p-2 text-gray-600 rounded-lg ${user.id > 0 ? 'hover:text-primary-600 hover:bg-gray-100' : 'opacity-50 cursor-not-allowed'}`}
+                      title="Duzenle">
+                      
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (user.id > 0) handleToggleActive(user);
-                          }}
-                          className={`p-2 rounded-lg ${user.id > 0 ? (user.aktif ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50') : 'text-gray-400 cursor-not-allowed'}`}
-                          title={user.aktif ? 'Pasif Yap' : 'Aktif Yap'}
-                        >
-                          {user.aktif ? (
-                            <UserX className="w-4 h-4" />
-                          ) : (
-                            <UserCheck className="w-4 h-4" />
-                          )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (user.id > 0) handleToggleActive(user);
+                      }}
+                      className={`p-2 rounded-lg ${user.id > 0 ? user.aktif ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50' : 'text-gray-400 cursor-not-allowed'}`}
+                      title={user.aktif ? 'Pasif Yap' : 'Aktif Yap'}>
+                      
+                          {user.aktif ?
+                      <UserX className="w-4 h-4" /> :
+
+                      <UserCheck className="w-4 h-4" />
+                      }
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))
-              )}
+              )
+              }
             </tbody>
           </table>
         </div>
@@ -1024,8 +1030,8 @@ export default function Personnel() {
         }}
         user={selectedUser}
         onSubmit={handleSubmit}
-        isLoading={createMutation.isPending || updateMutation.isPending}
-      />
+        isLoading={createMutation.isPending || updateMutation.isPending} />
+      
 
       <PersonnelPerformanceModal
         isOpen={isPerformanceModalOpen}
@@ -1034,8 +1040,8 @@ export default function Personnel() {
           setSelectedPerformanceUser(null);
         }}
         user={selectedPerformanceUser}
-        completedWorks={completedWorks}
-      />
-    </div>
-  );
+        completedWorks={completedWorks} />
+      
+    </div>);
+
 }

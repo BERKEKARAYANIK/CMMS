@@ -13,12 +13,11 @@ import PlanlananIsler from './pages/PlanlananIsler';
 import BakimTakipMerkezi from './pages/BakimTakipMerkezi';
 import DisabledPage from './pages/DisabledPage';
 import SifreDegistir from './pages/SifreDegistir';
-import PreventiveMaintenancePage from './pages/PreventiveMaintenance';
 import DcMotorBakim from './pages/DcMotorBakim';
 import Equipment from './pages/Equipment';
 import IsSagligiGuvenligi from './pages/IsSagligiGuvenligi';
+import DurusAnalizi from './pages/DurusAnalizi';
 import GunlukPerformansGenelBakis from './pages/GunlukPerformansGenelBakis';
-import TekrarlayanArizaAnalizi from './pages/TekrarlayanArizaAnalizi';
 import WorkOrders from './pages/WorkOrders';
 import { isBerkeUser, isSystemAdminUser } from './utils/access';
 
@@ -34,7 +33,7 @@ function SettingsRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!allowed && !warnedRef.current) {
-      toast.error('Ayarlar sadece sistem yoneticisi tarafindan kullanilabilir.');
+      toast.error('Ayarlar sadece sistem yöneticisi tarafından kullanılabilir.');
       warnedRef.current = true;
     }
   }, [allowed]);
@@ -50,7 +49,7 @@ function BerkeOnlyRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!allowed && !warnedRef.current) {
-      toast.error('Bu sayfa sadece Berke Karayanik tarafindan kullanilabilir.');
+      toast.error('Bu sayfa sadece Berke Karayanik tarafından kullanılabilir.');
       warnedRef.current = true;
     }
   }, [allowed]);
@@ -76,7 +75,14 @@ function App() {
         <Route path="tamamlanan-isler" element={<TamamlananIsler />} />
         <Route path="planlanan-isler" element={<PlanlananIsler />} />
         <Route path="bakim-takip-merkezi" element={<BakimTakipMerkezi />} />
-        <Route path="dc-motor-bakim" element={<DcMotorBakim />} />
+        <Route
+          path="dc-motor-bakim"
+          element={(
+            <BerkeOnlyRoute>
+              <DcMotorBakim />
+            </BerkeOnlyRoute>
+          )}
+        />
         <Route
           path="ayarlar"
           element={(
@@ -105,14 +111,51 @@ function App() {
             </BerkeOnlyRoute>
           )}
         />
-        <Route path="tekrarlayan-ariza-analizi" element={<TekrarlayanArizaAnalizi />} />
-        <Route path="shifts" element={<DisabledPage title="Vardiyalar" />} />
+        <Route
+          path="tekrarlayan-ariza-analizi"
+          element={(
+            <BerkeOnlyRoute>
+              <DisabledPage title="Tekrarlayan Arıza Analizi" />
+            </BerkeOnlyRoute>
+          )}
+        />
+        <Route
+          path="shifts"
+          element={(
+            <BerkeOnlyRoute>
+              <DisabledPage title="Vardiyalar" />
+            </BerkeOnlyRoute>
+          )}
+        />
         <Route path="demirbas" element={<Equipment />} />
         <Route path="isg" element={<IsSagligiGuvenligi />} />
-        <Route path="equipment" element={<Navigate to="/demirbas" replace />} />
+        <Route path="durus-analizi" element={<DurusAnalizi />} />
+        <Route path="pareto-analizi" element={<DurusAnalizi />} />
+        <Route
+          path="equipment"
+          element={(
+            <BerkeOnlyRoute>
+              <DisabledPage title="Ekipmanlar" />
+            </BerkeOnlyRoute>
+          )}
+        />
         <Route path="work-orders" element={<WorkOrders />} />
-        <Route path="preventive-maintenance" element={<PreventiveMaintenancePage />} />
-        <Route path="reports" element={<DisabledPage title="Raporlar" />} />
+        <Route
+          path="preventive-maintenance"
+          element={(
+            <BerkeOnlyRoute>
+              <DisabledPage title="Periyodik Bakım" />
+            </BerkeOnlyRoute>
+          )}
+        />
+        <Route
+          path="reports"
+          element={(
+            <BerkeOnlyRoute>
+              <DisabledPage title="Raporlar" />
+            </BerkeOnlyRoute>
+          )}
+        />
       </Route>
     </Routes>
   );

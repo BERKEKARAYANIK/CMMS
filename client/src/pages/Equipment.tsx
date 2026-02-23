@@ -7,8 +7,8 @@ import {
   Plus,
   X,
   ArrowLeft,
-  FolderOpen
-} from 'lucide-react';
+  FolderOpen } from
+'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { isBerkeUser } from '../utils/access';
 
@@ -35,16 +35,16 @@ interface StoredFormPackage {
   dataUrl: string;
 }
 
-const departments: Array<{ id: Department; label: string }> = [
-  { id: 'MEKANIK', label: 'Mekanik' },
-  { id: 'ELEKTRIK', label: 'Elektrik' },
-  { id: 'YARDIMCI_TESISLER', label: 'Yardimci Tesisler' }
-];
+const departments: Array<{id: Department;label: string;}> = [
+{ id: 'MEKANIK', label: 'Mekanik' },
+{ id: 'ELEKTRIK', label: 'Elektrik' },
+{ id: 'YARDIMCI_TESISLER', label: 'Yardımcı Tesisler' }];
 
-const forms: Array<{ id: FormType; label: string }> = [
-  { id: 'DEMIRBAS_FORMU', label: 'Demirbas Formu' },
-  { id: 'BILGI_FORMU', label: 'Bilgi Formu' }
-];
+
+const forms: Array<{id: FormType;label: string;}> = [
+{ id: 'DEMIRBAS_FORMU', label: 'Demirbas Formu' },
+{ id: 'BILGI_FORMU', label: 'Bilgi Formu' }];
+
 
 const DB_NAME = 'cmms-form-packages';
 const DB_VERSION = 2;
@@ -55,7 +55,7 @@ function makePackageId(department: Department, formType: FormType): PackageId {
 }
 
 const allPackageIds: PackageId[] = departments.flatMap((department) =>
-  forms.map((form) => makePackageId(department.id, form.id))
+forms.map((form) => makePackageId(department.id, form.id))
 );
 
 type PackageState = Record<PackageId, StoredFormPackage | null>;
@@ -93,9 +93,9 @@ function normalizeStoredPackage(raw: unknown): StoredFormPackage | null {
     id: value.id,
     department: value.department,
     formType: value.formType,
-    approvalStatus: value.approvalStatus === 'RED'
-      ? 'RED'
-      : (value.approvalStatus === 'KABUL' ? 'KABUL' : 'BEKLIYOR'),
+    approvalStatus: value.approvalStatus === 'RED' ?
+    'RED' :
+    value.approvalStatus === 'KABUL' ? 'KABUL' : 'BEKLIYOR',
     formNumber: value.formNumber || '-',
     pypNo: value.pypNo || '',
     formName: value.formName || value.fileName,
@@ -263,12 +263,12 @@ export default function EquipmentPage() {
   };
 
   const upsertPackage = async (
-    department: Department,
-    formType: FormType,
-    file: File,
-    number: string,
-    name: string
-  ) => {
+  department: Department,
+  formType: FormType,
+  file: File,
+  number: string,
+  name: string) =>
+  {
     const packageId = makePackageId(department, formType);
     const dataUrl = await readFileAsDataUrl(file);
 
@@ -313,35 +313,35 @@ export default function EquipmentPage() {
     }
 
     if (!demirbasFile || !bilgiFile) {
-      toast.error('Yukleme icin iki dosya da zorunludur');
+      toast.error('Yükleme için iki dosya da zorunludur');
       return;
     }
 
     setIsUploading(true);
     try {
       await Promise.all([
-        upsertPackage(
-          selectedDepartment,
-          'DEMIRBAS_FORMU',
-          demirbasFile,
-          trimmedFormNumber,
-          trimmedFormName
-        ),
-        upsertPackage(
-          selectedDepartment,
-          'BILGI_FORMU',
-          bilgiFile,
-          trimmedFormNumber,
-          trimmedFormName
-        )
-      ]);
+      upsertPackage(
+        selectedDepartment,
+        'DEMIRBAS_FORMU',
+        demirbasFile,
+        trimmedFormNumber,
+        trimmedFormName
+      ),
+      upsertPackage(
+        selectedDepartment,
+        'BILGI_FORMU',
+        bilgiFile,
+        trimmedFormNumber,
+        trimmedFormName
+      )]
+      );
 
-      toast.success('Iki dosya secilen klasore yuklendi');
+      toast.success("İki dosya seçilen klasöre yüklendi");
       setIsUploadModalOpen(false);
       setActiveDepartment(selectedDepartment);
       resetUploadModal();
     } catch {
-      toast.error('Paket yuklenemedi');
+      toast.error("Paket yüklenemedi");
     } finally {
       setIsUploading(false);
     }
@@ -382,7 +382,7 @@ export default function EquipmentPage() {
     if (rowItem.approvalStatus !== 'BEKLIYOR') {
       return {
         canEdit: false,
-        message: 'Karar verildi, sadece Berke Karayanik mudahale edebilir'
+        message: 'Karar verildi, sadece Berke Karayanik müdahale edebilir'
       };
     }
 
@@ -400,7 +400,7 @@ export default function EquipmentPage() {
     const rowItem = demirbasItem || bilgiItem;
 
     if (!rowItem) {
-      toast.error('Karar verilecek satir bulunamadi');
+      toast.error('Karar verilecek satır bulunamadı');
       return;
     }
 
@@ -412,7 +412,7 @@ export default function EquipmentPage() {
 
     const trimmedPypNo = rowPypNoInput.trim();
     if (status === 'KABUL' && !trimmedPypNo) {
-      toast.error('Kabul icin PYP No zorunludur');
+      toast.error('Kabul için PYP No zorunludur');
       return;
     }
 
@@ -423,9 +423,9 @@ export default function EquipmentPage() {
     setIsDecisionSaving(true);
     try {
       await Promise.all([
-        nextDemirbas ? saveStoredPackage(nextDemirbas) : Promise.resolve(),
-        nextBilgi ? saveStoredPackage(nextBilgi) : Promise.resolve()
-      ]);
+      nextDemirbas ? saveStoredPackage(nextDemirbas) : Promise.resolve(),
+      nextBilgi ? saveStoredPackage(nextBilgi) : Promise.resolve()]
+      );
 
       setPackages((prev) => ({
         ...prev,
@@ -437,7 +437,7 @@ export default function EquipmentPage() {
         setRowPypNoInput('');
       }
 
-      toast.success(status === 'KABUL' ? 'Satir KABUL olarak guncellendi' : 'Satir RED olarak guncellendi');
+      toast.success(status === 'KABUL' ? "Satır KABUL olarak güncellendi" : "Satır RED olarak güncellendi");
     } catch {
       toast.error('Karar kaydedilemedi');
     } finally {
@@ -447,7 +447,7 @@ export default function EquipmentPage() {
 
   const handleDelete = async (department: Department, formType: FormType) => {
     if (!canDelete) {
-      toast.error('Silme yetkisi sadece Berke Karayanik kullanicisinda');
+      toast.error("Silme yetkisi sadece Berke Karayanik kullanıcısında");
       return;
     }
 
@@ -464,15 +464,15 @@ export default function EquipmentPage() {
 
   const handleDeleteBoth = async (department: Department) => {
     if (!canDelete) {
-      toast.error('Silme yetkisi sadece Berke Karayanik kullanicisinda');
+      toast.error("Silme yetkisi sadece Berke Karayanik kullanıcısında");
       return;
     }
 
     try {
       await Promise.all([
-        removeStoredPackage(makePackageId(department, 'DEMIRBAS_FORMU')),
-        removeStoredPackage(makePackageId(department, 'BILGI_FORMU'))
-      ]);
+      removeStoredPackage(makePackageId(department, 'DEMIRBAS_FORMU')),
+      removeStoredPackage(makePackageId(department, 'BILGI_FORMU'))]
+      );
 
       setPackages((prev) => ({
         ...prev,
@@ -532,35 +532,35 @@ export default function EquipmentPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Demirbas Form Paketleri</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Yeni Ekle ile klasor secin, Form No ve Form Adi girin, iki dosyayi birlikte yukleyin.
+            Yeni Ekle ile klasor seçin, Form No ve Form Adi girin, iki dosyayi birlikte yükleyin.
           </p>
         </div>
 
         <button
           type="button"
           className="btn btn-primary inline-flex items-center"
-          onClick={openUploadModal}
-        >
+          onClick={openUploadModal}>
+          
           <Plus className="w-4 h-4 mr-2" />
           Yeni Ekle
         </button>
       </div>
 
-      {isLoading ? (
-        <div className="card p-8 text-center text-sm text-gray-500">Paketler yukleniyor...</div>
-      ) : activeDepartment ? (
-        <div className="space-y-4">
+      {isLoading ?
+      <div className="card p-8 text-center text-sm text-gray-500">Paketler yükleniyor...</div> :
+      activeDepartment ?
+      <div className="space-y-4">
           <div className="flex items-center justify-between">
             <button
-              type="button"
-              className="btn btn-secondary inline-flex items-center"
-              onClick={() => setActiveDepartment(null)}
-            >
+            type="button"
+            className="btn btn-secondary inline-flex items-center"
+            onClick={() => setActiveDepartment(null)}>
+            
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Bolumlere Don
+              Bölümlere Don
             </button>
             <span className="text-sm text-gray-600">
-              Aktif Bolum: <span className="font-semibold">{getDepartmentLabel(activeDepartment)}</span>
+              Aktif Bölüm: <span className="font-semibold">{getDepartmentLabel(activeDepartment)}</span>
             </span>
           </div>
 
@@ -575,207 +575,207 @@ export default function EquipmentPage() {
                     <th className="px-3 py-3 text-left font-semibold">Form Adi</th>
                     <th className="px-3 py-3 text-left font-semibold">Demirbas Dosyasi</th>
                     <th className="px-3 py-3 text-left font-semibold">Bilgi Dosyasi</th>
-                    <th className="px-3 py-3 text-left font-semibold">Yukleyen Kisi</th>
-                    <th className="px-3 py-3 text-left font-semibold">Yuklenme</th>
-                    <th className="px-3 py-3 text-center font-semibold">Islem</th>
+                    <th className="px-3 py-3 text-left font-semibold">Yükleyen Kişi</th>
+                    <th className="px-3 py-3 text-left font-semibold">Yüklenme</th>
+                    <th className="px-3 py-3 text-center font-semibold">İşlem</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {(() => {
-                    const demirbasItem = activeRow?.demirbasItem || null;
-                    const bilgiItem = activeRow?.bilgiItem || null;
-                    const rowItem = activeRow?.rowItem || null;
+                  const demirbasItem = activeRow?.demirbasItem || null;
+                  const bilgiItem = activeRow?.bilgiItem || null;
+                  const rowItem = activeRow?.rowItem || null;
 
-                    return (
-                      <tr className="hover:bg-gray-50">
+                  return (
+                    <tr className="hover:bg-gray-50">
                         <td className="px-3 py-2 font-mono">{rowItem?.formNumber || '-'}</td>
                         <td className="px-3 py-2">
-                          {rowItem ? (
-                            rowItem.approvalStatus === 'KABUL'
-                              ? (
-                                <span className="px-2 py-1 rounded text-xs bg-emerald-100 text-emerald-800">KABUL</span>
-                              )
-                              : rowItem.approvalStatus === 'RED'
-                                ? (
-                                  <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">RED</span>
-                                )
-                                : (
-                                  <span className="px-2 py-1 rounded text-xs bg-amber-100 text-amber-800">BEKLIYOR</span>
-                                )
-                          ) : (
-                            '-'
-                          )}
+                          {rowItem ?
+                        rowItem.approvalStatus === 'KABUL' ?
+
+                        <span className="px-2 py-1 rounded text-xs bg-emerald-100 text-emerald-800">KABUL</span> :
+
+                        rowItem.approvalStatus === 'RED' ?
+
+                        <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">RED</span> :
+
+
+                        <span className="px-2 py-1 rounded text-xs bg-amber-100 text-amber-800">BEKLIYOR</span> :
+
+
+                        '-'
+                        }
                         </td>
                         <td className="px-3 py-2 font-mono">
-                          {rowItem
-                            ? (rowItem.approvalStatus === 'RED'
-                              ? 'RED'
-                              : (rowItem.approvalStatus === 'KABUL' ? (rowItem.pypNo || '-') : '-'))
-                            : '-'}
+                          {rowItem ?
+                        rowItem.approvalStatus === 'RED' ?
+                        'RED' :
+                        rowItem.approvalStatus === 'KABUL' ? rowItem.pypNo || '-' : '-' :
+                        '-'}
                         </td>
                         <td className="px-3 py-2">{rowItem?.formName || '-'}</td>
                         <td className="px-3 py-2">
-                          {demirbasItem ? (
-                            <div className="flex items-center gap-2">
+                          {demirbasItem ?
+                        <div className="flex items-center gap-2">
                               <button
-                                type="button"
-                                className="text-primary-700 underline underline-offset-2"
-                                onClick={() => handleRead(demirbasItem)}
-                              >
+                            type="button"
+                            className="text-primary-700 underline underline-offset-2"
+                            onClick={() => handleRead(demirbasItem)}>
+                            
                                 {demirbasItem.fileName}
                               </button>
                               <button
-                                type="button"
-                                className="text-blue-600 hover:text-blue-800 p-1"
-                                title="Oku"
-                                onClick={() => handleRead(demirbasItem)}
-                              >
+                            type="button"
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                            title="Oku"
+                            onClick={() => handleRead(demirbasItem)}>
+                            
                                 <Eye className="w-4 h-4" />
                               </button>
                               <button
-                                type="button"
-                                className="text-emerald-600 hover:text-emerald-800 p-1"
-                                title="Indir"
-                                onClick={() => triggerDownload(demirbasItem)}
-                              >
+                            type="button"
+                            className="text-emerald-600 hover:text-emerald-800 p-1"
+                            title="Indir"
+                            onClick={() => triggerDownload(demirbasItem)}>
+                            
                                 <Download className="w-4 h-4" />
                               </button>
-                              {canDelete && (
-                                <button
-                                  type="button"
-                                  className="text-red-500 hover:text-red-700 p-1"
-                                  title="Sil"
-                                  onClick={() => void handleDelete(activeDepartment, 'DEMIRBAS_FORMU')}
-                                >
+                              {canDelete &&
+                          <button
+                            type="button"
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Sil"
+                            onClick={() => void handleDelete(activeDepartment, 'DEMIRBAS_FORMU')}>
+                            
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">Yuklenmedi</span>
-                          )}
+                          }
+                            </div> :
+
+                        <span className="text-xs text-gray-400">Yüklenmedi</span>
+                        }
                         </td>
                         <td className="px-3 py-2">
-                          {bilgiItem ? (
-                            <div className="flex items-center gap-2">
+                          {bilgiItem ?
+                        <div className="flex items-center gap-2">
                               <button
-                                type="button"
-                                className="text-primary-700 underline underline-offset-2"
-                                onClick={() => handleRead(bilgiItem)}
-                              >
+                            type="button"
+                            className="text-primary-700 underline underline-offset-2"
+                            onClick={() => handleRead(bilgiItem)}>
+                            
                                 {bilgiItem.fileName}
                               </button>
                               <button
-                                type="button"
-                                className="text-blue-600 hover:text-blue-800 p-1"
-                                title="Oku"
-                                onClick={() => handleRead(bilgiItem)}
-                              >
+                            type="button"
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                            title="Oku"
+                            onClick={() => handleRead(bilgiItem)}>
+                            
                                 <Eye className="w-4 h-4" />
                               </button>
                               <button
-                                type="button"
-                                className="text-emerald-600 hover:text-emerald-800 p-1"
-                                title="Indir"
-                                onClick={() => triggerDownload(bilgiItem)}
-                              >
+                            type="button"
+                            className="text-emerald-600 hover:text-emerald-800 p-1"
+                            title="Indir"
+                            onClick={() => triggerDownload(bilgiItem)}>
+                            
                                 <Download className="w-4 h-4" />
                               </button>
-                              {canDelete && (
-                                <button
-                                  type="button"
-                                  className="text-red-500 hover:text-red-700 p-1"
-                                  title="Sil"
-                                  onClick={() => void handleDelete(activeDepartment, 'BILGI_FORMU')}
-                                >
+                              {canDelete &&
+                          <button
+                            type="button"
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Sil"
+                            onClick={() => void handleDelete(activeDepartment, 'BILGI_FORMU')}>
+                            
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">Yuklenmedi</span>
-                          )}
+                          }
+                            </div> :
+
+                        <span className="text-xs text-gray-400">Yüklenmedi</span>
+                        }
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-700">
-                          {rowItem
-                            ? `${rowItem.uploadedByName} (${rowItem.uploadedBySicilNo})`
-                            : '-'}
+                          {rowItem ?
+                        `${rowItem.uploadedByName} (${rowItem.uploadedBySicilNo})` :
+                        '-'}
                         </td>
                         <td className="px-3 py-2 text-xs text-gray-600">
                           {rowItem ? new Date(rowItem.uploadedAt).toLocaleString('tr-TR') : '-'}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {rowItem ? (
-                            <div className="flex flex-col items-center gap-2">
+                          {rowItem ?
+                        <div className="flex flex-col items-center gap-2">
                               {(() => {
-                                const permission = getDecisionPermission(rowItem);
-                                return permission.canEdit ? (
-                                <div className="flex flex-wrap items-center justify-center gap-2">
+                            const permission = getDecisionPermission(rowItem);
+                            return permission.canEdit ?
+                            <div className="flex flex-wrap items-center justify-center gap-2">
                                   <button
-                                    type="button"
-                                    className="px-2 py-1 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
-                                    onClick={() => void handleDecisionUpdate(activeDepartment, 'RED')}
-                                    disabled={isDecisionSaving}
-                                  >
+                                type="button"
+                                className="px-2 py-1 rounded text-xs bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                                onClick={() => void handleDecisionUpdate(activeDepartment, 'RED')}
+                                disabled={isDecisionSaving}>
+                                
                                     RED
                                   </button>
                                   <input
-                                    type="text"
-                                    className="input !h-8 !w-28 text-xs"
-                                    placeholder="PYP No"
-                                    value={rowPypNoInput}
-                                    onChange={(event) => setRowPypNoInput(event.target.value)}
-                                    disabled={isDecisionSaving}
-                                  />
+                                type="text"
+                                className="input !h-8 !w-28 text-xs"
+                                placeholder="PYP No"
+                                value={rowPypNoInput}
+                                onChange={(event) => setRowPypNoInput(event.target.value)}
+                                disabled={isDecisionSaving} />
+                              
                                   <button
-                                    type="button"
-                                    className="px-2 py-1 rounded text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50"
-                                    onClick={() => void handleDecisionUpdate(activeDepartment, 'KABUL')}
-                                    disabled={isDecisionSaving || !rowPypNoInput.trim()}
-                                  >
+                                type="button"
+                                className="px-2 py-1 rounded text-xs bg-emerald-100 text-emerald-700 hover:bg-emerald-200 disabled:opacity-50"
+                                onClick={() => void handleDecisionUpdate(activeDepartment, 'KABUL')}
+                                disabled={isDecisionSaving || !rowPypNoInput.trim()}>
+                                
                                     KABUL
                                   </button>
-                                </div>
-                              ) : (
-                                <span className="text-xs text-gray-400">{permission.message}</span>
-                              );
-                              })()}
+                                </div> :
 
-                              {canDelete && (
-                                <button
-                                  type="button"
-                                  className="text-red-500 hover:text-red-700 p-1"
-                                  title="Tumunu Sil"
-                                  onClick={() => void handleDeleteBoth(activeDepartment)}
-                                >
+                            <span className="text-xs text-gray-400">{permission.message}</span>;
+
+                          })()}
+
+                              {canDelete &&
+                          <button
+                            type="button"
+                            className="text-red-500 hover:text-red-700 p-1"
+                            title="Tümunu Sil"
+                            onClick={() => void handleDeleteBoth(activeDepartment)}>
+                            
                                   <Trash2 className="w-4 h-4" />
                                 </button>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">-</span>
-                          )}
+                          }
+                            </div> :
+
+                        <span className="text-xs text-gray-400">-</span>
+                        }
                         </td>
-                      </tr>
-                    );
-                  })()}
+                      </tr>);
+
+                })()}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {departments.map((department) => {
-            const rowCount = getRowCount(department.id);
+        </div> :
 
-            return (
-              <button
-                key={department.id}
-                type="button"
-                className="card p-5 text-left hover:shadow-md transition-shadow"
-                onClick={() => setActiveDepartment(department.id)}
-              >
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {departments.map((department) => {
+          const rowCount = getRowCount(department.id);
+
+          return (
+            <button
+              key={department.id}
+              type="button"
+              className="card p-5 text-left hover:shadow-md transition-shadow"
+              onClick={() => setActiveDepartment(department.id)}>
+              
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-lg font-semibold text-gray-900 flex items-center">
                     <FolderOpen className="w-5 h-5 mr-2 text-primary-600" />
@@ -786,31 +786,31 @@ export default function EquipmentPage() {
                 <p className="text-sm text-gray-600">
                   Bu bolumun form listesini ac
                 </p>
-              </button>
-            );
-          })}
-        </div>
-      )}
+              </button>);
 
-      {isUploadModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        })}
+        </div>
+      }
+
+      {isUploadModalOpen &&
+      <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => {
-              setIsUploadModalOpen(false);
-              resetUploadModal();
-            }} />
+            setIsUploadModalOpen(false);
+            resetUploadModal();
+          }} />
 
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl p-6">
               <div className="flex items-start justify-between mb-4">
                 <h3 className="text-xl font-semibold text-gray-900">Yeni Paket Ekle</h3>
                 <button
-                  type="button"
-                  className="text-gray-500 hover:text-gray-700"
-                  onClick={() => {
-                    setIsUploadModalOpen(false);
-                    resetUploadModal();
-                  }}
-                >
+                type="button"
+                className="text-gray-500 hover:text-gray-700"
+                onClick={() => {
+                  setIsUploadModalOpen(false);
+                  resetUploadModal();
+                }}>
+                
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -819,13 +819,13 @@ export default function EquipmentPage() {
                 <div>
                   <label className="label">Klasor</label>
                   <select
-                    className="input"
-                    value={selectedDepartment}
-                    onChange={(event) => setSelectedDepartment(event.target.value as Department)}
-                  >
-                    {departments.map((department) => (
-                      <option key={department.id} value={department.id}>{department.label}</option>
-                    ))}
+                  className="input"
+                  value={selectedDepartment}
+                  onChange={(event) => setSelectedDepartment(event.target.value as Department)}>
+                  
+                    {departments.map((department) =>
+                  <option key={department.id} value={department.id}>{department.label}</option>
+                  )}
                   </select>
                 </div>
 
@@ -833,24 +833,24 @@ export default function EquipmentPage() {
                   <div>
                     <label className="label">Form Numarasi</label>
                     <input
-                      type="text"
-                      className="input"
-                      value={formNumber}
-                      onChange={(event) => setFormNumber(event.target.value)}
-                      placeholder="ORN: FRM-001"
-                      required
-                    />
+                    type="text"
+                    className="input"
+                    value={formNumber}
+                    onChange={(event) => setFormNumber(event.target.value)}
+                    placeholder="ORN: FRM-001"
+                    required />
+                  
                   </div>
                   <div>
                     <label className="label">Form Adi</label>
                     <input
-                      type="text"
-                      className="input"
-                      value={formName}
-                      onChange={(event) => setFormName(event.target.value)}
-                      placeholder="ORN: Mekanik Aylik Kontrol"
-                      required
-                    />
+                    type="text"
+                    className="input"
+                    value={formName}
+                    onChange={(event) => setFormName(event.target.value)}
+                    placeholder="ORN: Mekanik Aylık Kontrol"
+                    required />
+                  
                   </div>
                 </div>
 
@@ -858,58 +858,58 @@ export default function EquipmentPage() {
                   <div>
                     <label className="label">Demirbas Formu Paketi (Zorunlu)</label>
                     <input
-                      type="file"
-                      className="input"
-                      onChange={(event) => setDemirbasFile(event.target.files?.[0] || null)}
-                      required
-                    />
+                    type="file"
+                    className="input"
+                    onChange={(event) => setDemirbasFile(event.target.files?.[0] || null)}
+                    required />
+                  
                   </div>
                   <div>
                     <label className="label">Bilgi Formu Paketi (Zorunlu)</label>
                     <input
-                      type="file"
-                      className="input"
-                      onChange={(event) => setBilgiFile(event.target.files?.[0] || null)}
-                      required
-                    />
+                    type="file"
+                    className="input"
+                    onChange={(event) => setBilgiFile(event.target.files?.[0] || null)}
+                    required />
+                  
                   </div>
                 </div>
 
                 <div>
-                  <label className="label">Yukleyen Kisi</label>
+                  <label className="label">Yükleyen Kişi</label>
                   <input
-                    type="text"
-                    className="input"
-                    value={`${currentUser?.ad || ''} ${currentUser?.soyad || ''} (${currentUser?.sicilNo || '-'})`}
-                    readOnly
-                  />
+                  type="text"
+                  className="input"
+                  value={`${currentUser?.ad || ''} ${currentUser?.soyad || ''} (${currentUser?.sicilNo || '-'})`}
+                  readOnly />
+                
                 </div>
 
                 <p className="text-xs text-gray-500">
-                  Yukleme sadece iki dosya birlikte secildiginde yapilir. Kabul/Red islemi satir olustuktan sonra yapilir.
+                  Yükleme sadece iki dosya birlikte seçildiğinde yapılır. Kabul/Red işlemi satır oluştuktan sonra yapılır.
                 </p>
 
                 <div className="flex justify-end gap-3 pt-2">
                   <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      setIsUploadModalOpen(false);
-                      resetUploadModal();
-                    }}
-                    disabled={isUploading}
-                  >
-                    Iptal
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setIsUploadModalOpen(false);
+                    resetUploadModal();
+                  }}
+                  disabled={isUploading}>
+                  
+                    İptal
                   </button>
                   <button type="submit" className="btn btn-primary" disabled={isUploading}>
-                    {isUploading ? 'Yukleniyor...' : 'Yukle'}
+                    {isUploading ? 'Yükleniyor...' : 'Yükle'}
                   </button>
                 </div>
               </form>
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 }

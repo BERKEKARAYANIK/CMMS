@@ -12,6 +12,7 @@ export default defineConfig({
                 short_name: 'ERW Bakim',
                 description: 'ERW Bakim Kontrol Merkezi uygulamasi',
                 lang: 'tr',
+                id: '/',
                 start_url: '/',
                 scope: '/',
                 display: 'standalone',
@@ -19,10 +20,22 @@ export default defineConfig({
                 background_color: '#f8fafc',
                 icons: [
                     {
-                        src: '/pwa-icon.svg',
-                        sizes: 'any',
-                        type: 'image/svg+xml',
-                        purpose: 'any maskable'
+                        src: '/pwa-192x192.png',
+                        sizes: '192x192',
+                        type: 'image/png',
+                        purpose: 'any'
+                    },
+                    {
+                        src: '/pwa-512x512.png',
+                        sizes: '512x512',
+                        type: 'image/png',
+                        purpose: 'any'
+                    },
+                    {
+                        src: '/pwa-512x512-maskable.png',
+                        sizes: '512x512',
+                        type: 'image/png',
+                        purpose: 'maskable'
                     }
                 ]
             },

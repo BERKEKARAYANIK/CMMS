@@ -5,8 +5,8 @@ import {
   ClipboardCheck,
   Flame,
   ShieldAlert,
-  Target
-} from 'lucide-react';
+  Target } from
+'lucide-react';
 import {
   ISG_TOPICS,
   ISG_YEARLY_TOPIC_DETAILS,
@@ -15,12 +15,12 @@ import {
   ISG_YEAR_OPTIONS,
   type IsgTopicDefinition,
   type IsgTopicMetricTone,
-  type IsgYearKey
-} from '../data/isg';
+  type IsgYearKey } from
+'../data/isg';
 import {
   ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR,
-  type IsgMissingTopicId
-} from '../data/isgMissing';
+  type IsgMissingTopicId } from
+'../data/isgMissing';
 
 const toneClassMap: Record<IsgTopicMetricTone, string> = {
   neutral: 'bg-gray-100 text-gray-700',
@@ -62,33 +62,33 @@ const getClosureColor = (rate: number): ClosureColor => {
 };
 
 function isPriorityMaintenanceDepartment(department: string): boolean {
-  const normalized = String(department || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleUpperCase('tr-TR');
+  const normalized = String(department || '').
+  normalize('NFD').
+  replace(/[\u0300-\u036f]/g, '').
+  toLocaleUpperCase('tr-TR');
   return (
-    normalized.includes('E.BAKIM')
-    || normalized.includes('E. BAKIM')
-    || normalized.includes('E BAKIM')
-    || normalized.includes('ELEKTRIK BAKIM')
-    || normalized.includes('M. BAKIM')
-    || normalized.includes('MEKANIK BAKIM')
-    || normalized.includes('Y. TESISLER')
-    || normalized.includes('YARDIMCI TESISLER')
-  );
+    normalized.includes('E.BAKIM') ||
+    normalized.includes('E. BAKIM') ||
+    normalized.includes('E BAKIM') ||
+    normalized.includes('ELEKTRIK BAKIM') ||
+    normalized.includes('M. BAKIM') ||
+    normalized.includes('MEKANIK BAKIM') ||
+    normalized.includes('Y. TESISLER') ||
+    normalized.includes('YARDIMCI TESISLER'));
+
 }
 
-type ReportOption = { id: string; label: string };
+type ReportOption = {id: string;label: string;};
 type DepartmentSortMode = 'name_asc' | 'name_desc' | 'rate_desc' | 'rate_asc';
 
 const REPORT_OPTIONS: ReportOption[] = [
-  { id: 'uygunsuzluk-yillik', label: 'Uygunsuzluklar' },
-  { id: 'capraz-denetim', label: 'Capraz Denetim Uygunsuzluklar' },
-  { id: 'durum-kaynakli-kazalar', label: 'Durum Kaynakli Kazalar' },
-  { id: 'ramak-kala', label: 'Ramak Kala' },
-  { id: 'ifade-gelmeyen', label: 'Ifade Gelmeyenler' },
-  { id: 'sari-kart-gelmeyen', label: 'Sari Kart Gelmeyenler' }
-];
+{ id: 'uygunsuzluk-yillik', label: 'Uygunsuzluklar' },
+{ id: 'capraz-denetim', label: 'Çapraz Denetim Uygunsuzluklar' },
+{ id: 'durum-kaynakli-kazalar', label: "Durum Kaynaklı Kazalar" },
+{ id: 'ramak-kala', label: 'Ramak Kala' },
+{ id: 'ifade-gelmeyen', label: 'Ifade Gelmeyenler' },
+{ id: 'sari-kart-gelmeyen', label: 'Sari Kart Gelmeyenler' }];
+
 
 export default function IsSagligiGuvenligi() {
   const [selectedYear, setSelectedYear] = useState<IsgYearKey>('2026');
@@ -105,14 +105,14 @@ export default function IsSagligiGuvenligi() {
   const activeTopicDetails = ISG_YEARLY_TOPIC_DETAILS[effectiveYear];
   const activeMissingByTopic = ISG_TOPIC_MISSING_BREAKDOWN_BY_YEAR[effectiveYear];
 
-  const missingTopicCards: Array<{ id: IsgMissingTopicId; title: string; missingLabel: string }> = [
-    { id: 'uygunsuzluk-yillik', title: 'Uygunsuzluk Giderilmeyen', missingLabel: 'Giderilmeyen' },
-    { id: 'capraz-denetim', title: 'Capraz Denetim Giderilmeyen', missingLabel: 'Giderilmeyen' },
-    { id: 'durum-kaynakli-kazalar', title: 'Durum Kaynakli Kaza', missingLabel: 'Aksiyon Eksik' },
-    { id: 'ramak-kala', title: 'Bekleyen Ramak Kala', missingLabel: 'Bekleyen' },
-    { id: 'ifade-gelmeyen', title: 'Kaza Ifade Gelmeyen', missingLabel: 'Ifade Gelmeyen' },
-    { id: 'sari-kart-gelmeyen', title: 'Sari Kart Gelmeyen', missingLabel: 'Savunma Gelmeyen' }
-  ];
+  const missingTopicCards: Array<{id: IsgMissingTopicId;title: string;missingLabel: string;}> = [
+  { id: 'uygunsuzluk-yillik', title: 'Uygunsuzluk Giderilmeyen', missingLabel: 'Giderilmeyen' },
+  { id: 'capraz-denetim', title: 'Çapraz Denetim Giderilmeyen', missingLabel: 'Giderilmeyen' },
+  { id: 'durum-kaynakli-kazalar', title: "Durum Kaynaklı Kaza", missingLabel: 'Aksiyon Eksik' },
+  { id: 'ramak-kala', title: 'Bekleyen Ramak Kala', missingLabel: 'Bekleyen' },
+  { id: 'ifade-gelmeyen', title: 'Kaza Ifade Gelmeyen', missingLabel: 'Ifade Gelmeyen' },
+  { id: 'sari-kart-gelmeyen', title: 'Sari Kart Gelmeyen', missingLabel: 'Savunma Gelmeyen' }];
+
 
   const missingCardsWithRows = missingTopicCards.map((card) => {
     const breakdown = activeMissingByTopic[card.id];
@@ -142,38 +142,38 @@ export default function IsSagligiGuvenligi() {
   const selectedMissingCard = missingCardsWithRows.find((card) => card.id === selectedReport.id);
   const showDepartmentRates = Boolean(selectedMissingCard);
   const SelectedTopicIcon = topicIconMap[selectedTopic.iconKey];
-  const selectedUnresolvedItems = selectedMissingCard
-    ? selectedMissingCard.rows
-        .flatMap((row) =>
-          row.items.map((item) => ({
-            department: row.department,
-            date: item.date,
-            person: item.person || '-',
-            missingField: item.missingField || '-',
-            detail: item.detail || '-',
-            sourceRowNo: typeof item.sourceRowNo === 'number' ? item.sourceRowNo : undefined
-          }))
-        )
-        .sort((a, b) => {
-          const byDate = a.date.localeCompare(b.date);
-          if (byDate !== 0) return byDate;
+  const selectedUnresolvedItems = selectedMissingCard ?
+  selectedMissingCard.rows.
+  flatMap((row) =>
+  row.items.map((item) => ({
+    department: row.department,
+    date: item.date,
+    person: item.person || '-',
+    missingField: item.missingField || '-',
+    detail: item.detail || '-',
+    sourceRowNo: typeof item.sourceRowNo === 'number' ? item.sourceRowNo : undefined
+  }))
+  ).
+  sort((a, b) => {
+    const byDate = a.date.localeCompare(b.date);
+    if (byDate !== 0) return byDate;
 
-          const aRowNo = a.sourceRowNo ?? Number.MAX_SAFE_INTEGER;
-          const bRowNo = b.sourceRowNo ?? Number.MAX_SAFE_INTEGER;
-          if (aRowNo !== bRowNo) return aRowNo - bRowNo;
+    const aRowNo = a.sourceRowNo ?? Number.MAX_SAFE_INTEGER;
+    const bRowNo = b.sourceRowNo ?? Number.MAX_SAFE_INTEGER;
+    if (aRowNo !== bRowNo) return aRowNo - bRowNo;
 
-          return a.department.localeCompare(b.department, 'tr-TR', { sensitivity: 'base' });
-        })
-    : [];
+    return a.department.localeCompare(b.department, 'tr-TR', { sensitivity: 'base' });
+  }) :
+  [];
   const departmentFilterOptions = Array.from(
     new Set(selectedUnresolvedItems.map((item) => item.department))
   ).sort((a, b) => a.localeCompare(b, 'tr-TR', { sensitivity: 'base' }));
-  const activeDepartmentFilter = departmentFilterOptions.includes(selectedDepartmentFilter)
-    ? selectedDepartmentFilter
-    : 'ALL';
-  const filteredUnresolvedItems = activeDepartmentFilter === 'ALL'
-    ? selectedUnresolvedItems
-    : selectedUnresolvedItems.filter((item) => item.department === activeDepartmentFilter);
+  const activeDepartmentFilter = departmentFilterOptions.includes(selectedDepartmentFilter) ?
+  selectedDepartmentFilter :
+  'ALL';
+  const filteredUnresolvedItems = activeDepartmentFilter === 'ALL' ?
+  selectedUnresolvedItems :
+  selectedUnresolvedItems.filter((item) => item.department === activeDepartmentFilter);
   const reportDepartmentRates = useMemo(() => {
     if (selectedReport.id === 'uygunsuzluk-yillik') {
       return activeDepartmentRates;
@@ -184,8 +184,8 @@ export default function IsSagligiGuvenligi() {
         const total = row.total;
         const ongoing = row.missing;
         const resolved = Math.max(total - ongoing, 0);
-        const closureRate = total > 0 ? Number(((resolved / total) * 100).toFixed(2)) : 0;
-        const openRate = total > 0 ? Number(((ongoing / total) * 100).toFixed(2)) : 0;
+        const closureRate = total > 0 ? Number((resolved / total * 100).toFixed(2)) : 0;
+        const openRate = total > 0 ? Number((ongoing / total * 100).toFixed(2)) : 0;
 
         return {
           department: row.department,
@@ -211,11 +211,11 @@ export default function IsSagligiGuvenligi() {
         return b.department.localeCompare(a.department, 'tr-TR', { sensitivity: 'base' });
       }
       if (departmentSortMode === 'rate_asc') {
-        return a.closureRate - b.closureRate
-          || a.department.localeCompare(b.department, 'tr-TR', { sensitivity: 'base' });
+        return a.closureRate - b.closureRate ||
+        a.department.localeCompare(b.department, 'tr-TR', { sensitivity: 'base' });
       }
-      return b.closureRate - a.closureRate
-        || a.department.localeCompare(b.department, 'tr-TR', { sensitivity: 'base' });
+      return b.closureRate - a.closureRate ||
+      a.department.localeCompare(b.department, 'tr-TR', { sensitivity: 'base' });
     });
     return rows;
   }, [departmentSortMode, reportDepartmentRates]);
@@ -226,19 +226,19 @@ export default function IsSagligiGuvenligi() {
   }, [selectedYear, selectedReportId]);
 
   const copyRowText = async (
-    rowKey: string,
-    rowNo: number,
-    item: { date: string; department: string; person: string; missingField: string; detail: string }
-  ) => {
+  rowKey: string,
+  rowNo: number,
+  item: {date: string;department: string;person: string;missingField: string;detail: string;}) =>
+  {
     const text = [
-      `${selectedReport.label}`,
-      `Sira No: ${rowNo}`,
-      `Tarih: ${item.date}`,
-      `Bolum: ${item.department}`,
-      `Personel: ${item.person}`,
-      `Kayit: ${item.missingField}`,
-      `Detay: ${item.detail}`
-    ].join('\n');
+    `${selectedReport.label}`,
+    `Sira No: ${rowNo}`,
+    `Tarih: ${item.date}`,
+    `Bölüm: ${item.department}`,
+    `Personel: ${item.person}`,
+    `Kayıt: ${item.missingField}`,
+    `Detay: ${item.detail}`].
+    join('\n');
 
     try {
       if (navigator.clipboard && window.isSecureContext) {
@@ -255,9 +255,9 @@ export default function IsSagligiGuvenligi() {
         document.body.removeChild(textArea);
       }
       setCopiedRowKey(rowKey);
-      window.setTimeout(() => setCopiedRowKey((current) => (current === rowKey ? null : current)), 1200);
+      window.setTimeout(() => setCopiedRowKey((current) => current === rowKey ? null : current), 1200);
     } catch (error) {
-      console.error('Satir kopyalama basarisiz:', error);
+      console.error("Satır kopyalama başarısız:", error);
     }
   };
 
@@ -267,52 +267,52 @@ export default function IsSagligiGuvenligi() {
         <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-900 px-6 py-7 text-white">
           <div className="flex flex-col gap-4">
             <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">ISG ANALITIK PANELI</p>
-              <h1 className="mt-2 text-2xl font-bold md:text-3xl">Is Sagligi ve Guvenligi</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">İSG ANALITIK PANELI</p>
+              <h1 className="mt-2 text-2xl font-bold md:text-3xl">İş Sağlığı ve Güvenliği</h1>
               <p className="mt-2 text-sm text-slate-200">
-                Secili rapora gore KPI, bolum oranlari ve eksik kayit dagilimi asagida gosterilir.
+                Seçili rapora göre KPI, bölüm oranları ve eksik kayıt dağılımı aşağıda gösterilir.
               </p>
             </div>
             <div className="rounded-xl border border-white/20 bg-white/10 p-4">
-              <p className="text-xs uppercase tracking-wide text-slate-300">Rapor Secimi</p>
+              <p className="text-xs uppercase tracking-wide text-slate-300">Rapor Seçimi</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {REPORT_OPTIONS.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setSelectedReportId(option.id)}
-                    className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
-                      selectedReport.id === option.id
-                        ? 'bg-white text-slate-900'
-                        : 'bg-slate-900/40 text-slate-200 hover:bg-white/20'
-                    }`}
-                  >
+                {REPORT_OPTIONS.map((option) =>
+                <button
+                  key={option.id}
+                  type="button"
+                  onClick={() => setSelectedReportId(option.id)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  selectedReport.id === option.id ?
+                  'bg-white text-slate-900' :
+                  'bg-slate-900/40 text-slate-200 hover:bg-white/20'}`
+                  }>
+                  
                     {option.label}
                   </button>
-                ))}
+                )}
               </div>
 
-              {selectedReport.id === 'uygunsuzluk-yillik' && (
-                <>
-                  <p className="mt-3 text-xs uppercase tracking-wide text-slate-300">Yil Secimi</p>
+              {selectedReport.id === 'uygunsuzluk-yillik' &&
+              <>
+                  <p className="mt-3 text-xs uppercase tracking-wide text-slate-300">Yıl Seçimi</p>
                   <div className="mt-2 inline-flex rounded-lg bg-slate-900/50 p-1">
-                    {ISG_YEAR_OPTIONS.map((option) => (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => setSelectedYear(option.key)}
-                        className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
-                          selectedYear === option.key
-                            ? 'bg-white text-slate-900'
-                            : 'text-slate-200 hover:bg-white/20'
-                        }`}
-                      >
+                    {ISG_YEAR_OPTIONS.map((option) =>
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => setSelectedYear(option.key)}
+                    className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                    selectedYear === option.key ?
+                    'bg-white text-slate-900' :
+                    'text-slate-200 hover:bg-white/20'}`
+                    }>
+                    
                         {option.label}
                       </button>
-                    ))}
+                  )}
                   </div>
                 </>
-              )}
+              }
 
               <p className="mt-3 text-xs text-slate-300">Rapor Tarihi: {activeSummary.reportDate}</p>
               <p className="text-xs text-slate-300">Veri Kaynagi: {selectedTopic.dataSource}</p>
@@ -321,37 +321,37 @@ export default function IsSagligiGuvenligi() {
         </div>
       </section>
 
-      {showDepartmentRates && (
+      {showDepartmentRates &&
       <section className="card p-6">
         <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              {selectedReport.id === 'uygunsuzluk-yillik'
-                ? 'Uygunsuzluklarda Bolum Bazli Oranlar'
-                : `${selectedReport.label} - Bolum Bazli Oranlar`}
+              {selectedReport.id === 'uygunsuzluk-yillik' ?
+              "Uygunsuzluklarda Bölüm Bazlı Oranlar" :
+              `${selectedReport.label} - Bölüm Bazlı Oranlar`}
             </h2>
             <p className="mt-1 text-sm text-gray-600">
-              Her bolum icin giderilme ve acik kalan oranlari ayri ayri gosterilir.
+              Her bölüm için giderilme ve acik kalan oranları ayrı ayrı gösterilir.
             </p>
           </div>
           <div className="flex w-full flex-col gap-2 text-xs md:w-auto md:flex-row md:items-end">
             <div className="w-full md:w-64">
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">
-                Siralama
+                Sıralama
               </label>
               <select
                 value={departmentSortMode}
                 onChange={(event) => setDepartmentSortMode(event.target.value as DepartmentSortMode)}
-                className="input"
-              >
+                className="input">
+                
                 <option value="rate_desc">Giderilme Orani (Yuksekten Dusege)</option>
                 <option value="rate_asc">Giderilme Orani (Dusukten Yuksege)</option>
-                <option value="name_asc">Isme Gore (A-Z)</option>
-                <option value="name_desc">Isme Gore (Z-A)</option>
+                <option value="name_asc">İşme Göre (A-Z)</option>
+                <option value="name_desc">İşme Göre (Z-A)</option>
               </select>
             </div>
             <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-700">
-              Bolum: {departmentCount}
+              Bölüm: {departmentCount}
             </span>
           </div>
         </div>
@@ -360,7 +360,7 @@ export default function IsSagligiGuvenligi() {
           <table className="min-w-full divide-y divide-gray-200 text-sm">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-3 py-2 text-left font-semibold text-gray-600">Bolum</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-600">Bölüm</th>
                 <th className="px-3 py-2 text-right font-semibold text-gray-600">Toplam</th>
                 <th className="px-3 py-2 text-right font-semibold text-gray-600">Giderildi</th>
                 <th className="px-3 py-2 text-right font-semibold text-gray-600">Devam</th>
@@ -389,54 +389,54 @@ export default function IsSagligiGuvenligi() {
                         <div className={`h-full ${color.barClass}`} style={{ width: `${item.closureRate}%` }} />
                       </div>
                     </td>
-                  </tr>
-                );
+                  </tr>);
+
               })}
             </tbody>
           </table>
         </div>
       </section>
-      )}
+      }
 
       <section className="card p-6">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">{selectedReport.label} - Giderilmeyenler</h2>
             <p className="mt-1 text-sm text-gray-600">
-              Secilen rapordaki giderilmeyen kayitlar tarih ve sira no sirasina gore listelenir.
+              Seçilen rapordaki giderilmeyen kayıtlar tarih ve sıra no sirasina göre listelenir.
             </p>
           </div>
           <div className="w-full md:w-72">
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-600">
-              Bolum Filtresi
+              Bölüm Filtresi
             </label>
             <select
               value={activeDepartmentFilter}
               onChange={(event) => setSelectedDepartmentFilter(event.target.value)}
               className="input"
-              disabled={!selectedMissingCard || departmentFilterOptions.length === 0}
-            >
-              <option value="ALL">Tum Bolumler</option>
-              {departmentFilterOptions.map((department) => (
-                <option key={department} value={department}>
+              disabled={!selectedMissingCard || departmentFilterOptions.length === 0}>
+              
+              <option value="ALL">Tüm Bölümler</option>
+              {departmentFilterOptions.map((department) =>
+              <option key={department} value={department}>
                   {department}
                 </option>
-              ))}
+              )}
             </select>
           </div>
         </div>
 
-        {selectedMissingCard ? (
-          <div className="overflow-x-auto">
-            {filteredUnresolvedItems.length === 0 ? (
-              <p className="text-sm text-gray-500">Giderilmeyen kayit bulunmuyor.</p>
-            ) : (
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
+        {selectedMissingCard ?
+        <div className="overflow-x-auto">
+            {filteredUnresolvedItems.length === 0 ?
+          <p className="text-sm text-gray-500">Giderilmeyen kayıt bulunmuyor.</p> :
+
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Sira No</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Sıra No</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Tarih</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Bolum</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Bölüm</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Personel</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Giderilmeyen</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Detay</th>
@@ -445,11 +445,11 @@ export default function IsSagligiGuvenligi() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filteredUnresolvedItems.map((item, index) => {
-                    const rowKey = `${item.date}-${item.department}-${item.person}-${index}`;
-                    const displayRowNo = item.sourceRowNo ?? index + 1;
+                const rowKey = `${item.date}-${item.department}-${item.person}-${index}`;
+                const displayRowNo = item.sourceRowNo ?? index + 1;
 
-                    return (
-                    <tr key={rowKey}>
+                return (
+                  <tr key={rowKey}>
                       <td className="px-3 py-2 font-semibold text-gray-800">{displayRowNo}</td>
                       <td className="px-3 py-2 text-gray-700">{item.date}</td>
                       <td className="px-3 py-2 font-medium text-gray-800">{item.department}</td>
@@ -458,27 +458,27 @@ export default function IsSagligiGuvenligi() {
                       <td className="px-3 py-2 text-gray-600">{item.detail}</td>
                       <td className="px-3 py-2">
                         <button
-                          type="button"
-                          onClick={() => copyRowText(rowKey, displayRowNo, item)}
-                          className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100"
-                        >
-                          {copiedRowKey === rowKey
-                            ? 'Kopyalandi'
-                            : 'Satiri Kopyala'}
+                        type="button"
+                        onClick={() => copyRowText(rowKey, displayRowNo, item)}
+                        className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100">
+                        
+                          {copiedRowKey === rowKey ?
+                        'Kopyalandı' :
+                        'Satırı Kopyala'}
                         </button>
                       </td>
-                    </tr>
-                    );
-                  })}
+                    </tr>);
+
+              })}
                 </tbody>
               </table>
-            )}
+          }
+          </div> :
+
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            Bu rapor için eksik kayıt dağılımı bulunmuyor.
           </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-            Bu rapor icin eksik kayit dagilimi bulunmuyor.
-          </div>
-        )}
+        }
       </section>
 
       <section className="card p-5">
@@ -494,31 +494,31 @@ export default function IsSagligiGuvenligi() {
           </div>
           <span
             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-              selectedTopic.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-            }`}
-          >
+            selectedTopic.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`
+            }>
+            
             {selectedTopic.status === 'active' ? 'Aktif KPI' : 'Pipeline'}
           </span>
         </div>
         <p className="text-sm text-gray-600">{selectedTopic.description}</p>
         <p className="mt-3 text-xs text-gray-500">Veri Kaynagi: {selectedTopic.dataSource}</p>
 
-        {selectedTopic.metrics && selectedTopic.metrics.length > 0 ? (
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {selectedTopic.metrics.map((metric) => (
-              <div key={metric.label} className={`rounded-lg px-3 py-2 ${toneClassMap[metric.tone]}`}>
+        {selectedTopic.metrics && selectedTopic.metrics.length > 0 ?
+        <div className="mt-4 grid grid-cols-2 gap-2">
+            {selectedTopic.metrics.map((metric) =>
+          <div key={metric.label} className={`rounded-lg px-3 py-2 ${toneClassMap[metric.tone]}`}>
                 <p className="text-[11px] font-medium uppercase tracking-wide">{metric.label}</p>
                 <p className="mt-1 text-sm font-semibold">{metric.value}</p>
               </div>
-            ))}
+          )}
+          </div> :
+
+        <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            Bu rapor için KPI sutunlari hazir. Veri eklendiginde otomatik gosterilecek.
           </div>
-        ) : (
-          <div className="mt-4 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            Bu rapor icin KPI sutunlari hazir. Veri eklendiginde otomatik gosterilecek.
-          </div>
-        )}
+        }
       </section>
 
-    </div>
-  );
+    </div>);
+
 }

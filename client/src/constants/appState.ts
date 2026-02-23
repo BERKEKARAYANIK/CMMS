@@ -11,6 +11,9 @@ import {
 
 export const APP_STATE_KEYS = {
   settingsLists: 'settings:lists',
+  settingsIsgImports: 'settings:isg_imports',
+  settingsDurusAnaliziImports: 'settings:durus_analizi_imports',
+  settingsDurusCustomMachineGroups: 'settings:durus_custom_machine_groups',
   dashboardFiveSLevels: 'dashboard:five_s_levels',
   bakimTakipData: 'bakim_takip:data',
   bakimTakipConfigs: 'bakim_takip:configs',
@@ -20,10 +23,10 @@ export const APP_STATE_KEYS = {
 } as const;
 
 export const DASHBOARD_FIVE_S_DEPARTMENTS = [
-  { id: 'elektrik-ana-bina', name: 'Elektrik Bakim Ana Bina' },
-  { id: 'elektrik-ek-bina', name: 'Elektrik Bakim Ek Bina' },
+  { id: 'elektrik-ana-bina', name: 'Elektrik Bakım Ana Bina' },
+  { id: 'elektrik-ek-bina', name: 'Elektrik Bakım Ek Bina' },
   { id: 'mekanik', name: 'Mekanik' },
-  { id: 'yardimci-tesisler', name: 'Yardimci Tesisler' }
+  { id: 'yardimci-tesisler', name: 'Yardımcı Tesisler' }
 ] as const;
 
 export const FIVE_S_LEVEL_OPTIONS = ['0S', '1S', '2S', '3S', '4S', '5S'] as const;
@@ -97,6 +100,25 @@ export function sortPersonelListesiByName(personeller: Personel[]): Personel[] {
 
     return String(a.sicilNo || '').localeCompare(
       String(b.sicilNo || ''),
+      'tr-TR',
+      { numeric: true, sensitivity: 'base' }
+    );
+  });
+}
+
+export function sortMakinaListesiByName(makinalar: Makina[]): Makina[] {
+  return [...makinalar].sort((a, b) => {
+    const adKarsilastirma = String(a.ad || '').localeCompare(
+      String(b.ad || ''),
+      'tr-TR',
+      { numeric: true, sensitivity: 'base' }
+    );
+    if (adKarsilastirma !== 0) {
+      return adKarsilastirma;
+    }
+
+    return String(a.id || '').localeCompare(
+      String(b.id || ''),
       'tr-TR',
       { numeric: true, sensitivity: 'base' }
     );
@@ -242,7 +264,9 @@ export function normalizeSettingsLists(value: unknown): SettingsListsState {
   const personelListesi = sortPersonelListesiByName(
     normalizePersonelListesi(source.personelListesi)
   );
-  const makinaListesi = normalizeMakinaListesi(source.makinaListesi);
+  const makinaListesi = sortMakinaListesiByName(
+    normalizeMakinaListesi(source.makinaListesi)
+  );
 
   return {
     vardiyalar: vardiyalar.length > 0 ? vardiyalar : defaults.vardiyalar,

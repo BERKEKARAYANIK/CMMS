@@ -26,23 +26,23 @@ const DcMotorBakim: React.FC = () => {
       try {
         setIsLoadingState(true);
         const response = await appStateApi.getMany([
-          APP_STATE_KEYS.dcMotorReports,
-          APP_STATE_KEYS.dcMotorInventory
-        ]);
+        APP_STATE_KEYS.dcMotorReports,
+        APP_STATE_KEYS.dcMotorInventory]
+        );
         const payload = (response.data?.data || {}) as Record<string, unknown>;
-        const loadedReports = Array.isArray(payload[APP_STATE_KEYS.dcMotorReports])
-          ? payload[APP_STATE_KEYS.dcMotorReports] as CompletedReport[]
-          : [];
-        const loadedInventory = Array.isArray(payload[APP_STATE_KEYS.dcMotorInventory])
-          ? payload[APP_STATE_KEYS.dcMotorInventory] as Machine[]
-          : MOCK_INVENTORY;
+        const loadedReports = Array.isArray(payload[APP_STATE_KEYS.dcMotorReports]) ?
+        payload[APP_STATE_KEYS.dcMotorReports] as CompletedReport[] :
+        [];
+        const loadedInventory = Array.isArray(payload[APP_STATE_KEYS.dcMotorInventory]) ?
+        payload[APP_STATE_KEYS.dcMotorInventory] as Machine[] :
+        MOCK_INVENTORY;
 
         setCompletedReports(loadedReports);
         setInventory(loadedInventory);
       } catch {
         setCompletedReports([]);
         setInventory(MOCK_INVENTORY);
-        toast.error('Dc motor verileri yuklenemedi');
+        toast.error("Dc motor verileri yüklenemedi");
       } finally {
         setIsLoadingState(false);
         setIsHydrated(true);
@@ -57,9 +57,9 @@ const DcMotorBakim: React.FC = () => {
 
     const timeout = window.setTimeout(() => {
       void Promise.all([
-        appStateApi.set(APP_STATE_KEYS.dcMotorReports, completedReports),
-        appStateApi.set(APP_STATE_KEYS.dcMotorInventory, inventory)
-      ]);
+      appStateApi.set(APP_STATE_KEYS.dcMotorReports, completedReports),
+      appStateApi.set(APP_STATE_KEYS.dcMotorInventory, inventory)]
+      );
     }, 400);
 
     return () => window.clearTimeout(timeout);
@@ -103,13 +103,13 @@ const DcMotorBakim: React.FC = () => {
     });
 
     setInventory((prev) =>
-      prev.map((machine) => {
-        if (machine.id !== currentTask?.machineId) return machine;
-        return {
-          ...machine,
-          motors: machine.motors.map((motor) => (motor.id === specs.id ? { ...specs } : motor))
-        };
-      })
+    prev.map((machine) => {
+      if (machine.id !== currentTask?.machineId) return machine;
+      return {
+        ...machine,
+        motors: machine.motors.map((motor) => motor.id === specs.id ? { ...specs } : motor)
+      };
+    })
     );
   };
 
@@ -140,60 +140,60 @@ const DcMotorBakim: React.FC = () => {
             <p className="text-sm text-gray-600">Dc motor bakım raporları ve kontrol formları.</p>
           </div>
         </div>
-        {currentView !== 'selector' && (
-          <button onClick={handleBackToSelector} className="btn btn-secondary">
+        {currentView !== 'selector' &&
+        <button onClick={handleBackToSelector} className="btn btn-secondary">
             Yeni Kayıt
           </button>
-        )}
+        }
       </div>
 
-      {isLoadingState && (
-        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
-          Dc motor verileri yukleniyor...
+      {isLoadingState &&
+      <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-2 text-xs text-blue-700">
+          Dc motor verileri yükleniyor...
         </div>
-      )}
+      }
 
-      {currentView === 'report-detail' && selectedReport ? (
-        <ReportDetail
-          report={selectedReport}
-          onBack={() => {
-            setSelectedReport(null);
-            setCurrentView('history');
-          }}
-        />
-      ) : (
-        <div className="card p-4">
-          {currentView === 'selector' && (
-            <AssetSelector
-              inventory={inventory}
-              onSelect={handleAssetSelect}
-              onViewHistory={() => setCurrentView('history')}
-            />
-          )}
+      {currentView === 'report-detail' && selectedReport ?
+      <ReportDetail
+        report={selectedReport}
+        onBack={() => {
+          setSelectedReport(null);
+          setCurrentView('history');
+        }} /> :
 
-          {currentView === 'form' && currentTask && (
-            <MaintenanceForm
-              task={currentTask}
-              onBack={handleBackToSelector}
-              onSave={handleSaveForm}
-              onUpdateSpecs={handleUpdateSpecs}
-            />
-          )}
 
-          {currentView === 'history' && (
-            <ReportHistory
-              reports={completedReports}
-              onBack={handleBackToSelector}
-              onViewReport={(report) => {
-                setSelectedReport(report);
-                setCurrentView('report-detail');
-              }}
-            />
-          )}
+      <div className="card p-4">
+          {currentView === 'selector' &&
+        <AssetSelector
+          inventory={inventory}
+          onSelect={handleAssetSelect}
+          onViewHistory={() => setCurrentView('history')} />
+
+        }
+
+          {currentView === 'form' && currentTask &&
+        <MaintenanceForm
+          task={currentTask}
+          onBack={handleBackToSelector}
+          onSave={handleSaveForm}
+          onUpdateSpecs={handleUpdateSpecs} />
+
+        }
+
+          {currentView === 'history' &&
+        <ReportHistory
+          reports={completedReports}
+          onBack={handleBackToSelector}
+          onViewReport={(report) => {
+            setSelectedReport(report);
+            setCurrentView('report-detail');
+          }} />
+
+        }
         </div>
-      )}
-    </div>
-  );
+      }
+    </div>);
+
 };
 
 export default DcMotorBakim;

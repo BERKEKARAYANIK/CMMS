@@ -3,13 +3,16 @@ import type { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { authenticate, AuthRequest, isSystemAdminUser } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
+import { buildDefaultUserPassword } from '../utils/passwordPolicy.js';
 
 const router = Router();
 
 const KEY_PATTERN = /^[a-z0-9:_-]{2,100}$/i;
 const SETTINGS_LISTS_KEY = 'settings:lists';
 const ADMIN_ONLY_WRITE_KEYS = new Set<string>([
-  'dashboard:five_s_levels'
+  'dashboard:five_s_levels',
+  'settings:isg_imports',
+  'settings:durus_analizi_imports'
 ]);
 const VALID_APP_ROLES = new Set(['ADMIN', 'BAKIM_MUDURU', 'BAKIM_SEFI', 'TEKNISYEN', 'OPERATOR']);
 
@@ -81,15 +84,6 @@ function normalizeAuthText(value: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function buildDefaultPassword(ad: string, soyad: string): string {
-  const parts = normalizeAuthText(`${ad} ${soyad}`)
-    .split(' ')
-    .map((part) => part.replace(/[^a-z0-9]/g, ''))
-    .filter(Boolean);
-  const initials = parts.map((part) => part.charAt(0)).join('');
-  return `${initials || 'user'}123456`;
 }
 
 function buildDefaultEmail(sicilNo: string): string {
@@ -212,7 +206,7 @@ async function syncUsersFromSettingsPersonnel(
       }
 
       if (!existing.password) {
-        data.password = await bcrypt.hash(buildDefaultPassword(row.ad, row.soyad), 10);
+        data.password = await bcrypt.hash(buildDefaultUserPassword(row.ad, row.soyad), 10);
         passwordAssigned += 1;
       }
 
@@ -235,7 +229,7 @@ async function syncUsersFromSettingsPersonnel(
       continue;
     }
 
-    const password = await bcrypt.hash(buildDefaultPassword(row.ad, row.soyad), 10);
+    const password = await bcrypt.hash(buildDefaultUserPassword(row.ad, row.soyad), 10);
     passwordAssigned += 1;
 
     await tx.user.create({

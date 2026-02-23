@@ -91,7 +91,7 @@ export const workOrdersApi = {
         try {
           await api.patch(`/work-orders/${id}/status`, {
             durum: 'DEVAM_EDIYOR',
-            aciklama: 'Is emri formu temizlendigi icin geri yollandi'
+            aciklama: 'İş emri formu temizlendigi için geri yollandı'
           });
         } catch {
           // Durum gecisi eski sunucu kurallarinda engellenebilir; en azindan formu temizleyelim.
