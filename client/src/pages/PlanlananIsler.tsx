@@ -265,6 +265,12 @@ export default function PlanlananIsler() {
               <p><span className="text-gray-500">Makina:</span> {selectedIs.makina}</p>
               <p><span className="text-gray-500">Tur:</span> {selectedIs.mudahaleTuru}</p>
               <p><span className="text-gray-500">Müdahale Açıklaması:</span> {selectedIs.aciklama}</p>
+              <p>
+                <span className="text-gray-500">Planlayan:</span>{' '}
+                {selectedIs.planlayanAdSoyad
+                  ? `${selectedIs.planlayanAdSoyad}${selectedIs.planlayanSicilNo ? ` (${selectedIs.planlayanSicilNo})` : ''}`
+                  : '-'}
+              </p>
               <p><span className="text-gray-500">Durum:</span> {selectedIs.gorevTipi === 'DURUS_RAPOR_ANALIZ' ? 'Uzayan Duruş Analizi Aktif' : 'Normal Plan'}</p>
               {selectedIs.atananAdSoyad &&
             <p><span className="text-gray-500">Atanan:</span> {selectedIs.atananAdSoyad} ({selectedIs.atananSicilNo})</p>
@@ -314,6 +320,7 @@ export default function PlanlananIsler() {
                 <th className="px-4 py-3 text-left font-semibold">Makina</th>
                 <th className="px-4 py-3 text-left font-semibold">Müdahale Türü</th>
                 <th className="px-4 py-3 text-left font-semibold">Müdahale Açıklaması</th>
+                <th className="px-4 py-3 text-left font-semibold">Planlayan</th>
                 <th className="px-4 py-3 text-left font-semibold">Atanan</th>
                 <th className="px-4 py-3 text-center font-semibold">İşlem</th>
               </tr>
@@ -321,11 +328,11 @@ export default function PlanlananIsler() {
             <tbody className="divide-y divide-gray-200">
               {isLoading ?
               <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">Yükleniyor...</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">Yükleniyor...</td>
                 </tr> :
               filteredIsler.length === 0 ?
               <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">Planlı is bulunamadı</td>
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">Planlı is bulunamadı</td>
                 </tr> :
 
               filteredIsler.map((is) =>
@@ -342,7 +349,12 @@ export default function PlanlananIsler() {
                         {is.mudahaleTuru}
                       </span>
                     </td>
-                    <td className="px-4 py-3 max-w-xs truncate" title={is.aciklama}>{is.aciklama}</td>
+                    <td className="px-4 py-3 align-top">
+                      <div className="max-w-md whitespace-pre-wrap break-words">{is.aciklama}</div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-700 align-top">
+                      {is.planlayanAdSoyad ? `${is.planlayanAdSoyad}${is.planlayanSicilNo ? ` (${is.planlayanSicilNo})` : ''}` : '-'}
+                    </td>
                     <td className="px-4 py-3 text-xs text-gray-700">
                       {is.atananAdSoyad ? `${is.atananAdSoyad}${is.atananSicilNo ? ` (${is.atananSicilNo})` : ''}` : '-'}
                       {is.backendWorkOrderNo ? ` / ${is.backendWorkOrderNo}` : ''}

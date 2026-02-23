@@ -206,6 +206,8 @@ model PlanlananIs {
   aciklama            String
   malzeme             String?
   gorevTipi           String    @default("PLANLI_BAKIM") @map("gorev_tipi")
+  planlayanSicilNo    String?   @map("planlayan_sicil_no")
+  planlayanAdSoyad    String?   @map("planlayan_ad_soyad")
   atananSicilNo       String?   @map("atanan_sicil_no")
   atananAdSoyad       String?   @map("atanan_ad_soyad")
   atananBolum         String?   @map("atanan_bolum")

@@ -18,6 +18,8 @@ type PlannedJobResponse = {
   aciklama: string;
   malzeme: string;
   gorevTipi: PlannedTaskType;
+  planlayanSicilNo?: string;
+  planlayanAdSoyad?: string;
   atananSicilNo?: string;
   atananAdSoyad?: string;
   atananBolum?: string;
@@ -198,6 +200,8 @@ function mapPlannedJob(job: {
   aciklama: string;
   malzeme: string | null;
   gorevTipi: string;
+  planlayanSicilNo: string | null;
+  planlayanAdSoyad: string | null;
   atananSicilNo: string | null;
   atananAdSoyad: string | null;
   atananBolum: string | null;
@@ -215,6 +219,8 @@ function mapPlannedJob(job: {
     aciklama: job.aciklama,
     malzeme: job.malzeme || '',
     gorevTipi: normalizePlannedTaskType(job.gorevTipi),
+    planlayanSicilNo: job.planlayanSicilNo || undefined,
+    planlayanAdSoyad: job.planlayanAdSoyad || undefined,
     atananSicilNo: job.atananSicilNo || undefined,
     atananAdSoyad: job.atananAdSoyad || undefined,
     atananBolum: job.atananBolum || undefined,
@@ -317,6 +323,8 @@ router.post('/planned', authenticate, async (req: AuthRequest, res: Response) =>
     const mudahaleTuru = normalizeText(req.body?.mudahaleTuru || 'Planli Bakim');
     const aciklama = normalizeText(req.body?.aciklama);
     const malzeme = normalizeText(req.body?.malzeme);
+    const planlayanSicilNo = normalizeText(req.user?.sicilNo);
+    const planlayanAdSoyad = normalizeText(`${req.user?.ad || ''} ${req.user?.soyad || ''}`);
 
     if (!makina || !aciklama) {
       return res.status(400).json({
@@ -333,6 +341,8 @@ router.post('/planned', authenticate, async (req: AuthRequest, res: Response) =>
         aciklama,
         malzeme: malzeme || null,
         gorevTipi: normalizePlannedTaskType(req.body?.gorevTipi),
+        planlayanSicilNo: planlayanSicilNo || null,
+        planlayanAdSoyad: planlayanAdSoyad || null,
         atananSicilNo: normalizeText(req.body?.atananSicilNo) || null,
         atananAdSoyad: normalizeText(req.body?.atananAdSoyad) || null,
         atananBolum: normalizeText(req.body?.atananBolum) || null,

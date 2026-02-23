@@ -7,6 +7,8 @@ export interface PlannedJob {
   aciklama: string;
   malzeme: string;
   gorevTipi: PlannedTaskType;
+  planlayanSicilNo?: string;
+  planlayanAdSoyad?: string;
   atananSicilNo?: string;
   atananAdSoyad?: string;
   atananBolum?: string;
