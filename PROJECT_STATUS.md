@@ -57,3 +57,4 @@ Son guncelleme: 2026-02-21
 - Durum ozeti: `PROJECT_STATUS.md`
 - Yapilan isler: `CHANGELOG.md`
 - Siradaki isler: `NEXT_STEPS.md`
+- Kalici oturum notlari: `SESSION_NOTLARI.md`
