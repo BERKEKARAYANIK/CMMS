@@ -13,6 +13,7 @@ import type { Personel } from '../data/lists';
 import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
 const MIN_DURUS_DAKIKASI = 45;
+const SELF_MANAGE_WINDOW_MS = 8 * 60 * 60 * 1000;
 const BERKE_DEPARTMENT_FILTER_OPTIONS = [
 'ELEKTRIK BAKIM ANA BINA',
 'ELEKTRIK BAKIM EK BINA',
@@ -124,6 +125,24 @@ function canManageCompletedJobs(user: User | null): boolean {
 
 }
 
+function canSelfManageCompletedJob(job: CompletedJob, user: User | null): boolean {
+  if (!user) return false;
+
+  const ownerById = typeof job.olusturanUserId === 'number' && job.olusturanUserId === user.id;
+  const ownerBySicilNo = Boolean(
+    job.olusturanSicilNo &&
+    normalizeForAuth(job.olusturanSicilNo) === normalizeForAuth(user.sicilNo)
+  );
+
+  if (!ownerById && !ownerBySicilNo) return false;
+
+  const createdAt = new Date(job.createdAt);
+  if (Number.isNaN(createdAt.getTime())) return false;
+
+  const elapsedMs = Date.now() - createdAt.getTime();
+  return elapsedMs <= SELF_MANAGE_WINDOW_MS;
+}
+
 type CompletedRow = {
   is: CompletedJob;
   personel: {
@@ -215,6 +234,8 @@ export default function TamamlananIsler() {
   const selectedEditIs = editIsId ?
   isler.find((is) => is.id === editIsId) || null :
   null;
+  const canManageCompletedRecord = (item: CompletedJob): boolean =>
+  canManage || canSelfManageCompletedJob(item, currentUser);
   const editSureDakika = useMemo(
     () => calculateDurationMinutes(editBaslangicSaati, editBitisSaati),
     [editBaslangicSaati, editBitisSaati]
@@ -243,8 +264,8 @@ export default function TamamlananIsler() {
   };
 
   const openEditModal = (is: CompletedJob) => {
-    if (!canManage) {
-      toast.error("Düzenleme yetkisi sadece Berke Karayanik kullanıcısında");
+    if (!canManageCompletedRecord(is)) {
+      toast.error("Bu kaydi duzenleme yetkiniz yok veya 8 saat suresi doldu");
       return;
     }
 
@@ -261,13 +282,13 @@ export default function TamamlananIsler() {
   };
 
   const handleEditKaydet = async () => {
-    if (!canManage) {
-      toast.error("Düzenleme yetkisi sadece Berke Karayanik kullanıcısında");
+    if (!editIsId || !selectedEditIs) {
+      toast.error("Duzenlenecek kayit bulunamadi");
       return;
     }
 
-    if (!editIsId) {
-      toast.error("Düzenlenecek kayıt bulunamadı");
+    if (!canManageCompletedRecord(selectedEditIs)) {
+      toast.error("Bu kaydi duzenleme yetkiniz yok veya 8 saat suresi doldu");
       return;
     }
 
@@ -481,8 +502,9 @@ export default function TamamlananIsler() {
   };
 
   const handleSil = async (id: string) => {
-    if (!canManage) {
-      toast.error("Bu işlem için yetkiniz yok");
+    const target = isler.find((item) => item.id === id);
+    if (!target || !canManageCompletedRecord(target)) {
+      toast.error("Bu kaydi silme yetkiniz yok veya 8 saat suresi doldu");
       return;
     }
 
@@ -748,7 +770,7 @@ export default function TamamlananIsler() {
                   }
                     </td>
                     <td className="px-3 py-2 text-center">
-                      {canManage ?
+                      {canManageCompletedRecord(is) ?
                   <div className="flex items-center justify-center gap-1">
                           <button
                       onClick={() => openEditModal(is)}
@@ -808,7 +830,7 @@ export default function TamamlananIsler() {
         </div>
       }
 
-      {isEditModalOpen && canManage &&
+      {isEditModalOpen && selectedEditIs && canManageCompletedRecord(selectedEditIs) &&
       <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={closeEditModal} />

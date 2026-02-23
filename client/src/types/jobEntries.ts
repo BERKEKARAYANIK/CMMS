@@ -47,6 +47,9 @@ export interface CompletedJob {
   sureDakika: number;
   aciklama: string;
   malzeme: string;
+  olusturanUserId?: number;
+  olusturanSicilNo?: string;
+  olusturanAdSoyad?: string;
   personeller: CompletedJobPersonnel[];
   analizAtamasi?: CompletedJobAnalysisAssignment;
   createdAt: string;

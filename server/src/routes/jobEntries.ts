@@ -42,6 +42,9 @@ type CompletedJobResponse = {
   sureDakika: number;
   aciklama: string;
   malzeme: string;
+  olusturanUserId?: number;
+  olusturanSicilNo?: string;
+  olusturanAdSoyad?: string;
   personeller: Array<{
     sicilNo: string;
     adSoyad: string;
@@ -62,6 +65,37 @@ type CompletedJobResponse = {
 function canManageEntries(user: AuthRequest['user'] | undefined): boolean {
   if (!user) return false;
   return isBerkeUser(user) || isSystemAdminUser(user);
+}
+
+const COMPLETED_SELF_MANAGE_WINDOW_MS = 8 * 60 * 60 * 1000;
+
+function normalizeIdentity(value: unknown): string {
+  return String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .trim();
+}
+
+function isCompletedOwner(
+  user: AuthRequest['user'] | undefined,
+  record: {
+    olusturanUserId: number | null;
+    olusturanSicilNo: string | null;
+  }
+): boolean {
+  if (!user) return false;
+
+  const ownerById = record.olusturanUserId !== null && record.olusturanUserId === user.id;
+  const ownerBySicilNo = Boolean(
+    record.olusturanSicilNo
+    && normalizeIdentity(record.olusturanSicilNo) === normalizeIdentity(user.sicilNo)
+  );
+
+  return ownerById || ownerBySicilNo;
+}
+
+function isInSelfManageWindow(createdAt: Date): boolean {
+  const elapsedMs = Date.now() - createdAt.getTime();
+  return elapsedMs >= 0 && elapsedMs <= COMPLETED_SELF_MANAGE_WINDOW_MS;
 }
 
 function toDateKey(date: Date): string {
@@ -244,6 +278,9 @@ function mapCompletedJob(job: {
   sureDakika: number;
   aciklama: string;
   malzeme: string | null;
+  olusturanUserId: number | null;
+  olusturanSicilNo: string | null;
+  olusturanAdSoyad: string | null;
   analizPlanlananIsId: number | null;
   analizBackendWorkOrderId: number | null;
   analizBackendWorkOrderNo: string | null;
@@ -276,6 +313,9 @@ function mapCompletedJob(job: {
     sureDakika: job.sureDakika,
     aciklama: job.aciklama,
     malzeme: job.malzeme || '',
+    olusturanUserId: job.olusturanUserId || undefined,
+    olusturanSicilNo: job.olusturanSicilNo || undefined,
+    olusturanAdSoyad: job.olusturanAdSoyad || undefined,
     personeller: job.personeller.map((personel) => ({
       sicilNo: personel.sicilNo,
       adSoyad: personel.adSoyad,
@@ -612,6 +652,9 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
         sureDakika,
         aciklama,
         malzeme: malzeme || null,
+        olusturanUserId: req.user?.id ?? null,
+        olusturanSicilNo: normalizeText(req.user?.sicilNo) || null,
+        olusturanAdSoyad: normalizeText(`${req.user?.ad || ''} ${req.user?.soyad || ''}`) || null,
         analizPlanlananIsId: parseOptionalInt(analizAtamasi?.planlananIsId) ?? null,
         analizBackendWorkOrderId: parseOptionalInt(analizAtamasi?.backendWorkOrderId) ?? null,
         analizBackendWorkOrderNo: normalizeText(analizAtamasi?.backendWorkOrderNo) || null,
@@ -650,13 +693,6 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
 
 router.put('/completed/:recordId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    if (!canManageEntries(req.user)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Duzenleme yetkisi sadece Berke Karayanik kullanicisinda'
-      });
-    }
-
     const recordId = String(req.params.recordId || '').trim();
     if (!recordId) {
       return res.status(400).json({
@@ -667,7 +703,12 @@ router.put('/completed/:recordId', authenticate, async (req: AuthRequest, res: R
 
     const existing = await prisma.tamamlananIs.findUnique({
       where: { recordId },
-      select: { id: true }
+      select: {
+        id: true,
+        createdAt: true,
+        olusturanUserId: true,
+        olusturanSicilNo: true
+      }
     });
 
     if (!existing) {
@@ -675,6 +716,22 @@ router.put('/completed/:recordId', authenticate, async (req: AuthRequest, res: R
         success: false,
         message: 'Is kaydi bulunamadi'
       });
+    }
+
+    if (!canManageEntries(req.user)) {
+      if (!isCompletedOwner(req.user, existing)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bu kaydi sadece olusturan kullanici ilk 8 saat icinde duzenleyebilir'
+        });
+      }
+
+      if (!isInSelfManageWindow(existing.createdAt)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bu kayit icin 8 saatlik duzenleme suresi doldu'
+        });
+      }
     }
 
     const tarih = parseDateKey(req.body?.tarih);
@@ -830,19 +887,45 @@ router.patch('/completed/:recordId/analysis-assignment', authenticate, async (re
 
 router.delete('/completed/:recordId', authenticate, async (req: AuthRequest, res: Response) => {
   try {
-    if (!canManageEntries(req.user)) {
-      return res.status(403).json({
-        success: false,
-        message: 'Silme yetkisi sadece Berke Karayanik kullanicisinda'
-      });
-    }
-
     const recordId = String(req.params.recordId || '').trim();
     if (!recordId) {
       return res.status(400).json({
         success: false,
         message: 'Gecersiz is ID'
       });
+    }
+
+    const existing = await prisma.tamamlananIs.findUnique({
+      where: { recordId },
+      select: {
+        id: true,
+        createdAt: true,
+        olusturanUserId: true,
+        olusturanSicilNo: true
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Is kaydi bulunamadi'
+      });
+    }
+
+    if (!canManageEntries(req.user)) {
+      if (!isCompletedOwner(req.user, existing)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bu kaydi sadece olusturan kullanici ilk 8 saat icinde silebilir'
+        });
+      }
+
+      if (!isInSelfManageWindow(existing.createdAt)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bu kayit icin 8 saatlik silme suresi doldu'
+        });
+      }
     }
 
     await prisma.tamamlananIs.delete({

@@ -235,6 +235,9 @@ model TamamlananIs {
   sureDakika              Int      @map("sure_dakika")
   aciklama                String
   malzeme                 String?
+  olusturanUserId         Int?     @map("olusturan_user_id")
+  olusturanSicilNo        String?  @map("olusturan_sicil_no")
+  olusturanAdSoyad        String?  @map("olusturan_ad_soyad")
   analizPlanlananIsId     Int?     @map("analiz_planlanan_is_id")
   analizBackendWorkOrderId Int?    @map("analiz_backend_work_order_id")
   analizBackendWorkOrderNo String? @map("analiz_backend_work_order_no")
