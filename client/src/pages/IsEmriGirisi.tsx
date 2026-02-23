@@ -370,9 +370,8 @@ export default function IsEmriGirisi() {
 
       try {
         setIsBootstrapping(true);
-        const [completedResult, plannedResult, listsResult] = await Promise.allSettled([
+        const [completedResult, listsResult] = await Promise.allSettled([
         jobEntriesApi.getCompleted(),
-        jobEntriesApi.getPlanned(),
         appStateApi.get(APP_STATE_KEYS.settingsLists)]
         );
 
@@ -381,12 +380,6 @@ export default function IsEmriGirisi() {
           setMevcutIsler(Array.isArray(completed) ? completed : []);
         } else {
           setMevcutIsler([]);
-        }
-
-        let plannedList: PlannedJob[] = [];
-        if (plannedResult.status === 'fulfilled') {
-          const plannedJobs = plannedResult.value.data?.data as PlannedJob[] | undefined;
-          plannedList = Array.isArray(plannedJobs) ? plannedJobs : [];
         }
 
         const normalizedLists = listsResult.status === 'fulfilled' ?
@@ -425,10 +418,7 @@ export default function IsEmriGirisi() {
           } finally {sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);}return;
         }
 
-        const firstPlanned = plannedList.find((item) => item.gorevTipi !== 'DURUS_RAPOR_ANALIZ');
-        if (firstPlanned) {
-          applyPlanlananToForm(firstPlanned, visiblePersonnelFromSettings);
-        }
+        // Form sadece "Is Girisine Aktar" akisi ile doldurulmali.
       } catch {
         setPersonelListesi([]);
         toast.error("Başlangıç verileri yüklenemedi");
