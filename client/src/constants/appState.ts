@@ -12,6 +12,7 @@ import {
 export const APP_STATE_KEYS = {
   settingsLists: 'settings:lists',
   settingsIsgImports: 'settings:isg_imports',
+  settingsIsgClosedItems: 'settings:isg_closed_items',
   settingsDurusAnaliziImports: 'settings:durus_analizi_imports',
   settingsDurusCustomMachineGroups: 'settings:durus_custom_machine_groups',
   dashboardFiveSLevels: 'dashboard:five_s_levels',

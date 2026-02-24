@@ -1,6 +1,6 @@
 # PROJECT STATUS
 
-Son guncelleme: 2026-02-21
+Son guncelleme: 2026-02-24
 
 ## Amac
 - ERW Bakim platformunu dusuk maliyetli, canli, guvenli ve surdurulebilir sekilde calistirmak.
@@ -18,6 +18,16 @@ Son guncelleme: 2026-02-21
 
 ## Simdiki Durum
 - Uygulama canlida ayakta ve HTTPS aktif.
+- Planlanan Isler akisinda guncellemeler canlida:
+  - Liste kolonlari `Mudahale Aciklamasi` ve `Planlayan` ile netlestirildi.
+  - Uzun aciklama metinleri kirpilmadan alt satira sarilir hale getirildi.
+  - Yeni plan kaydinda planlayan (ad-soyad + sicil) giris yapan kullanicidan otomatik yazilir.
+- Is Girisi akisinda guncelleme:
+  - Planli isler otomatik on-yukleme davranisi kaldirildi.
+  - Form sadece `Is Girisine Aktar` akisi ile planli kayittan doldurulur.
+- Canli deploy durumu:
+  - 2026-02-23 tarihinde Hetzner ortaminda server+client rebuild tamamlandi.
+  - Ayni gun aktarim davranisi hotfix'i icin client container tek basina rebuild edildi.
 - ISG modulu aktif:
   - Uygunsuzluklar, Capraz Denetim, Durum Kaynakli Kazalar, Ramak Kala, Ifade Gelmeyenler, Sari Kart Gelmeyenler
   - Bolum bazli oran tablolari ve siralama secenekleri aktif
@@ -32,14 +42,25 @@ Son guncelleme: 2026-02-21
   - Durus kartlarindaki sag ust dk/ay etiketi kaldirildi
 - Ayarlar > Personel listesi:
   - Kaydetme aninda kullanici hesaplari otomatik senkronlanir (yeni personel hesabinin otomatik acilmasi, sifre atanmasi, aktiflestirme).
+- 2026-02-24 ISG ve Is Girisi entegrasyonu canlida:
+  - Ayarlar > ISG Veri yuklemelerinde `uygunsuzluk2025`, `uygunsuzluk2026` ve `caprazDenetim` dosyalari panel hesaplarina baglandi.
+  - ISG ekraninda `Satiri Kopyala` yanina `Uygunsuzluk Kapat` eklendi (uygunsuzluk + capraz denetim).
+  - Uygunsuzluk Kapat ile Is Girisi ekranina aktarimda:
+    - Mudahale aciklamasi satir icerigiyle otomatik dolar.
+    - Mudahale turu rapora gore otomatik secilir.
+    - Personel sec alaninda giris yapan kullanici otomatik secili gelir.
+  - Is Girisi kaydindan sonra secilen uygunsuzluk/giderilmeyen kayit listeden otomatik duser.
+  - ISG liste ve grafikler yuklenen dosyadan hesaplanir ve kapanan kayitlar hesaplara dahil edilerek anlik guncellenir.
+  - Kapanis eslesmesi sertlestirildi (V2 id + legacy uyumu) ve bolumler arasi yanlis dusum riski giderildi.
+  - Talep uzerine tabloya eklenen `Is Girisi Kapanan` kolonu geri kaldirildi (yalnizca hesaplar guncel tutuluyor).
 
 ## Kritik Notlar
 - PWA/cache nedeniyle mobilde eski gorunum kalabilir. Gerekirse uygulama kapat-ac veya cache temizle.
 - Gizli bilgiler (sunucu sifreleri vb.) bu dosyalara yazilmamali.
 
 ## Kaldigimiz Yer
-- Son odak: ISG ve Dashboard verilerinin ayni kaynaktan tutarli calismasi.
-- Siradaki buyuk konu: is kazasi verisi geldikten sonra dashboard kaza kismi.
+- Son odak: ISG yukleme verilerinin canli panel hesaplari ve Is Girisi kapanis akisiyla birebir tutarli calismasi.
+- Siradaki buyuk konu: is kazasi verisi geldikten sonra dashboard kaza kisminin dinamik veriyle tamamlanmasi.
 
 ## Hizli Devam Checklist
 - `cd "C:\Users\YAPAY_ZEKA\Desktop\CMMS FULL\cmms"`

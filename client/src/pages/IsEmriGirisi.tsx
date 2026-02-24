@@ -22,6 +22,7 @@ import {
 '../constants/appState';
 
 const PLANLANAN_TO_IS_EMRI_KEY = 'cmms_planlanan_is_to_is_emri';
+const ISG_TO_IS_EMRI_KEY = 'cmms_isg_to_is_emri_transfer';
 const TIME_STEP_MINUTES = 1;
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, '0'));
 const MINUTE_OPTIONS = Array.from(
@@ -52,6 +53,24 @@ const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
 type TimeInterval = {
   start: number;
   end: number;
+};
+
+type IsgToIsEmriTransferPayload = {
+  source: 'isg-unresolved';
+  closeItemId: string;
+  aciklama: string;
+  reportId: string;
+  reportLabel: string;
+  year: string;
+};
+
+type IsgClosedItemsState = {
+  closedItemIds: string[];
+};
+
+type MudahaleSelectionResult = {
+  list: MudahaleTuru[];
+  selectedLabel: string;
 };
 
 function buildTimeInterval(tarih: string, baslangic: string, bitis: string): TimeInterval | null {
@@ -121,6 +140,109 @@ function normalizeDepartment(value: unknown): string {
   return DEPARTMENT_ALIAS_MAP[key] || key;
 }
 
+function normalizeCompareText(value: unknown): string {
+  return String(value || '').
+  toLocaleUpperCase('tr-TR').
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/[^A-Z0-9]+/g, ' ').
+  replace(/\s+/g, ' ').
+  trim();
+}
+
+function findMudahaleByKeywords(
+mudahaleList: MudahaleTuru[],
+keywords: string[])
+: MudahaleTuru | null {
+  if (!Array.isArray(mudahaleList) || mudahaleList.length === 0) return null;
+  const normalizedKeywords = keywords.map((keyword) => normalizeCompareText(keyword));
+  return mudahaleList.find((item) => {
+    const text = normalizeCompareText(item.ad);
+    return normalizedKeywords.every((keyword) => text.includes(keyword));
+  }) || null;
+}
+
+function ensureMudahaleType(
+mudahaleList: MudahaleTuru[],
+desiredLabel: string,
+desiredKeywords: string[],
+fallbackKeywords: string[])
+: MudahaleSelectionResult {
+  const desired = findMudahaleByKeywords(mudahaleList, desiredKeywords);
+  if (desired) {
+    return { list: mudahaleList, selectedLabel: desired.ad };
+  }
+
+  const fallback = findMudahaleByKeywords(mudahaleList, fallbackKeywords);
+  if (fallback) {
+    return { list: mudahaleList, selectedLabel: fallback.ad };
+  }
+
+  const normalizedDesired = normalizeCompareText(desiredLabel);
+  const existing = mudahaleList.find((item) => normalizeCompareText(item.ad) === normalizedDesired);
+  if (existing) {
+    return { list: mudahaleList, selectedLabel: existing.ad };
+  }
+
+  const appended: MudahaleTuru = {
+    id: `AUTO_${normalizedDesired.replace(/\s+/g, '_')}`,
+    ad: desiredLabel
+  };
+  return { list: [...mudahaleList, appended], selectedLabel: appended.ad };
+}
+
+function selectIsgMudahaleType(
+reportId: string,
+mudahaleList: MudahaleTuru[])
+: MudahaleSelectionResult | null {
+  const normalizedReportId = String(reportId || '').trim();
+  if (!normalizedReportId) return null;
+
+  if (normalizedReportId === 'capraz-denetim') {
+    return ensureMudahaleType(
+      mudahaleList,
+      'Çapraz Denetim Uygunsuzluk Giderme',
+      ['CAPRAZ', 'DENETIM', 'UYGUNSUZLUK', 'GIDERME'],
+      ['UYGUNSUZLUK', 'GIDERME']
+    );
+  }
+
+  if (normalizedReportId === 'uygunsuzluk-yillik') {
+    return ensureMudahaleType(
+      mudahaleList,
+      'Uygunsuzluk Giderme',
+      ['UYGUNSUZLUK', 'GIDERME'],
+      ['UYGUNSUZLUK']
+    );
+  }
+
+  return null;
+}
+
+function resolveDefaultCurrentPersonelSicil(
+personeller: Personel[],
+currentUserSicilNo: string,
+currentUserFullName: string)
+: string {
+  const normalizedSicil = String(currentUserSicilNo || '').trim();
+  if (!Array.isArray(personeller) || personeller.length === 0) return '';
+
+  if (normalizedSicil) {
+    const bySicil = personeller.find((personel) => String(personel.sicilNo || '').trim() === normalizedSicil);
+    if (bySicil) return bySicil.sicilNo;
+  }
+
+  const normalizedUserName = normalizeCompareText(currentUserFullName);
+  if (normalizedUserName) {
+    const byName = personeller.find((personel) =>
+    normalizeCompareText(personel.adSoyad || `${personel.ad || ''} ${personel.soyad || ''}`) === normalizedUserName
+    );
+    if (byName) return byName.sicilNo;
+  }
+
+  return '';
+}
+
 function filterPersonnelByDepartment(
 personeller: Personel[],
 activeDepartment: string,
@@ -129,6 +251,29 @@ canSeeAllPersonnel: boolean)
   if (canSeeAllPersonnel) return personeller;
   if (!activeDepartment) return [];
   return personeller.filter((personel) => normalizeDepartment(personel.bolum) === activeDepartment);
+}
+
+function normalizeIsgClosedItemsState(value: unknown): IsgClosedItemsState {
+  let rawIds: unknown[] = [];
+
+  if (Array.isArray(value)) {
+    rawIds = value;
+  } else if (value && typeof value === 'object') {
+    const source = value as Record<string, unknown>;
+    if (Array.isArray(source.closedItemIds)) {
+      rawIds = source.closedItemIds;
+    }
+  }
+
+  const closedItemIds = Array.from(
+    new Set(
+      rawIds.
+      map((item) => String(item || '').trim()).
+      filter(Boolean)
+    )
+  );
+
+  return { closedItemIds };
 }
 
 function TimeWheelPicker({
@@ -324,10 +469,12 @@ export default function IsEmriGirisi() {
   const [aciklama, setAciklama] = useState('');
   const [malzeme, setMalzeme] = useState('');
   const [planlananId, setPlanlananId] = useState<string | null>(null);
+  const [pendingIsgCloseItemId, setPendingIsgCloseItemId] = useState<string | null>(null);
 
   const [selectedPersonel, setSelectedPersonel] = useState('');
   const [eklenenPersoneller, setEklenenPersoneller] = useState<Personel[]>([]);
   const currentUserSicilNo = String(currentUser?.sicilNo || '').trim();
+  const currentUserFullName = `${String(currentUser?.ad || '').trim()} ${String(currentUser?.soyad || '').trim()}`.trim();
 
   const canSeeAllPersonnel = Boolean(
     currentUser && (isSystemAdminUser(currentUser) || isBerkeUser(currentUser))
@@ -340,12 +487,17 @@ export default function IsEmriGirisi() {
     () => filterPersonnelByDepartment(personelListesi, activeDepartment, canSeeAllPersonnel),
     [activeDepartment, canSeeAllPersonnel, personelListesi]
   );
+  const defaultSelectedCurrentPersonelSicil = useMemo(
+    () => resolveDefaultCurrentPersonelSicil(visiblePersonelListesi, currentUserSicilNo, currentUserFullName),
+    [currentUserFullName, currentUserSicilNo, visiblePersonelListesi]
+  );
 
   const applyPlanlananToForm = (
   planned: PlannedJob,
   personnelSource: Personel[] = personelListesi) =>
   {
-    setPlanlananId(planned.id);
+    const normalizedPlannedId = String(planned.id || '').trim();
+    setPlanlananId(normalizedPlannedId || null);
     setMakina(planned.makina || '');
     setMudahaleTuru(planned.mudahaleTuru || '');
     setAciklama(planned.aciklama || '');
@@ -405,17 +557,52 @@ export default function IsEmriGirisi() {
           toast.error('Merkezi personel listesi alinamadi');
         }
 
+        const isgTransferRaw = sessionStorage.getItem(ISG_TO_IS_EMRI_KEY);
+        if (isgTransferRaw) {
+          try {
+            const selected = JSON.parse(isgTransferRaw) as IsgToIsEmriTransferPayload;
+            const closeItemId = String(selected?.closeItemId || '').trim();
+            const transferAciklama = String(selected?.aciklama || '').trim();
+            if (!closeItemId || !transferAciklama) {
+              throw new Error('Invalid ISG transfer payload');
+            }
+            const mudahaleSelection = selectIsgMudahaleType(
+              String(selected?.reportId || ''),
+              normalizedLists.mudahaleTurleri
+            );
+            if (mudahaleSelection) {
+              setMudahaleTurleri(mudahaleSelection.list);
+              setMudahaleTuru(mudahaleSelection.selectedLabel);
+            }
+
+            setAciklama(transferAciklama);
+            setPendingIsgCloseItemId(closeItemId);
+            setPlanlananId(null);
+          } catch {
+            // ignore invalid ISG transfer payload
+          }
+          sessionStorage.removeItem(ISG_TO_IS_EMRI_KEY);
+          return;
+        }
+
         const transferRaw = sessionStorage.getItem(PLANLANAN_TO_IS_EMRI_KEY);
         if (transferRaw) {
           try {
             const selected = JSON.parse(transferRaw) as PlannedJob;
+            if (!String(selected?.id || '').trim()) {
+              throw new Error('Invalid planned transfer payload');
+            }
+            setPendingIsgCloseItemId(null);
             applyPlanlananToForm(selected, visiblePersonnelFromSettings);
           } catch {
 
 
 
             // ignore invalid transfer payload
-          } finally {sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);}return;
+          } finally {
+            sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);
+          }
+          return;
         }
 
         // Form sadece "Is Girisine Aktar" akisi ile doldurulmali.
@@ -431,14 +618,8 @@ export default function IsEmriGirisi() {
   }, [activeDepartment, canSeeAllPersonnel]);
 
   useEffect(() => {
-    const defaultSelectedPersonel =
-    currentUserSicilNo &&
-    visiblePersonelListesi.some((personel) => personel.sicilNo === currentUserSicilNo) ?
-    currentUserSicilNo :
-    '';
-
     setSelectedPersonel((prev) =>
-    visiblePersonelListesi.some((personel) => personel.sicilNo === prev) ? prev : defaultSelectedPersonel
+    visiblePersonelListesi.some((personel) => personel.sicilNo === prev) ? prev : defaultSelectedCurrentPersonelSicil
     );
     setEklenenPersoneller((prev) =>
     prev.filter((personel) =>
@@ -449,7 +630,7 @@ export default function IsEmriGirisi() {
   }, [
     activeDepartment,
     canSeeAllPersonnel,
-    currentUserSicilNo,
+    defaultSelectedCurrentPersonelSicil,
     visiblePersonelListesi
   ]);
 
@@ -488,7 +669,7 @@ export default function IsEmriGirisi() {
     }
 
     setEklenenPersoneller((prev) => [...prev, personel]);
-    setSelectedPersonel('');
+    setSelectedPersonel(defaultSelectedCurrentPersonelSicil || '');
     toast.success(`${personel.adSoyad} eklendi`);
   };
 
@@ -506,6 +687,10 @@ export default function IsEmriGirisi() {
     setSureDakika(0);
     setAciklama('');
     setMalzeme('');
+    setPlanlananId(null);
+    setPendingIsgCloseItemId(null);
+    sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);
+    sessionStorage.removeItem(ISG_TO_IS_EMRI_KEY);
     setSelectedPersonel('');
     setEklenenPersoneller([]);
     toast.success('Form temizlendi');
@@ -576,6 +761,19 @@ export default function IsEmriGirisi() {
 
     try {
       setIsSaving(true);
+      let effectivePlanlananId = planlananId;
+      if (!effectivePlanlananId) {
+        const transferRaw = sessionStorage.getItem(PLANLANAN_TO_IS_EMRI_KEY);
+        if (transferRaw) {
+          try {
+            const selected = JSON.parse(transferRaw) as PlannedJob;
+            const fallbackId = String(selected?.id || '').trim();
+            effectivePlanlananId = fallbackId || null;
+          } catch {
+            effectivePlanlananId = null;
+          }
+        }
+      }
       const response = await jobEntriesApi.createCompleted({
         tarih,
         vardiya,
@@ -586,6 +784,7 @@ export default function IsEmriGirisi() {
         sureDakika,
         aciklama: aciklama.trim(),
         malzeme: malzeme.trim(),
+        planlananIsRecordId: effectivePlanlananId || undefined,
         personeller: eklenenPersoneller.map((p) => ({
           sicilNo: p.sicilNo,
           adSoyad: p.adSoyad,
@@ -600,15 +799,26 @@ export default function IsEmriGirisi() {
 
       setMevcutIsler((prev) => [created, ...prev]);
 
-      if (planlananId) {
+      if (pendingIsgCloseItemId) {
         try {
-          await jobEntriesApi.deletePlanned(planlananId);
+          const response = await appStateApi.get(APP_STATE_KEYS.settingsIsgClosedItems);
+          const currentState = normalizeIsgClosedItemsState(response.data?.data?.value);
+          if (!currentState.closedItemIds.includes(pendingIsgCloseItemId)) {
+            const nextState: IsgClosedItemsState = {
+              closedItemIds: [...currentState.closedItemIds, pendingIsgCloseItemId]
+            };
+            await appStateApi.set(APP_STATE_KEYS.settingsIsgClosedItems, nextState);
+          }
+          setPendingIsgCloseItemId(null);
         } catch {
+          toast.error('ISG uygunsuzluk kaydi kapanis listesine eklenemedi');
+        }
+      }
 
-
-
-          // planned item cleanup best effort
-        }setPlanlananId(null);}
+      if (effectivePlanlananId) {
+        sessionStorage.removeItem(PLANLANAN_TO_IS_EMRI_KEY);
+        setPlanlananId(null);
+      }
       toast.success("İş girişi kaydedildi");
       handleTemizle();
     } catch (error: any) {
@@ -843,3 +1053,4 @@ export default function IsEmriGirisi() {
     </div>);
 
 }
+
