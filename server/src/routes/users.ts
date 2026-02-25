@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { authenticate, authorize, AuthRequest, isBerkeUser } from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { isPasswordPolicyCompliant, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy.js';
 
@@ -106,6 +106,26 @@ function calculateAvailableMinutesFromSchedules(
   return schedules.reduce((total, schedule) => (
     total + calculateShiftDurationMinutes(schedule.shift.baslangicSaati, schedule.shift.bitisSaati)
   ), 0);
+}
+
+function isActorSystemAdmin(req: AuthRequest): boolean {
+  return String(req.user?.role || '').toUpperCase() === 'ADMIN';
+}
+
+function isReservedBerkeIdentity(identity: {
+  sicilNo?: unknown;
+  email?: unknown;
+  ad?: unknown;
+  soyad?: unknown;
+  adSoyad?: unknown;
+}): boolean {
+  return isBerkeUser({
+    sicilNo: typeof identity.sicilNo === 'string' ? identity.sicilNo : null,
+    email: typeof identity.email === 'string' ? identity.email : null,
+    ad: typeof identity.ad === 'string' ? identity.ad : null,
+    soyad: typeof identity.soyad === 'string' ? identity.soyad : null,
+    adSoyad: typeof identity.adSoyad === 'string' ? identity.adSoyad : null
+  });
 }
 
 async function buildMinuteBasedSummary(where: any, availableMinutes: number) {
@@ -442,11 +462,36 @@ router.post('/', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req: A
   try {
     const { sicilNo, ad, soyad, email, password, telefon, departman, unvan, uzmanlikAlani, role } = req.body;
     const normalizedPassword = String(password ?? '').trim();
+    const normalizedRole = String(role || 'TEKNISYEN').toUpperCase();
+    const actorIsAdmin = isActorSystemAdmin(req);
 
     if (!normalizedPassword) {
       return res.status(400).json({
         success: false,
         message: 'Sifre gereklidir'
+      });
+    }
+
+    if (!actorIsAdmin && normalizedRole === 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'ADMIN rol atamasi sadece sistem yoneticisi tarafindan yapilabilir'
+      });
+    }
+
+    if (
+      !actorIsAdmin
+      && isReservedBerkeIdentity({
+        sicilNo,
+        email,
+        ad,
+        soyad,
+        adSoyad: `${String(ad || '')} ${String(soyad || '')}`.trim()
+      })
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: 'Berke kimligi sadece sistem yoneticisi tarafindan atanabilir'
       });
     }
 
@@ -483,7 +528,7 @@ router.post('/', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req: A
         departman,
         unvan,
         uzmanlikAlani,
-        role: role || 'TEKNISYEN'
+        role: normalizedRole
       },
       select: {
         id: true,
@@ -513,10 +558,68 @@ router.post('/', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req: A
 // Update user
 router.put('/:id', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req: AuthRequest, res: Response) => {
   try {
+    const userId = Number.parseInt(req.params.id, 10);
+    if (Number.isNaN(userId) || userId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Gecersiz kullanici ID'
+      });
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        sicilNo: true,
+        ad: true,
+        soyad: true,
+        email: true,
+        role: true
+      }
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Kullanici bulunamadi'
+      });
+    }
+
     const { ad, soyad, email, telefon, departman, unvan, uzmanlikAlani, role, aktif } = req.body;
+    const actorIsAdmin = isActorSystemAdmin(req);
+    const normalizedRole = String(role ?? existing.role ?? 'TEKNISYEN').toUpperCase();
+
+    const nextIdentity = {
+      sicilNo: existing.sicilNo,
+      email: email ?? existing.email,
+      ad: ad ?? existing.ad,
+      soyad: soyad ?? existing.soyad,
+      adSoyad: `${String(ad ?? existing.ad ?? '')} ${String(soyad ?? existing.soyad ?? '')}`.trim()
+    };
+
+    if (!actorIsAdmin && normalizedRole === 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'ADMIN rol atamasi sadece sistem yoneticisi tarafindan yapilabilir'
+      });
+    }
+
+    if (!actorIsAdmin && isReservedBerkeIdentity(existing)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Berke kullanicisi sadece sistem yoneticisi tarafindan guncellenebilir'
+      });
+    }
+
+    if (!actorIsAdmin && isReservedBerkeIdentity(nextIdentity)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Berke kimligi sadece sistem yoneticisi tarafindan atanabilir'
+      });
+    }
 
     const user = await prisma.user.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: userId },
       data: {
         ad,
         soyad,
@@ -525,7 +628,7 @@ router.put('/:id', authenticate, authorize('ADMIN', 'BAKIM_MUDURU'), async (req:
         departman,
         unvan,
         uzmanlikAlani,
-        role,
+        role: normalizedRole,
         aktif
       },
       select: {

@@ -59,7 +59,7 @@ export default function PlanlananIsler() {
     };
 
     void loadPlannedJobs();
-  }, []);
+  }, [canManagePlanlanan]);
 
   const handleKaydet = async () => {
     if (!makina) {
@@ -177,7 +177,11 @@ export default function PlanlananIsler() {
       return;
     }
 
-    sessionStorage.setItem(CONVERT_KEY, JSON.stringify(selectedIs));
+    const transferPayload: PlannedJob = {
+      ...selectedIs,
+      id: String(selectedIs.id || '').trim()
+    };
+    sessionStorage.setItem(CONVERT_KEY, JSON.stringify(transferPayload));
     navigate('/is-emri-girisi');
   };
 

@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Filter } from 'lucide-react';
+import { BarChart3, Calendar, ChevronLeft, ChevronRight, Filter, LayoutGrid } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis } from
+'recharts';
 import { APP_STATE_KEYS } from '../constants/appState';
 import { appStateApi } from '../services/api';
 
@@ -79,6 +89,34 @@ type DurusMachineDetailRow = {
   note: string;
   sortDate: number;
   sortTime: number;
+};
+
+type WeeklyDowntimeDepartmentKey = Exclude<DepartmentGraphDepartment, 'all'>;
+
+type WeeklyDowntimeMinuteRecord = {
+  date: string;
+  shiftNo: 1 | 2 | 3;
+  department: WeeklyDowntimeDepartmentKey;
+  minutes: number;
+};
+
+type WeeklyDowntimeChartRow = {
+  key: string;
+  date: string;
+  name: string;
+  electrical: number;
+  mechanical: number;
+  helper: number;
+  total: number;
+};
+
+type WeeklyDowntimeChartMode = 'stacked' | 'grouped';
+
+type WeeklyDowntimeWeekOption = {
+  key: string;
+  dateKeys: string[];
+  rangeLabel: string;
+  label: string;
 };
 
 type ParetoPoint = {
@@ -701,6 +739,149 @@ function getDetailDowntimeDepartmentKey(department: string): DetailDowntimeDepar
   return 'other';
 }
 
+function isIsoDateValue(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
+}
+
+function toIsoDateKeyFromDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function toIsoDateValue(input: string): string {
+  const value = String(input || '').trim();
+  if (!value) return '';
+
+  if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return value.slice(0, 10);
+  }
+
+  const dotMatch = value.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (dotMatch) {
+    const day = dotMatch[1].padStart(2, '0');
+    const month = dotMatch[2].padStart(2, '0');
+    return `${dotMatch[3]}-${month}-${day}`;
+  }
+
+  const slashMatch = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slashMatch) {
+    const day = slashMatch[1].padStart(2, '0');
+    const month = slashMatch[2].padStart(2, '0');
+    return `${slashMatch[3]}-${month}-${day}`;
+  }
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  return '';
+}
+
+function parseShiftNoFromText(value: string): 1 | 2 | 3 | null {
+  const normalized = String(value || '').
+  toLocaleUpperCase('tr-TR').
+  normalize('NFKD').
+  replace(/[\u0300-\u036f]/g, '').
+  replace(/[^A-Z0-9]+/g, ' ').
+  trim();
+
+  if (!normalized) return null;
+  if (normalized.includes('VARDIYA 1') || normalized.includes('1 VARDIYA') || normalized === '1' || normalized === 'A') return 1;
+  if (normalized.includes('VARDIYA 2') || normalized.includes('2 VARDIYA') || normalized === '2' || normalized === 'B') return 2;
+  if (normalized.includes('VARDIYA 3') || normalized.includes('3 VARDIYA') || normalized === '3' || normalized === 'C') return 3;
+  return null;
+}
+
+function getIsoWeekStartKey(date: Date): string {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+
+  const dayNo = normalized.getDay();
+  const diffToMonday = dayNo === 0 ? -6 : 1 - dayNo;
+  normalized.setDate(normalized.getDate() + diffToMonday);
+
+  return toIsoDateKeyFromDate(normalized);
+}
+
+function buildWeekDateKeysFromStart(weekStartKey: string): string[] {
+  if (!isIsoDateValue(weekStartKey)) return [];
+
+  const weekStart = new Date(`${weekStartKey}T00:00:00`);
+  if (Number.isNaN(weekStart.getTime())) return [];
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    return toIsoDateKeyFromDate(date);
+  });
+}
+
+function getIsoWeekMetaFromDateKey(dateKey: string): {weekYear: number;weekNumber: number;} | null {
+  if (!isIsoDateValue(dateKey)) return null;
+
+  const [yearText, monthText, dayText] = dateKey.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime())) return null;
+
+  const weekday = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - weekday);
+  const weekYear = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(weekYear, 0, 1));
+  const weekNumber = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+
+  return { weekYear, weekNumber };
+}
+
+function formatIsoDateRangeLabel(startDateKey: string, endDateKey: string, fallback = 'Son 7 gun'): string {
+  if (!startDateKey || !endDateKey) return fallback;
+
+  const startDate = new Date(`${startDateKey}T00:00:00`);
+  const endDate = new Date(`${endDateKey}T00:00:00`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return fallback;
+
+  const formatter = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`;
+}
+
+function buildMonthDateKeys(monthKey: string): string[] {
+  const normalizedMonth = normalizeMonthKey(monthKey);
+  if (!normalizedMonth) return [];
+
+  const monthStart = new Date(`${normalizedMonth}-01T00:00:00`);
+  if (Number.isNaN(monthStart.getTime())) return [];
+
+  const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const date = new Date(monthStart);
+    date.setDate(index + 1);
+    return toIsoDateKeyFromDate(date);
+  });
+}
+
+function buildRecentSevenDateKeys(baseDate: Date): string[] {
+  return buildWeekDateKeysFromStart(getIsoWeekStartKey(baseDate));
+}
+
+function formatIsoWeekdayShort(dateValue: string): string {
+  if (!isIsoDateValue(dateValue)) return dateValue;
+  const date = new Date(`${dateValue}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateValue;
+
+  const dayNo = date.getDay();
+  if (dayNo === 1) return 'Pzt';
+  if (dayNo === 2) return 'Sal';
+  if (dayNo === 3) return 'Car';
+  if (dayNo === 4) return 'Per';
+  if (dayNo === 5) return 'Cum';
+  if (dayNo === 6) return 'Cmt';
+  return 'Paz';
+}
+
 function getMachineDepartmentValue(
 row: MachineDepartmentDowntimeRow,
 mode: DepartmentGraphMode,
@@ -758,6 +939,9 @@ export default function DurusAnalizi() {
   const [selectedGraphDepartment, setSelectedGraphDepartment] = useState<DepartmentGraphDepartment>('all');
   const [departmentGraphSort, setDepartmentGraphSort] = useState<DepartmentGraphSort>('value_desc');
   const [selectedParetoReason, setSelectedParetoReason] = useState('');
+  const [weeklyChartMode, setWeeklyChartMode] = useState<WeeklyDowntimeChartMode>('grouped');
+  const [weeklyDepartmentFilter, setWeeklyDepartmentFilter] = useState<DepartmentGraphDepartment>('all');
+  const [selectedWeeklyStartKey, setSelectedWeeklyStartKey] = useState('');
 
   const {
     data: imports,
@@ -960,6 +1144,182 @@ export default function DurusAnalizi() {
     });
     return values;
   }, [filteredKayitRows]);
+
+  const weeklyDowntimeMinuteRecords = useMemo<WeeklyDowntimeMinuteRecord[]>(() => {
+    return filteredKayitRows.flatMap((row) => {
+      const startDateRaw = getFirstColumnValue(row, ['BASLANGIC TARIHI', 'TARIH']);
+      const endDateRaw = getFirstColumnValue(row, ['BITIS TARIHI']);
+      const date = toIsoDateValue(startDateRaw || endDateRaw);
+      if (!isIsoDateValue(date)) return [];
+
+      const shiftNo = parseShiftNoFromText(getFirstColumnValue(row, ['VARDIYA']));
+      if (!shiftNo) return [];
+
+      const department = getDetailDowntimeDepartmentKey(getFirstColumnValue(row, ['BOLUM TANIMI', 'BOLUM']));
+      if (department === 'other' || department === 'all') return [];
+
+      const minutesText = getFirstColumnValue(row, ['TOPLAM DURUS (DAK)', 'TOPLAM DURUS(DK)', 'TOPLAM DURUS']);
+      const minutes = parseDowntimeMinutes(minutesText);
+      if (minutes <= 0) return [];
+
+      return [{
+        date,
+        shiftNo,
+        department,
+        minutes
+      }];
+    });
+  }, [filteredKayitRows]);
+
+  const weeklyAnchorDate = useMemo(() => {
+    let latestTimestamp = 0;
+
+    weeklyDowntimeMinuteRecords.forEach((record) => {
+      const parsed = Date.parse(`${record.date}T00:00:00`);
+      if (Number.isFinite(parsed) && parsed > latestTimestamp) {
+        latestTimestamp = parsed;
+      }
+    });
+
+    if (latestTimestamp > 0) {
+      return new Date(latestTimestamp);
+    }
+
+    const monthStart = new Date(`${selectedMonth}-01T00:00:00`);
+    if (!Number.isNaN(monthStart.getTime())) {
+      monthStart.setMonth(monthStart.getMonth() + 1, 0);
+      return monthStart;
+    }
+
+    return new Date();
+  }, [weeklyDowntimeMinuteRecords, selectedMonth]);
+
+  const weeklyWeekOptions = useMemo<WeeklyDowntimeWeekOption[]>(() => {
+    const weekStartSet = new Set<string>();
+
+    buildMonthDateKeys(selectedMonth).forEach((dateKey) => {
+      if (!isIsoDateValue(dateKey)) return;
+      const parsed = new Date(`${dateKey}T00:00:00`);
+      if (Number.isNaN(parsed.getTime())) return;
+      weekStartSet.add(getIsoWeekStartKey(parsed));
+    });
+
+    if (weekStartSet.size === 0) {
+      weekStartSet.add(getIsoWeekStartKey(weeklyAnchorDate));
+    }
+
+    return Array.from(weekStartSet).
+    sort((a, b) => b.localeCompare(a, 'tr-TR')).
+    map((weekStartKey, index) => {
+      const dateKeys = buildWeekDateKeysFromStart(weekStartKey);
+      const startDateKey = dateKeys[0] || weekStartKey;
+      const endDateKey = dateKeys[dateKeys.length - 1] || weekStartKey;
+      const rangeLabel = formatIsoDateRangeLabel(startDateKey, endDateKey);
+      const weekMeta = getIsoWeekMetaFromDateKey(weekStartKey);
+      const weekLabel =
+      weekMeta ?
+      `${weekMeta.weekYear} / ${String(weekMeta.weekNumber).padStart(2, '0')}. Hafta` :
+      `Hafta ${index + 1}`;
+      return {
+        key: weekStartKey,
+        dateKeys,
+        rangeLabel,
+        label: `${weekLabel} (Pzt-Paz: ${rangeLabel})`
+      };
+    });
+  }, [selectedMonth, weeklyAnchorDate]);
+
+  useEffect(() => {
+    if (weeklyWeekOptions.length === 0) {
+      if (selectedWeeklyStartKey) setSelectedWeeklyStartKey('');
+      return;
+    }
+
+    if (weeklyWeekOptions.some((option) => option.key === selectedWeeklyStartKey)) return;
+    setSelectedWeeklyStartKey(weeklyWeekOptions[0].key);
+  }, [selectedWeeklyStartKey, weeklyWeekOptions]);
+
+  const selectedWeeklyWeekOption = useMemo(
+    () => weeklyWeekOptions.find((option) => option.key === selectedWeeklyStartKey) || weeklyWeekOptions[0] || null,
+    [selectedWeeklyStartKey, weeklyWeekOptions]
+  );
+  const selectedWeeklyWeekIndex = useMemo(
+    () => weeklyWeekOptions.findIndex((option) => option.key === (selectedWeeklyWeekOption?.key || '')),
+    [selectedWeeklyWeekOption, weeklyWeekOptions]
+  );
+  const canSelectPreviousWeeklyOption = selectedWeeklyWeekIndex > 0;
+  const canSelectNextWeeklyOption = selectedWeeklyWeekIndex >= 0 && selectedWeeklyWeekIndex < weeklyWeekOptions.length - 1;
+  const fallbackWeeklyDateKeys = useMemo(
+    () => buildRecentSevenDateKeys(weeklyAnchorDate),
+    [weeklyAnchorDate]
+  );
+  const weeklyDateKeys = useMemo(
+    () => selectedWeeklyWeekOption?.dateKeys.length ? selectedWeeklyWeekOption.dateKeys : fallbackWeeklyDateKeys,
+    [fallbackWeeklyDateKeys, selectedWeeklyWeekOption]
+  );
+  const weeklyDateKeySet = useMemo(
+    () => new Set(weeklyDateKeys),
+    [weeklyDateKeys]
+  );
+  const weeklyRangeLabel = useMemo(() => {
+    if (selectedWeeklyWeekOption?.rangeLabel) return selectedWeeklyWeekOption.rangeLabel;
+    const start = weeklyDateKeys[0];
+    const end = weeklyDateKeys[weeklyDateKeys.length - 1];
+    return formatIsoDateRangeLabel(start, end);
+  }, [selectedWeeklyWeekOption, weeklyDateKeys]);
+
+  const weeklyRecordsInRange = useMemo(
+    () => weeklyDowntimeMinuteRecords.filter((record) => weeklyDateKeySet.has(record.date)),
+    [weeklyDowntimeMinuteRecords, weeklyDateKeySet]
+  );
+
+  const weeklyRecordsForChart = useMemo(() => {
+    if (weeklyDepartmentFilter === 'all') return weeklyRecordsInRange;
+    return weeklyRecordsInRange.filter((record) => record.department === weeklyDepartmentFilter);
+  }, [weeklyDepartmentFilter, weeklyRecordsInRange]);
+
+  const weeklyDowntimeChartRows = useMemo<WeeklyDowntimeChartRow[]>(() => {
+    const rows: WeeklyDowntimeChartRow[] = [];
+    const rowMap = new Map<string, WeeklyDowntimeChartRow>();
+
+    weeklyDateKeys.forEach((dateKey) => {
+      const dayLabel = formatIsoWeekdayShort(dateKey);
+      ([1, 2, 3] as const).forEach((shiftNo) => {
+        const key = `${dateKey}|${shiftNo}`;
+        const row: WeeklyDowntimeChartRow = {
+          key,
+          date: dateKey,
+          name: `${dayLabel} V${shiftNo}`,
+          electrical: 0,
+          mechanical: 0,
+          helper: 0,
+          total: 0
+        };
+        rows.push(row);
+        rowMap.set(key, row);
+      });
+    });
+
+    weeklyRecordsForChart.forEach((record) => {
+      const row = rowMap.get(`${record.date}|${record.shiftNo}`);
+      if (!row) return;
+
+      if (record.department === 'electrical') row.electrical += record.minutes;
+      if (record.department === 'mechanical') row.mechanical += record.minutes;
+      if (record.department === 'helper') row.helper += record.minutes;
+      row.total = row.electrical + row.mechanical + row.helper;
+    });
+
+    return rows;
+  }, [weeklyDateKeys, weeklyRecordsForChart]);
+
+  const weeklyElectricalMinutes = weeklyDowntimeChartRows.reduce((sum, row) => sum + row.electrical, 0);
+  const weeklyMechanicalMinutes = weeklyDowntimeChartRows.reduce((sum, row) => sum + row.mechanical, 0);
+  const weeklyHelperMinutes = weeklyDowntimeChartRows.reduce((sum, row) => sum + row.helper, 0);
+  const weeklyTotalMinutes = weeklyDowntimeChartRows.reduce((sum, row) => sum + row.total, 0);
+  const showWeeklyElectricalBar = weeklyDepartmentFilter === 'all' || weeklyDepartmentFilter === 'electrical';
+  const showWeeklyMechanicalBar = weeklyDepartmentFilter === 'all' || weeklyDepartmentFilter === 'mechanical';
+  const showWeeklyHelperBar = weeklyDepartmentFilter === 'all' || weeklyDepartmentFilter === 'helper';
 
   const parsedOranRows = useMemo(() => parseOranRows(oranRows), [oranRows]);
 
@@ -1495,6 +1855,199 @@ export default function DurusAnalizi() {
       {hasData &&
       <>
           {!isParetoPage &&
+          <>
+            <section className="card p-6">
+              <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Vardiya Bazli Durus Dakika Grafigi</h2>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Secilen haftada (Pazartesi-Pazar) tum vardiyalar ayri ayri gosterilir (V1, V2, V3).
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs font-medium">
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
+                    Mekanik: {formatNumber(weeklyMechanicalMinutes, 0)} dk
+                  </span>
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+                    Elektrik: {formatNumber(weeklyElectricalMinutes, 0)} dk
+                  </span>
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+                    Yardimci: {formatNumber(weeklyHelperMinutes, 0)} dk
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                    Toplam: {formatNumber(weeklyTotalMinutes, 0)} dk
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex w-full flex-col gap-3">
+                  <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <Calendar className="h-4 w-4 shrink-0 text-gray-500" />
+                    {weeklyRangeLabel}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-slate-600">Hafta</span>
+                    <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!canSelectPreviousWeeklyOption) return;
+                          const previousOption = weeklyWeekOptions[selectedWeeklyWeekIndex - 1];
+                          if (previousOption) setSelectedWeeklyStartKey(previousOption.key);
+                        }}
+                        disabled={!canSelectPreviousWeeklyOption}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                        canSelectPreviousWeeklyOption ?
+                        'text-slate-700 hover:bg-slate-100' :
+                        'cursor-not-allowed text-slate-300'}`
+                        }
+                        aria-label="Onceki hafta">
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <span className="min-w-[250px] text-center text-xs font-semibold text-slate-700">
+                        {selectedWeeklyWeekOption?.label || '-'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!canSelectNextWeeklyOption) return;
+                          const nextOption = weeklyWeekOptions[selectedWeeklyWeekIndex + 1];
+                          if (nextOption) setSelectedWeeklyStartKey(nextOption.key);
+                        }}
+                        disabled={!canSelectNextWeeklyOption}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                        canSelectNextWeeklyOption ?
+                        'text-slate-700 hover:bg-slate-100' :
+                        'cursor-not-allowed text-slate-300'}`
+                        }
+                        aria-label="Sonraki hafta">
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {[
+                    { key: 'all' as const, label: 'Tumu' },
+                    { key: 'electrical' as const, label: 'Elektrik' },
+                    { key: 'mechanical' as const, label: 'Mekanik' },
+                    { key: 'helper' as const, label: 'Yardimci Tesisler' }].
+                    map((option) =>
+                    <button
+                      key={`weekly-dept-${option.key}`}
+                      type="button"
+                      onClick={() => setWeeklyDepartmentFilter(option.key)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      weeklyDepartmentFilter === option.key ?
+                      'bg-slate-800 text-white' :
+                      'bg-white text-slate-600 hover:bg-slate-100'}`
+                      }>
+
+                        {option.label}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-xs font-semibold">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                      Gun Sayisi: {weeklyDateKeys.length}
+                    </span>
+                    <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-700">
+                      Toplam Durus: {formatNumber(weeklyTotalMinutes, 0)} dk
+                    </span>
+                  </div>
+                </div>
+
+                <div className="inline-flex rounded-lg bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setWeeklyChartMode('stacked')}
+                    className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    weeklyChartMode === 'stacked' ?
+                    'bg-white text-slate-900 shadow-sm' :
+                    'text-slate-600 hover:bg-white/80'}`
+                    }>
+
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    Yigin
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWeeklyChartMode('grouped')}
+                    className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    weeklyChartMode === 'grouped' ?
+                    'bg-white text-slate-900 shadow-sm' :
+                    'text-slate-600 hover:bg-white/80'}`
+                    }>
+
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    Grup
+                  </button>
+                </div>
+              </div>
+
+              {weeklyRecordsForChart.length === 0 &&
+              <div className="mt-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                  Secili filtrelerde kayit bulunamadi. Grafik 0 degerleri ile gosteriliyor.
+                </div>
+              }
+
+              <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+                <div className="h-[420px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={weeklyDowntimeChartRows}
+                      margin={{ top: 20, right: 16, left: 0, bottom: 12 }}>
+
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#64748b', fontSize: 10 }}
+                        interval={0}
+                        height={46} />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#64748b', fontSize: 11 }}
+                        width={42} />
+                      <Tooltip
+                        formatter={(value: number | string | undefined) => `${formatNumber(Number(value) || 0, 0)} dk`}
+                        cursor={{ fill: '#f8fafc' }} />
+                      <Legend wrapperStyle={{ paddingTop: '12px' }} iconType="circle" />
+                      {showWeeklyMechanicalBar &&
+                      <Bar
+                        dataKey="mechanical"
+                        name="Mekanik"
+                        stackId={weeklyChartMode === 'stacked' ? 'a' : undefined}
+                        fill="#3b82f6"
+                        radius={weeklyChartMode === 'stacked' ? [0, 0, 4, 4] : [4, 4, 0, 0]}
+                        maxBarSize={36} />
+                      }
+                      {showWeeklyElectricalBar &&
+                      <Bar
+                        dataKey="electrical"
+                        name="Elektrik"
+                        stackId={weeklyChartMode === 'stacked' ? 'a' : undefined}
+                        fill="#d4af37"
+                        radius={weeklyChartMode === 'stacked' ? [0, 0, 0, 0] : [4, 4, 0, 0]}
+                        maxBarSize={36} />
+                      }
+                      {showWeeklyHelperBar &&
+                      <Bar
+                        dataKey="helper"
+                        name="Yardimci Tesisler"
+                        stackId={weeklyChartMode === 'stacked' ? 'a' : undefined}
+                        fill="#10b981"
+                        radius={weeklyChartMode === 'stacked' ? [4, 4, 0, 0] : [4, 4, 0, 0]}
+                        maxBarSize={36} />
+                      }
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </section>
+
           <div className="card p-5">
             <div className="mb-4 flex flex-col gap-1">
               <h2 className="text-lg font-semibold text-gray-900">
@@ -1723,6 +2276,7 @@ export default function DurusAnalizi() {
             })}
             </div>
           </div>
+          </>
           }
 
           {isParetoPage &&

@@ -351,6 +351,9 @@ type IsgTemplateDefinition = {
   templateFileName: string;
   headers: string[];
   sampleRow: string[];
+  headerAliases?: Partial<Record<string, string[]>>;
+  optionalHeaders?: string[];
+  optionalHeaderAliases?: Partial<Record<string, string[]>>;
 };
 
 type IsgImportDataset = {
@@ -376,15 +379,21 @@ const ISG_UYGUNSUZLUK_HEADERS = [
 'ILGILI BOLUM/BIRIM',
 'AKSIYON DURUMU',
 'TERMIN'];
+const ISG_OPTIONAL_SHIFT_HEADERS = ['VARDIYA'];
+const ISG_OPTIONAL_SHIFT_ALIASES: Partial<Record<string, string[]>> = {
+  'VARDIYA': ['VARDIYA ADI', 'VARDIYAADI', 'VARDIYA NO', 'VARDIYA NO.', 'SHIFT']
+};
 
 
 const ISG_TEMPLATE_DEFINITIONS: IsgTemplateDefinition[] = [
 {
   key: 'uygunsuzluk2026',
   title: 'Uygunsuzluklar (2026)',
-  description: "2026 yılı uygunsuzluk kayıtlarını yüklemek için kullanılır.",
+  description: '2026 yili uygunsuzluk kayitlari bu alandan yuklenir.',
   templateFileName: 'isg_uygunsuzluk_2026_sablon.xlsx',
   headers: ISG_UYGUNSUZLUK_HEADERS,
+  optionalHeaders: ISG_OPTIONAL_SHIFT_HEADERS,
+  optionalHeaderAliases: ISG_OPTIONAL_SHIFT_ALIASES,
   sampleRow: [
   'SARI',
   '1',
@@ -401,9 +410,11 @@ const ISG_TEMPLATE_DEFINITIONS: IsgTemplateDefinition[] = [
 {
   key: 'uygunsuzluk2025',
   title: 'Uygunsuzluklar (2025)',
-  description: "2025 yılı uygunsuzluk kayıtlarını yüklemek için kullanılır.",
+  description: '2025 yili uygunsuzluk kayitlari bu alandan yuklenir.',
   templateFileName: 'isg_uygunsuzluk_2025_sablon.xlsx',
   headers: ISG_UYGUNSUZLUK_HEADERS,
+  optionalHeaders: ISG_OPTIONAL_SHIFT_HEADERS,
+  optionalHeaderAliases: ISG_OPTIONAL_SHIFT_ALIASES,
   sampleRow: [
   'KIRMIZI',
   '3298',
@@ -419,16 +430,45 @@ const ISG_TEMPLATE_DEFINITIONS: IsgTemplateDefinition[] = [
 },
 {
   key: 'caprazDenetim',
-  title: 'Çapraz Denetim Uygunsuzluklar',
-  description: "Çapraz denetim uygunsuzluk kayıtları bu alandan yüklenir.",
-  templateFileName: 'isg_capraz_denetim_sablon.xlsx',
-  headers: ['SATIR ETIKETLERI', 'DEVAM EDIYOR', 'GIDERILDI', 'GENEL TOPLAM'],
-  sampleRow: ['E. BAKIM', '178', '398', '576']
+  title: 'Capraz Denetim Uygunsuzluklar',
+  description: 'Capraz denetim uygunsuzluk kayitlari bu alandan yuklenir.',
+  templateFileName: 'isg_capraz_denetim_uygunsuzluk_takip_sablon.xlsx',
+  headers: [
+  'SIRA',
+  'TARIH',
+  'HAFTA',
+  'RAPORLAMA YAPAN BIRIM',
+  'UYGUNSUZLUK TANIMI',
+  'DENETIM KONUSU',
+  'DENETLENEN BIRIM',
+  'AKSIYON DURUMU'],
+
+  sampleRow: [
+  '1',
+  '20.02.2025',
+  '1. HAFTA',
+  'KONSTRUKSIYON',
+  'Sarici donen aksam muhafazasi yok',
+  'MUHAFAZA EKSIKLIGI',
+  'M. BAKIM',
+  'DEVAM EDIYOR'],
+
+  headerAliases: {
+    'SIRA': ['SIRA NO'],
+    'TARIH': ['TARIH'],
+    'RAPORLAMA YAPAN BIRIM': ['RAPORLAMA YAPAN BIRIM'],
+    'UYGUNSUZLUK TANIMI': ['UYGUNSUZLUK TANIMI'],
+    'DENETIM KONUSU': ['DENETIM KONUSU'],
+    'DENETLENEN BIRIM': ['DENETLENEN BIRIM'],
+    'AKSIYON DURUMU': ['AKSIYON DURUMU']
+  },
+  optionalHeaders: ISG_OPTIONAL_SHIFT_HEADERS,
+  optionalHeaderAliases: ISG_OPTIONAL_SHIFT_ALIASES
 },
 {
   key: 'durumKaynakliKazalar',
-  title: "Durum Kaynaklı Kazalar",
-  description: "Durum kaynaklı kaza kayıtları ve aksiyon durumları bu alandan yüklenir.",
+  title: 'Durum Kaynakli Kazalar',
+  description: 'Durum kaynakli kaza kayitlari ve aksiyon durumlari bu alandan yuklenir.',
   templateFileName: 'isg_durum_kaynakli_kazalar_sablon.xlsx',
   headers: [
   'KAZA IFADE',
@@ -468,7 +508,7 @@ const ISG_TEMPLATE_DEFINITIONS: IsgTemplateDefinition[] = [
 {
   key: 'ramakKala',
   title: 'Ramak Kala',
-  description: "Ramak kala kayıtları ve bekleyen kayıtlar bu alandan yüklenir.",
+  description: 'Ramak kala kayitlari ve bekleyen kayitlar bu alandan yuklenir.',
   templateFileName: 'isg_ramak_kala_sablon.xlsx',
   headers: [
   'NO',
@@ -496,7 +536,7 @@ const ISG_TEMPLATE_DEFINITIONS: IsgTemplateDefinition[] = [
 {
   key: 'ifadeGelmeyenler',
   title: 'Ifade Gelmeyenler',
-  description: "Kaza ifade gelmeyen kayıtlar bu alandan yüklenir.",
+  description: 'Kaza ifade gelmeyen kayitlar bu alandan yuklenir.',
   templateFileName: 'isg_ifade_gelmeyenler_sablon.xlsx',
   headers: [
   'KAZA IFADE',
@@ -536,7 +576,7 @@ const ISG_TEMPLATE_DEFINITIONS: IsgTemplateDefinition[] = [
 {
   key: 'sariKartGelmeyenler',
   title: 'Sari Kart Gelmeyenler',
-  description: "Sari kartta savunma gelmeyen kayıtlar bu alandan yüklenir.",
+  description: 'Sari kartta savunma gelmeyen kayitlar bu alandan yuklenir.',
   templateFileName: 'isg_sari_kart_gelmeyenler_sablon.xlsx',
   headers: [
   'SIRA',
@@ -563,8 +603,6 @@ const ISG_TEMPLATE_DEFINITIONS: IsgTemplateDefinition[] = [
   'GELDI']
 
 }];
-
-
 const ISG_TEMPLATE_BY_KEY = ISG_TEMPLATE_DEFINITIONS.reduce<Record<IsgTemplateKey, IsgTemplateDefinition>>(
   (acc, definition) => {
     acc[definition.key] = definition;
@@ -572,6 +610,10 @@ const ISG_TEMPLATE_BY_KEY = ISG_TEMPLATE_DEFINITIONS.reduce<Record<IsgTemplateKe
   },
   {} as Record<IsgTemplateKey, IsgTemplateDefinition>
 );
+
+function getIsgTemplateHeaders(definition: IsgTemplateDefinition): string[] {
+  return Array.from(new Set([...(definition.headers || []), ...(definition.optionalHeaders || [])]));
+}
 
 type DurusTemplateKey =
 'durusKayitlari' |
@@ -731,7 +773,9 @@ type ParsedIsgDataset = {
 function parseIsgDatasetRows(
 rows: string[][],
 headers: string[],
-headerAliases?: Partial<Record<string, string[]>>)
+headerAliases?: Partial<Record<string, string[]>>,
+optionalHeaders: string[] = [],
+optionalHeaderAliases?: Partial<Record<string, string[]>>)
 : ParsedIsgDataset {
   const result: ParsedIsgDataset = {
     rows: [],
@@ -742,21 +786,26 @@ headerAliases?: Partial<Record<string, string[]>>)
 
   const maxHeaderScanRows = Math.min(rows.length, 10);
   let selectedHeaderIndexes: Array<{name: string;index: number;}> = [];
+  let selectedOptionalHeaderIndexes: Array<{name: string;index: number;}> = [];
   let selectedMissingHeaders: string[] = headers;
   let selectedHeaderRowIndex = 0;
   let bestMatchedCount = -1;
 
   for (let rowIndex = 0; rowIndex < maxHeaderScanRows; rowIndex += 1) {
     const normalizedHeaderRow = rows[rowIndex].map((cell) => normalizeHeader(String(cell || '')));
+    const resolveHeaderIndex = (header: string, aliases?: string[]) => {
+      const expectedValues = [
+      normalizeHeader(header),
+      ...(aliases || []).map((alias) => normalizeHeader(alias))];
+      return normalizedHeaderRow.findIndex((value) => expectedValues.includes(value));
+    };
     const headerIndexes = headers.map((header) => ({
       name: header,
-      index: normalizedHeaderRow.findIndex((value) => {
-        const expectedValues = [
-        normalizeHeader(header),
-        ...(headerAliases?.[header] || []).map((alias) => normalizeHeader(alias))];
-
-        return expectedValues.includes(value);
-      })
+      index: resolveHeaderIndex(header, headerAliases?.[header])
+    }));
+    const optionalHeaderIndexes = optionalHeaders.map((header) => ({
+      name: header,
+      index: resolveHeaderIndex(header, optionalHeaderAliases?.[header])
     }));
 
     const missingHeaders = headerIndexes.
@@ -767,6 +816,7 @@ headerAliases?: Partial<Record<string, string[]>>)
     if (matchedCount > bestMatchedCount) {
       bestMatchedCount = matchedCount;
       selectedHeaderIndexes = headerIndexes;
+      selectedOptionalHeaderIndexes = optionalHeaderIndexes;
       selectedMissingHeaders = missingHeaders;
       selectedHeaderRowIndex = rowIndex;
     }
@@ -789,11 +839,43 @@ headerAliases?: Partial<Record<string, string[]>>)
       parsedRow[header.name] = value;
       if (value) hasAnyValue = true;
     });
+    selectedOptionalHeaderIndexes.forEach((header) => {
+      if (header.index < 0) return;
+      const rawValue = row[header.index];
+      parsedRow[header.name] = rawValue == null ? '' : String(rawValue).trim();
+    });
 
     return hasAnyValue ? [parsedRow] : [];
   });
 
   return result;
+}
+
+function isCaprazDenetimRowValid(row: Record<string, string>): boolean {
+  const denetlenenBirim = String(row['DENETLENEN BIRIM'] || '').trim();
+  const aksiyonDurumu = String(row['AKSIYON DURUMU'] || '').trim();
+  const tarih = String(row['TARIH'] || '').trim();
+  const raporlamaBirim = String(row['RAPORLAMA YAPAN BIRIM'] || '').trim();
+  const uygunsuzlukTanimi = String(row['UYGUNSUZLUK TANIMI'] || '').trim();
+  const denetimKonusu = String(row['DENETIM KONUSU'] || '').trim();
+
+  const hasContext = Boolean(
+    tarih ||
+    raporlamaBirim ||
+    uygunsuzlukTanimi ||
+    denetimKonusu ||
+    denetlenenBirim ||
+    aksiyonDurumu
+  );
+
+  if (!hasContext) return false;
+  if (!denetlenenBirim) return false;
+  if (!aksiyonDurumu) return false;
+  return true;
+}
+
+function sanitizeCaprazDenetimRows(rows: Array<Record<string, string>>): Array<Record<string, string>> {
+  return rows.filter((row) => isCaprazDenetimRowValid(row));
 }
 
 function normalizeIsgImportsState(value: unknown): IsgImportsState {
@@ -806,6 +888,7 @@ function normalizeIsgImportsState(value: unknown): IsgImportsState {
     const raw = source[definition.key];
     if (!raw || typeof raw !== 'object') return;
 
+    const templateHeaders = getIsgTemplateHeaders(definition);
     const rawDataset = raw as Record<string, unknown>;
     const rawRows = Array.isArray(rawDataset.rows) ? rawDataset.rows : [];
     const rows = rawRows.flatMap((item) => {
@@ -814,7 +897,7 @@ function normalizeIsgImportsState(value: unknown): IsgImportsState {
       const mapped: Record<string, string> = {};
       let hasAnyValue = false;
 
-      definition.headers.forEach((header) => {
+      templateHeaders.forEach((header) => {
         const text = String(rowData[header] ?? '').trim();
         mapped[header] = text;
         if (text) hasAnyValue = true;
@@ -823,6 +906,7 @@ function normalizeIsgImportsState(value: unknown): IsgImportsState {
       return hasAnyValue ? [mapped] : [];
     });
 
+    const finalRows = definition.key === 'caprazDenetim' ? sanitizeCaprazDenetimRows(rows) : rows;
     const sourceFileName = String(rawDataset.sourceFileName || '').trim();
     const uploadedAtRaw = String(rawDataset.uploadedAt || '').trim();
     const uploadedAt = Number.isNaN(new Date(uploadedAtRaw).getTime()) ? '' : uploadedAtRaw;
@@ -830,11 +914,11 @@ function normalizeIsgImportsState(value: unknown): IsgImportsState {
     normalized[definition.key] = {
       templateKey: definition.key,
       title: definition.title,
-      headers: [...definition.headers],
+      headers: [...templateHeaders],
       sourceFileName,
       uploadedAt,
-      rowCount: rows.length,
-      rows
+      rowCount: finalRows.length,
+      rows: finalRows
     };
   });
 
@@ -1367,12 +1451,31 @@ export default function Ayarlar({
     if (!definition) return;
 
     try {
-      const sheet = XLSX.utils.aoa_to_sheet([definition.headers, definition.sampleRow]);
+      const templateHeaders = getIsgTemplateHeaders(definition);
+      const sampleRow = [
+        ...definition.sampleRow,
+        ...Array(Math.max(templateHeaders.length - definition.sampleRow.length, 0)).fill('')
+      ];
+      const rows = templateKey === 'caprazDenetim'
+        ? [
+            ['CAPRAZ DENETIM UYGUNSUZLUK TAKIP TABLOSU'],
+            [],
+            [],
+            templateHeaders,
+            sampleRow
+          ]
+        : [templateHeaders, sampleRow];
+
+      const sheet = XLSX.utils.aoa_to_sheet(rows);
+      if (templateKey === 'caprazDenetim') {
+        sheet['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: templateHeaders.length - 1 } }];
+      }
+
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, sheet, 'ISG');
+      XLSX.utils.book_append_sheet(workbook, sheet, templateKey === 'caprazDenetim' ? 'LISTE' : 'ISG');
       XLSX.writeFile(workbook, definition.templateFileName);
     } catch {
-      toast.error(`${definition.title} şablonu indirilemedi`);
+      toast.error(`${definition.title} sablonu indirilemedi`);
     }
   };
 
@@ -1392,14 +1495,22 @@ export default function Ayarlar({
       const sheet = workbook.Sheets[sheetName];
       const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' }) as Array<Array<unknown>>;
       const rows = rawRows.map((row) => row.map((cell) => cell == null ? '' : String(cell)));
-      const parsed = parseIsgDatasetRows(rows, definition.headers);
+      const parsed = parseIsgDatasetRows(
+        rows,
+        definition.headers,
+        definition.headerAliases,
+        definition.optionalHeaders,
+        definition.optionalHeaderAliases
+      );
 
       if (parsed.missingHeaders.length > 0) {
         toast.error(`${definition.title} yüklenemedi. Eksik sutunlar: ${parsed.missingHeaders.join(', ')}`);
         return;
       }
 
-      if (parsed.rows.length === 0) {
+      const finalRows = templateKey === 'caprazDenetim' ? sanitizeCaprazDenetimRows(parsed.rows) : parsed.rows;
+
+      if (finalRows.length === 0) {
         toast.error(`${definition.title} dosyasında aktarılacak satır bulunamadı`);
         return;
       }
@@ -1407,11 +1518,11 @@ export default function Ayarlar({
       const nextDataset: IsgImportDataset = {
         templateKey,
         title: definition.title,
-        headers: [...definition.headers],
+        headers: getIsgTemplateHeaders(definition),
         sourceFileName: file.name,
         uploadedAt: new Date().toISOString(),
-        rowCount: parsed.rows.length,
-        rows: parsed.rows
+        rowCount: finalRows.length,
+        rows: finalRows
       };
 
       const nextState: IsgImportsState = {
@@ -1421,7 +1532,7 @@ export default function Ayarlar({
 
       setIsgImports(nextState);
       await persistIsgImports(nextState);
-      toast.success(`${definition.title} için ${parsed.rows.length} satır yüklendi`);
+      toast.success(`${definition.title} için ${finalRows.length} satır yüklendi`);
     } catch {
       toast.error(`${definition.title} dosyasi okunamadi`);
     } finally {
@@ -2492,6 +2603,9 @@ function IsgDataTab({
               <div className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-700">
                 <p><span className="font-semibold">Şablon:</span> {definition.templateFileName}</p>
                 <p><span className="font-semibold">Gerekli Sutunlar:</span> {definition.headers.join(', ')}</p>
+                {definition.optionalHeaders && definition.optionalHeaders.length > 0 ?
+                <p><span className="font-semibold">Opsiyonel Sutunlar:</span> {definition.optionalHeaders.join(', ')}</p> :
+                null}
                 <p><span className="font-semibold">Son Dosya:</span> {dataset?.sourceFileName || '-'}</p>
                 <p><span className="font-semibold">Son Yükleme:</span> {formatStatusDate(dataset?.uploadedAt)}</p>
                 <p><span className="font-semibold">Kayıt Sayısı:</span> {dataset?.rowCount ?? 0}</p>

@@ -47,6 +47,36 @@ if (-not $npmCommand) {
 }
 
 Set-Location $serverDir
+
+$envFile = Join-Path $serverDir '.env'
+if (Test-Path $envFile) {
+  Get-Content $envFile | ForEach-Object {
+    $line = $_.Trim()
+    if (-not $line -or $line.StartsWith('#')) {
+      return
+    }
+
+    $separatorIndex = $line.IndexOf('=')
+    if ($separatorIndex -lt 1) {
+      return
+    }
+
+    $key = $line.Substring(0, $separatorIndex).Trim()
+    $value = $line.Substring($separatorIndex + 1).Trim()
+    if (($value.StartsWith('"') -and $value.EndsWith('"')) -or ($value.StartsWith("'") -and $value.EndsWith("'"))) {
+      $value = $value.Substring(1, $value.Length - 2)
+    }
+
+    [Environment]::SetEnvironmentVariable($key, $value, 'Process')
+  }
+}
+
+if (-not $env:DATABASE_URL) {
+  [Environment]::SetEnvironmentVariable('DATABASE_URL', 'file:./prisma/cmms_local.db', 'Process')
+}
+
+[Environment]::SetEnvironmentVariable('PRISMA_CLIENT_ENGINE_TYPE', 'library', 'Process')
+
 Write-ServiceLog "Server service script started (npm: $npmCommand)"
 
 do {

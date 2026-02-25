@@ -152,6 +152,7 @@ export const backupsApi = {
 
 export const jobEntriesApi = {
   getPlanned: () => api.get('/job-entries/planned'),
+  cleanupStalePlanned: () => api.post('/job-entries/planned/cleanup-stale'),
   createPlanned: <T extends object>(data: T) => api.post('/job-entries/planned', data),
   updatePlanned: <T extends object>(recordId: string, data: T) =>
     api.put(`/job-entries/planned/${encodeURIComponent(recordId)}`, data),

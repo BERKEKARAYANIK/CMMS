@@ -146,6 +146,22 @@ function normalizeText(value: unknown): string {
   return String(value || '').trim();
 }
 
+function normalizeMatchText(value: unknown): string {
+  return String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeLooseMatchText(value: unknown): string {
+  return normalizeMatchText(value)
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function normalizeShift(value: unknown): string {
   return String(value || '')
     .toLocaleUpperCase('tr-TR')
@@ -225,6 +241,170 @@ async function generateCompletedRecordId(tarih: Date): Promise<string> {
   }
 
   return `${prefix}-${String(next).padStart(4, '0')}`;
+}
+
+type CleanupCompletedCandidate = {
+  dateKey: string;
+  strictTaskKey: string;
+  looseTaskKey: string;
+  plannerNameKeys: Set<string>;
+  plannerSicilKeys: Set<string>;
+};
+
+async function cleanupStalePlannedJobsTx(tx: any): Promise<string[]> {
+  const [plannedJobs, completedJobs] = await Promise.all([
+    tx.planlananIs.findMany({
+      where: { gorevTipi: 'PLANLI_BAKIM' },
+      select: {
+        recordId: true,
+        createdAt: true,
+        makina: true,
+        aciklama: true,
+        planlayanSicilNo: true,
+        planlayanAdSoyad: true,
+        gorevTipi: true
+      }
+    }),
+    tx.tamamlananIs.findMany({
+      select: {
+        tarih: true,
+        makina: true,
+        aciklama: true,
+        olusturanSicilNo: true,
+        olusturanAdSoyad: true,
+        personeller: {
+          select: {
+            sicilNo: true,
+            adSoyad: true
+          }
+        }
+      }
+    })
+  ]);
+
+  if (!plannedJobs.length || !completedJobs.length) {
+    return [];
+  }
+
+  const byDayAndStrictTask = new Map<string, CleanupCompletedCandidate[]>();
+  const byDayAndLooseTask = new Map<string, CleanupCompletedCandidate[]>();
+  const byStrictTask = new Map<string, CleanupCompletedCandidate[]>();
+  const byLooseTask = new Map<string, CleanupCompletedCandidate[]>();
+
+  for (const completed of completedJobs) {
+    const makinaStrictKey = normalizeMatchText(completed.makina);
+    const aciklamaStrictKey = normalizeMatchText(completed.aciklama);
+    const makinaLooseKey = normalizeLooseMatchText(completed.makina);
+    const aciklamaLooseKey = normalizeLooseMatchText(completed.aciklama);
+
+    if (!makinaLooseKey || !aciklamaLooseKey) continue;
+
+    const strictTaskKey = makinaStrictKey && aciklamaStrictKey
+      ? `${makinaStrictKey}|${aciklamaStrictKey}`
+      : '';
+    const looseTaskKey = `${makinaLooseKey}|${aciklamaLooseKey}`;
+
+    const candidate: CleanupCompletedCandidate = {
+      dateKey: toDateKey(completed.tarih),
+      strictTaskKey,
+      looseTaskKey,
+      plannerNameKeys: new Set(
+        [
+          normalizeMatchText(completed.olusturanAdSoyad),
+          ...completed.personeller
+            .map((personel: any) => normalizeMatchText(personel.adSoyad))
+        ].filter(Boolean)
+      ),
+      plannerSicilKeys: new Set(
+        [
+          normalizeIdentity(completed.olusturanSicilNo),
+          ...completed.personeller
+            .map((personel: any) => normalizeIdentity(personel.sicilNo))
+        ].filter(Boolean)
+      )
+    };
+
+    if (strictTaskKey) {
+      const dayStrictKey = `${candidate.dateKey}|${strictTaskKey}`;
+      const dayStrictList = byDayAndStrictTask.get(dayStrictKey);
+      if (dayStrictList) {
+        dayStrictList.push(candidate);
+      } else {
+        byDayAndStrictTask.set(dayStrictKey, [candidate]);
+      }
+
+      const strictTaskList = byStrictTask.get(strictTaskKey);
+      if (strictTaskList) {
+        strictTaskList.push(candidate);
+      } else {
+        byStrictTask.set(strictTaskKey, [candidate]);
+      }
+    }
+
+    const dayLooseKey = `${candidate.dateKey}|${looseTaskKey}`;
+    const dayLooseList = byDayAndLooseTask.get(dayLooseKey);
+    if (dayLooseList) {
+      dayLooseList.push(candidate);
+    } else {
+      byDayAndLooseTask.set(dayLooseKey, [candidate]);
+    }
+
+    const looseTaskList = byLooseTask.get(looseTaskKey);
+    if (looseTaskList) {
+      looseTaskList.push(candidate);
+    } else {
+      byLooseTask.set(looseTaskKey, [candidate]);
+    }
+  }
+
+  const staleRecordIds: string[] = [];
+  for (const planned of plannedJobs) {
+    const makinaStrictKey = normalizeMatchText(planned.makina);
+    const aciklamaStrictKey = normalizeMatchText(planned.aciklama);
+    const makinaLooseKey = normalizeLooseMatchText(planned.makina);
+    const aciklamaLooseKey = normalizeLooseMatchText(planned.aciklama);
+    if (!makinaLooseKey || !aciklamaLooseKey) continue;
+
+    const plannerNameKey = normalizeMatchText(planned.planlayanAdSoyad);
+    const plannerSicilKey = normalizeIdentity(planned.planlayanSicilNo);
+    const strictTaskKey = makinaStrictKey && aciklamaStrictKey
+      ? `${makinaStrictKey}|${aciklamaStrictKey}`
+      : '';
+    const looseTaskKey = `${makinaLooseKey}|${aciklamaLooseKey}`;
+    const dayKey = toDateKey(planned.createdAt);
+
+    const candidates = new Set<CleanupCompletedCandidate>();
+    if (strictTaskKey) {
+      (byDayAndStrictTask.get(`${dayKey}|${strictTaskKey}`) || []).forEach((candidate) => candidates.add(candidate));
+    }
+    (byDayAndLooseTask.get(`${dayKey}|${looseTaskKey}`) || []).forEach((candidate) => candidates.add(candidate));
+
+    if (candidates.size === 0 && (plannerNameKey || plannerSicilKey)) {
+      if (strictTaskKey) {
+        (byStrictTask.get(strictTaskKey) || []).forEach((candidate) => candidates.add(candidate));
+      }
+      (byLooseTask.get(looseTaskKey) || []).forEach((candidate) => candidates.add(candidate));
+    }
+
+    const isMatched = Array.from(candidates).some((candidate) => {
+      if (!plannerNameKey && !plannerSicilKey) return true;
+      const matchesByName = plannerNameKey ? candidate.plannerNameKeys.has(plannerNameKey) : false;
+      const matchesBySicil = plannerSicilKey ? candidate.plannerSicilKeys.has(plannerSicilKey) : false;
+      return matchesByName || matchesBySicil;
+    });
+
+    if (isMatched) {
+      staleRecordIds.push(planned.recordId);
+    }
+  }
+
+  if (staleRecordIds.length > 0) {
+    await tx.planlananIs.deleteMany({
+      where: { recordId: { in: staleRecordIds } }
+    });
+  }
+
+  return staleRecordIds;
 }
 
 function mapPlannedJob(job: {
@@ -340,6 +520,8 @@ function mapCompletedJob(job: {
 
 router.get('/planned', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    await prisma.$transaction((tx) => cleanupStalePlannedJobsTx(tx));
+
     const plannedJobs = await prisma.planlananIs.findMany({
       orderBy: { createdAt: 'desc' }
     });
@@ -505,8 +687,39 @@ router.delete('/planned/:recordId', authenticate, async (req: AuthRequest, res: 
   }
 });
 
+router.post('/planned/cleanup-stale', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!canManageEntries(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Temizleme yetkisi sadece Berke Karayanik kullanicisinda'
+      });
+    }
+
+    const deletedRecordIds = await prisma.$transaction((tx) => cleanupStalePlannedJobsTx(tx));
+    res.json({
+      success: true,
+      data: {
+        deletedCount: deletedRecordIds.length,
+        deletedRecordIds
+      },
+      message: deletedRecordIds.length > 0
+        ? `${deletedRecordIds.length} adet takili planlanan is temizlendi`
+        : 'Temizlenecek takili planlanan is bulunamadi'
+    });
+  } catch (error) {
+    console.error('Cleanup stale planned jobs error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Takili planlanan isler temizlenemedi'
+    });
+  }
+});
+
 router.get('/completed', authenticate, async (req: AuthRequest, res: Response) => {
   try {
+    await prisma.$transaction((tx) => cleanupStalePlannedJobsTx(tx));
+
     const isBerke = canManageEntries(req.user);
     const activeBolum = getAuthenticatedDepartment(req);
     const requestedBolum = normalizeDepartment(req.query?.bolum);
@@ -577,6 +790,7 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
     const sureDakika = parseOptionalInt(req.body?.sureDakika) ?? 0;
     const aciklama = normalizeText(req.body?.aciklama);
     const malzeme = normalizeText(req.body?.malzeme);
+    const planlananIsRecordId = normalizeText(req.body?.planlananIsRecordId);
     const rawPersoneller = Array.isArray(req.body?.personeller)
       ? req.body.personeller as Array<{
           sicilNo?: unknown;
@@ -639,42 +853,59 @@ router.post('/completed', authenticate, async (req: AuthRequest, res: Response) 
       atananBolum?: unknown;
       atamaTarihi?: unknown;
     } | undefined;
+    const completedRecordId = await generateCompletedRecordId(tarih);
 
-    const created = await prisma.tamamlananIs.create({
-      data: {
-        recordId: await generateCompletedRecordId(tarih),
-        tarih,
-        vardiya,
-        makina,
-        mudahaleTuru,
-        baslangicSaati,
-        bitisSaati,
-        sureDakika,
-        aciklama,
-        malzeme: malzeme || null,
-        olusturanUserId: req.user?.id ?? null,
-        olusturanSicilNo: normalizeText(req.user?.sicilNo) || null,
-        olusturanAdSoyad: normalizeText(`${req.user?.ad || ''} ${req.user?.soyad || ''}`) || null,
-        analizPlanlananIsId: parseOptionalInt(analizAtamasi?.planlananIsId) ?? null,
-        analizBackendWorkOrderId: parseOptionalInt(analizAtamasi?.backendWorkOrderId) ?? null,
-        analizBackendWorkOrderNo: normalizeText(analizAtamasi?.backendWorkOrderNo) || null,
-        analizAtananSicilNo: normalizeText(analizAtamasi?.atananSicilNo) || null,
-        analizAtananAdSoyad: normalizeText(analizAtamasi?.atananAdSoyad) || null,
-        analizAtananBolum: normalizeDepartment(analizAtamasi?.atananBolum) || null,
-        analizAtamaTarihi: parseOptionalDate(analizAtamasi?.atamaTarihi) ?? null,
-        personeller: {
-          create: personeller.map((personel) => ({
-            sicilNo: personel.sicilNo,
-            adSoyad: personel.adSoyad,
-            bolum: personel.bolum
-          }))
-        }
-      },
-      include: {
-        personeller: {
-          orderBy: { id: 'asc' }
-        }
+    const created = await prisma.$transaction(async (tx) => {
+      let plannedDeleteCount = 0;
+      if (planlananIsRecordId) {
+        const deleteResult = await tx.planlananIs.deleteMany({
+          where: { recordId: planlananIsRecordId }
+        });
+        plannedDeleteCount = deleteResult.count;
       }
+
+      const completed = await tx.tamamlananIs.create({
+        data: {
+          recordId: completedRecordId,
+          tarih,
+          vardiya,
+          makina,
+          mudahaleTuru,
+          baslangicSaati,
+          bitisSaati,
+          sureDakika,
+          aciklama,
+          malzeme: malzeme || null,
+          olusturanUserId: req.user?.id ?? null,
+          olusturanSicilNo: normalizeText(req.user?.sicilNo) || null,
+          olusturanAdSoyad: normalizeText(`${req.user?.ad || ''} ${req.user?.soyad || ''}`) || null,
+          analizPlanlananIsId: parseOptionalInt(analizAtamasi?.planlananIsId) ?? null,
+          analizBackendWorkOrderId: parseOptionalInt(analizAtamasi?.backendWorkOrderId) ?? null,
+          analizBackendWorkOrderNo: normalizeText(analizAtamasi?.backendWorkOrderNo) || null,
+          analizAtananSicilNo: normalizeText(analizAtamasi?.atananSicilNo) || null,
+          analizAtananAdSoyad: normalizeText(analizAtamasi?.atananAdSoyad) || null,
+          analizAtananBolum: normalizeDepartment(analizAtamasi?.atananBolum) || null,
+          analizAtamaTarihi: parseOptionalDate(analizAtamasi?.atamaTarihi) ?? null,
+          personeller: {
+            create: personeller.map((personel) => ({
+              sicilNo: personel.sicilNo,
+              adSoyad: personel.adSoyad,
+              bolum: personel.bolum
+            }))
+          }
+        },
+        include: {
+          personeller: {
+            orderBy: { id: 'asc' }
+          }
+        }
+      });
+
+      if (!planlananIsRecordId || plannedDeleteCount === 0) {
+        await cleanupStalePlannedJobsTx(tx);
+      }
+
+      return completed;
     });
 
     res.status(201).json({

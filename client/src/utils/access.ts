@@ -4,28 +4,25 @@ export { buildDefaultPasswordPreview } from './passwordPolicy';
 function normalizeAuthText(value: string | null | undefined): string {
   return String(value || '')
     .toLocaleLowerCase('tr-TR')
-    .replace(/ı/g, 'i')
+    .replace(/\u0131/g, 'i')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+const BERKE_ADMIN_SICIL_NOS = new Set(
+  String('BERKE')
+    .split(',')
+    .map((value) => normalizeAuthText(value))
+    .filter(Boolean)
+);
+
 export function isBerkeUser(user: User | null | undefined): boolean {
   if (!user) return false;
 
-  const ad = normalizeAuthText(user.ad);
-  const soyad = normalizeAuthText(user.soyad);
-  const fullName = normalizeAuthText(`${user.ad} ${user.soyad}`);
-  const email = normalizeAuthText(user.email);
   const sicilNo = normalizeAuthText(user.sicilNo);
-
-  return (
-    (fullName.includes('berke') && fullName.includes('karayan'))
-    || (ad === 'berke' && soyad.includes('karayan'))
-    || email.includes('berke')
-    || sicilNo === 'berke'
-  );
+  return Boolean(sicilNo && BERKE_ADMIN_SICIL_NOS.has(sicilNo));
 }
 
 export function isSystemAdminUser(user: User | null | undefined): boolean {
@@ -36,3 +33,4 @@ export function isSystemAdminUser(user: User | null | undefined): boolean {
 export function buildCompactLoginName(ad: string, soyad: string): string {
   return normalizeAuthText(`${ad} ${soyad}`).replace(/\s+/g, '');
 }
+

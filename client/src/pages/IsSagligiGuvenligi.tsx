@@ -3,12 +3,27 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
+  BarChart3,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
   CircleDashed,
   ClipboardCheck,
   Flame,
+  LayoutGrid,
   ShieldAlert,
   Target } from
 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis } from
+'recharts';
 import {
   ISG_TOPICS,
   ISG_YEARLY_TOPIC_DETAILS,
@@ -26,7 +41,8 @@ import {
   type IsgMissingTopicId } from
 '../data/isgMissing';
 import { APP_STATE_KEYS } from '../constants/appState';
-import { appStateApi } from '../services/api';
+import { appStateApi, jobEntriesApi } from '../services/api';
+import type { CompletedJob } from '../types/jobEntries';
 
 const toneClassMap: Record<IsgTopicMetricTone, string> = {
   neutral: 'bg-gray-100 text-gray-700',
@@ -68,6 +84,7 @@ const UYGUNSUZLUK_HEADERS = [
 'AKSIYON DURUMU',
 'TERMIN'] as
 const;
+const ISG_OPTIONAL_SHIFT_HEADERS = ['VARDIYA'] as const;
 const ISG_TO_IS_EMRI_KEY = 'cmms_isg_to_is_emri_transfer';
 
 type IsgImportDataset = {
@@ -134,6 +151,40 @@ type SelectedMissingCardView = {
   missing: number;
   missingRate: number;
   closedCount: number;
+};
+
+type ShiftTrackType = 'uygunsuzluk' | 'capraz';
+
+type ShiftTrackRecord = {
+  id: string;
+  date: string;
+  shift: string;
+  department: string;
+  departmentGroup: DepartmentGroupKey;
+  type: ShiftTrackType;
+  typeLabel: string;
+  isClosed: boolean;
+};
+
+type DepartmentGroupKey = 'elektrik' | 'mekanik' | 'yardimci';
+
+type ShiftChartRow = {
+  key: string;
+  date: string;
+  name: string;
+  mekanik: number;
+  elektrik: number;
+  yardimci: number;
+  total: number;
+};
+
+type ShiftChartMode = 'stacked' | 'grouped';
+type ShiftDepartmentFilter = 'tumu' | DepartmentGroupKey;
+type ShiftWeekOption = {
+  key: string;
+  dateLabels: string[];
+  rangeLabel: string;
+  label: string;
 };
 
 function normalizeText(value: string): string {
@@ -282,6 +333,249 @@ function parseSourceRowNo(value: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function buildDatasetSourceScope(dataset: IsgImportDataset): string {
+  return `${dataset.sourceFileName}|${dataset.uploadedAt}|${dataset.rowCount}`;
+}
+
+function resolveShiftLabel(value: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return 'Belirtilmemis';
+
+  const normalized = normalizeText(raw);
+  if (!normalized) return 'Belirtilmemis';
+
+  if (
+  normalized.includes('A VARDIYA') ||
+  normalized.includes('1 VARDIYA') ||
+  normalized.includes('VARDIYA 1') ||
+  normalized.includes('VARDIYA1') ||
+  normalized === 'A' ||
+  normalized === '1')
+  {
+    return 'A Vardiya';
+  }
+
+  if (
+  normalized.includes('B VARDIYA') ||
+  normalized.includes('2 VARDIYA') ||
+  normalized.includes('VARDIYA 2') ||
+  normalized.includes('VARDIYA2') ||
+  normalized === 'B' ||
+  normalized === '2')
+  {
+    return 'B Vardiya';
+  }
+
+  if (
+  normalized.includes('C VARDIYA') ||
+  normalized.includes('3 VARDIYA') ||
+  normalized.includes('VARDIYA 3') ||
+  normalized.includes('VARDIYA3') ||
+  normalized === 'C' ||
+  normalized === '3')
+  {
+    return 'C Vardiya';
+  }
+
+  return raw;
+}
+
+function isIsoDateLabel(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
+}
+
+function classifyDepartmentGroup(department: string): DepartmentGroupKey | null {
+  const normalized = normalizeText(department);
+  if (!normalized) return null;
+
+  if (
+  normalized.includes('ELEKTRIK') ||
+  normalized.includes('E BAKIM'))
+  {
+    return 'elektrik';
+  }
+
+  if (
+  normalized.includes('MEKANIK') ||
+  normalized.includes('M BAKIM'))
+  {
+    return 'mekanik';
+  }
+
+  if (
+  normalized.includes('YARDIMCI TESIS') ||
+  normalized.includes('Y TESIS'))
+  {
+    return 'yardimci';
+  }
+
+  return null;
+}
+
+function shiftToNo(shift: string): 1 | 2 | 3 | null {
+  const normalized = normalizeText(shift);
+  if (
+  normalized.includes('A VARDIYA') ||
+  normalized.includes('1 VARDIYA') ||
+  normalized.includes('VARDIYA 1') ||
+  normalized.includes('VARDIYA1') ||
+  normalized === 'A' ||
+  normalized === '1')
+  {
+    return 1 as const;
+  }
+  if (
+  normalized.includes('B VARDIYA') ||
+  normalized.includes('2 VARDIYA') ||
+  normalized.includes('VARDIYA 2') ||
+  normalized.includes('VARDIYA2') ||
+  normalized === 'B' ||
+  normalized === '2')
+  {
+    return 2 as const;
+  }
+  if (
+  normalized.includes('C VARDIYA') ||
+  normalized.includes('3 VARDIYA') ||
+  normalized.includes('VARDIYA 3') ||
+  normalized.includes('VARDIYA3') ||
+  normalized === 'C' ||
+  normalized === '3')
+  {
+    return 3 as const;
+  }
+  return null;
+}
+
+function resolveCompletedJobTrackType(job: CompletedJob): ShiftTrackType | null {
+  const normalized = normalizeText(`${job.mudahaleTuru || ''} ${job.aciklama || ''}`);
+  if (!normalized) return null;
+
+  if (
+  normalized.includes('CAPRAZ') &&
+  normalized.includes('DENETIM') &&
+  normalized.includes('UYGUNSUZLUK'))
+  {
+    return 'capraz';
+  }
+
+  if (normalized.includes('UYGUNSUZLUK')) {
+    return 'uygunsuzluk';
+  }
+
+  return null;
+}
+
+function resolveCompletedJobDepartment(job: CompletedJob): {department: string;departmentGroup: DepartmentGroupKey;} | null {
+  const personeller = Array.isArray(job.personeller) ? job.personeller : [];
+
+  for (const personel of personeller) {
+    const department = String(personel?.bolum || '').trim();
+    const departmentGroup = classifyDepartmentGroup(department);
+    if (departmentGroup) {
+      return { department: department || '-', departmentGroup };
+    }
+  }
+
+  return null;
+}
+
+function toIsoDateFromDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getIsoWeekStartLabel(date: Date): string {
+  const normalized = new Date(date);
+  normalized.setHours(0, 0, 0, 0);
+
+  const dayNo = normalized.getDay();
+  const diffToMonday = dayNo === 0 ? -6 : 1 - dayNo;
+  normalized.setDate(normalized.getDate() + diffToMonday);
+
+  return toIsoDateFromDate(normalized);
+}
+
+function buildWeekDateLabelsFromStart(weekStartLabel: string): string[] {
+  if (!isIsoDateLabel(weekStartLabel)) return [];
+
+  const startDate = new Date(`${weekStartLabel}T00:00:00`);
+  if (Number.isNaN(startDate.getTime())) return [];
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(startDate);
+    date.setDate(startDate.getDate() + index);
+    return toIsoDateFromDate(date);
+  });
+}
+
+function getIsoWeekMetaFromDateLabel(dateLabel: string): {weekYear: number;weekNumber: number;} | null {
+  if (!isIsoDateLabel(dateLabel)) return null;
+
+  const [yearText, monthText, dayText] = dateLabel.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (Number.isNaN(date.getTime())) return null;
+
+  const weekday = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - weekday);
+  const weekYear = date.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(weekYear, 0, 1));
+  const weekNumber = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+
+  return { weekYear, weekNumber };
+}
+
+function buildIsoWeekStartLabelsForYear(year: number): string[] {
+  if (!Number.isFinite(year)) return [];
+
+  const week1ReferenceDate = new Date(`${year}-01-04T00:00:00`);
+  if (Number.isNaN(week1ReferenceDate.getTime())) return [];
+
+  const week1Day = week1ReferenceDate.getDay() || 7;
+  week1ReferenceDate.setDate(week1ReferenceDate.getDate() - (week1Day - 1));
+
+  const weekCount = getIsoWeekMetaFromDateLabel(`${year}-12-28`)?.weekNumber || 52;
+  return Array.from({ length: weekCount }, (_, index) => {
+    const weekStartDate = new Date(week1ReferenceDate);
+    weekStartDate.setDate(week1ReferenceDate.getDate() + index * 7);
+    return toIsoDateFromDate(weekStartDate);
+  });
+}
+
+function buildRecentSevenDateLabels(baseDate: Date): string[] {
+  return buildWeekDateLabelsFromStart(getIsoWeekStartLabel(baseDate));
+}
+
+function formatIsoDateRangeLabel(startDateLabel: string, endDateLabel: string, fallback = 'Son 7 gun'): string {
+  if (!startDateLabel || !endDateLabel) return fallback;
+
+  const startDate = new Date(`${startDateLabel}T00:00:00`);
+  const endDate = new Date(`${endDateLabel}T00:00:00`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return fallback;
+
+  const formatter = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return `${formatter.format(startDate)} - ${formatter.format(endDate)}`;
+}
+
+function formatIsoWeekdayShortLabel(dateLabel: string): string {
+  if (!isIsoDateLabel(dateLabel)) return dateLabel;
+  const date = new Date(`${dateLabel}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateLabel;
+
+  const dayNo = date.getDay();
+  if (dayNo === 1) return 'Pzt';
+  if (dayNo === 2) return 'Sal';
+  if (dayNo === 3) return 'Car';
+  if (dayNo === 4) return 'Per';
+  if (dayNo === 5) return 'Cum';
+  if (dayNo === 6) return 'Cmt';
+  return 'Paz';
+}
+
 function isCaprazDenetimRowValid(row: Record<string, string>): boolean {
   const denetlenenBirim = String(row['DENETLENEN BIRIM'] || '').trim();
   const aksiyonDurumu = String(row['AKSIYON DURUMU'] || '').trim();
@@ -327,10 +621,15 @@ function sanitizeUygunsuzlukRows(rows: Array<Record<string, string>>): Array<Rec
   return rows.filter((row) => isUygunsuzlukRowValid(row));
 }
 
-function normalizeIsgImportDataset(raw: unknown, headers: readonly string[]): IsgImportDataset | null {
+function normalizeIsgImportDataset(
+raw: unknown,
+headers: readonly string[],
+optionalHeaders: readonly string[] = [])
+: IsgImportDataset | null {
   if (!raw || typeof raw !== 'object') return null;
 
   const source = raw as Record<string, unknown>;
+  const allHeaders = Array.from(new Set([...headers, ...optionalHeaders]));
   const rawRows = Array.isArray(source.rows) ? source.rows : [];
   const rows = rawRows.flatMap((item) => {
     if (!item || typeof item !== 'object') return [];
@@ -339,7 +638,7 @@ function normalizeIsgImportDataset(raw: unknown, headers: readonly string[]): Is
     const mapped: Record<string, string> = {};
     let hasAnyValue = false;
 
-    headers.forEach((header) => {
+    allHeaders.forEach((header) => {
       const value = String(row[header] ?? '').trim();
       mapped[header] = value;
       if (value) hasAnyValue = true;
@@ -364,9 +663,21 @@ function normalizeIsgImportsState(value: unknown): IsgImportsState {
   if (!value || typeof value !== 'object') return {};
 
   const source = value as Record<string, unknown>;
-  const caprazDataset = normalizeIsgImportDataset(source.caprazDenetim, CAPRAZ_DENETIM_HEADERS);
-  const uygunsuzluk2026Dataset = normalizeIsgImportDataset(source.uygunsuzluk2026, UYGUNSUZLUK_HEADERS);
-  const uygunsuzluk2025Dataset = normalizeIsgImportDataset(source.uygunsuzluk2025, UYGUNSUZLUK_HEADERS);
+  const caprazDataset = normalizeIsgImportDataset(
+    source.caprazDenetim,
+    CAPRAZ_DENETIM_HEADERS,
+    ISG_OPTIONAL_SHIFT_HEADERS
+  );
+  const uygunsuzluk2026Dataset = normalizeIsgImportDataset(
+    source.uygunsuzluk2026,
+    UYGUNSUZLUK_HEADERS,
+    ISG_OPTIONAL_SHIFT_HEADERS
+  );
+  const uygunsuzluk2025Dataset = normalizeIsgImportDataset(
+    source.uygunsuzluk2025,
+    UYGUNSUZLUK_HEADERS,
+    ISG_OPTIONAL_SHIFT_HEADERS
+  );
 
   const sanitizeDataset = (
   dataset: IsgImportDataset | null,
@@ -452,7 +763,7 @@ function computeCaprazBreakdown(dataset: IsgImportDataset): IsgComputation | nul
   return {
     breakdown,
     dataSource: dataset.sourceFileName || 'Çapraz Denetim Uygunsuzluk Takip',
-    sourceScope: `${dataset.sourceFileName}|${dataset.uploadedAt}|${dataset.rowCount}`,
+    sourceScope: buildDatasetSourceScope(dataset),
     uploadedAt: dataset.uploadedAt,
     metrics: [
     { label: 'Giderilme Orani', value: formatPercent(resolved, total), tone: 'warning' },
@@ -525,7 +836,7 @@ function computeUygunsuzlukBreakdown(dataset: IsgImportDataset): IsgComputation 
   return {
     breakdown,
     dataSource: dataset.sourceFileName || 'Uygunsuzluk Takip',
-    sourceScope: `${dataset.sourceFileName}|${dataset.uploadedAt}|${dataset.rowCount}`,
+    sourceScope: buildDatasetSourceScope(dataset),
     uploadedAt: dataset.uploadedAt,
     metrics: [
     { label: 'Giderilme Orani', value: formatPercent(resolved, total), tone: 'warning' },
@@ -592,6 +903,9 @@ export default function IsSagligiGuvenligi() {
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string>('ALL');
   const [departmentSortMode, setDepartmentSortMode] = useState<DepartmentSortMode>('rate_desc');
   const [copiedRowKey, setCopiedRowKey] = useState<string | null>(null);
+  const [shiftChartMode, setShiftChartMode] = useState<ShiftChartMode>('stacked');
+  const [shiftDepartmentFilter, setShiftDepartmentFilter] = useState<ShiftDepartmentFilter>('tumu');
+  const [selectedShiftWeekStart, setSelectedShiftWeekStart] = useState('');
 
   const { data: importedIsg } = useQuery({
     queryKey: ['isg-imports'],
@@ -604,19 +918,31 @@ export default function IsSagligiGuvenligi() {
       }
     }
   });
+  const { data: completedJobs = [] } = useQuery({
+    queryKey: ['isg-shift-track-completed-jobs'],
+    queryFn: async () => {
+      try {
+        const response = await jobEntriesApi.getCompleted();
+        const data = response.data?.data as CompletedJob[] | undefined;
+        return Array.isArray(data) ? data : [];
+      } catch {
+        return [] as CompletedJob[];
+      }
+    }
+  });
 
   const importedCaprazComputation = useMemo(() => {
     if (!importedIsg?.caprazDenetim) return null;
     return computeCaprazBreakdown(importedIsg.caprazDenetim);
   }, [importedIsg]);
+  const activeUygunsuzlukDataset =
+  selectedYear === '2025' ?
+  importedIsg?.uygunsuzluk2025 :
+  importedIsg?.uygunsuzluk2026;
   const importedUygunsuzlukComputation = useMemo(() => {
-    const dataset =
-    selectedYear === '2025' ?
-    importedIsg?.uygunsuzluk2025 :
-    importedIsg?.uygunsuzluk2026;
-    if (!dataset) return null;
-    return computeUygunsuzlukBreakdown(dataset);
-  }, [importedIsg, selectedYear]);
+    if (!activeUygunsuzlukDataset) return null;
+    return computeUygunsuzlukBreakdown(activeUygunsuzlukDataset);
+  }, [activeUygunsuzlukDataset]);
   const { data: closedItemsState } = useQuery({
     queryKey: ['isg-closed-items'],
     queryFn: async () => {
@@ -712,6 +1038,176 @@ export default function IsSagligiGuvenligi() {
   selectedReport.id === 'capraz-denetim' && importedCaprazComputation?.uploadedAt ?
   new Date(importedCaprazComputation.uploadedAt).toLocaleDateString('tr-TR') :
   activeSummary.reportDate;
+
+  const shiftTrackRecords = useMemo<ShiftTrackRecord[]>(() => {
+    return completedJobs.flatMap((job) => {
+      const date = toIsoDateLabel(String(job.tarih || '').trim());
+      if (!isIsoDateLabel(date)) return [];
+
+      const type = resolveCompletedJobTrackType(job);
+      if (!type) return [];
+
+      const departmentInfo = resolveCompletedJobDepartment(job);
+      if (!departmentInfo) return [];
+
+      const shift = resolveShiftLabel(job.vardiya);
+      if (!shiftToNo(shift)) return [];
+
+      return [{
+        id: `completed|${job.id}`,
+        date,
+        shift,
+        department: departmentInfo.department,
+        departmentGroup: departmentInfo.departmentGroup,
+        type,
+        typeLabel: type === 'capraz' ? 'Capraz Denetim' : 'Uygunsuzluk',
+        isClosed: true
+      }];
+    });
+  }, [completedJobs]);
+
+  const shiftChartTrackType = useMemo<ShiftTrackType | null>(() => {
+    if (selectedReport.id === 'uygunsuzluk-yillik') return 'uygunsuzluk';
+    if (selectedReport.id === 'capraz-denetim') return 'capraz';
+    return null;
+  }, [selectedReport.id]);
+  const showShiftChartSection = shiftChartTrackType !== null;
+  const shiftWeekYear = Number.parseInt(effectiveYear, 10);
+  const yearWeekStartLabels = useMemo(
+    () => buildIsoWeekStartLabelsForYear(shiftWeekYear),
+    [shiftWeekYear]
+  );
+  const shiftWeekOptions = useMemo<ShiftWeekOption[]>(() => {
+    const fallbackWeekStart = getIsoWeekStartLabel(new Date());
+    const sourceWeekStartLabels = yearWeekStartLabels.length > 0 ? yearWeekStartLabels : [fallbackWeekStart];
+
+    return sourceWeekStartLabels.map((weekStartLabel, index) => {
+      const dateLabels = buildWeekDateLabelsFromStart(weekStartLabel);
+      const startDateLabel = dateLabels[0] || weekStartLabel;
+      const endDateLabel = dateLabels[dateLabels.length - 1] || weekStartLabel;
+      const rangeLabel = formatIsoDateRangeLabel(startDateLabel, endDateLabel);
+      const weekMeta = getIsoWeekMetaFromDateLabel(weekStartLabel);
+      const weekLabel =
+      weekMeta ?
+      `${weekMeta.weekYear} / ${String(weekMeta.weekNumber).padStart(2, '0')}. Hafta` :
+      `Hafta ${index + 1}`;
+      return {
+        key: weekStartLabel,
+        dateLabels,
+        rangeLabel,
+        label: `${weekLabel} (Pzt-Paz: ${rangeLabel})`
+      };
+    });
+  }, [yearWeekStartLabels]);
+
+  useEffect(() => {
+    if (shiftWeekOptions.length === 0) {
+      if (selectedShiftWeekStart) setSelectedShiftWeekStart('');
+      return;
+    }
+
+    const currentWeekStart = getIsoWeekStartLabel(new Date());
+    const preferredWeekStart = shiftWeekOptions.some((option) => option.key === currentWeekStart) ?
+    currentWeekStart :
+    shiftWeekOptions[0].key;
+
+    if (shiftWeekOptions.some((option) => option.key === selectedShiftWeekStart)) return;
+    setSelectedShiftWeekStart(preferredWeekStart);
+  }, [selectedShiftWeekStart, shiftWeekOptions]);
+
+  const selectedShiftWeekOption = useMemo(
+    () => shiftWeekOptions.find((option) => option.key === selectedShiftWeekStart) || shiftWeekOptions[0] || null,
+    [selectedShiftWeekStart, shiftWeekOptions]
+  );
+  const selectedShiftWeekIndex = useMemo(
+    () => shiftWeekOptions.findIndex((option) => option.key === (selectedShiftWeekOption?.key || '')),
+    [selectedShiftWeekOption, shiftWeekOptions]
+  );
+  const canSelectPreviousShiftWeek = selectedShiftWeekIndex > 0;
+  const canSelectNextShiftWeek = selectedShiftWeekIndex >= 0 && selectedShiftWeekIndex < shiftWeekOptions.length - 1;
+  const fallbackWeeklyDateLabels = useMemo(() => buildRecentSevenDateLabels(new Date()), []);
+  const weeklyDateLabels = useMemo(
+    () => selectedShiftWeekOption?.dateLabels.length ? selectedShiftWeekOption.dateLabels : fallbackWeeklyDateLabels,
+    [fallbackWeeklyDateLabels, selectedShiftWeekOption]
+  );
+  const weeklyDateLabelSet = useMemo(() => new Set(weeklyDateLabels), [weeklyDateLabels]);
+  const weeklyRangeLabel = useMemo(() => {
+    if (selectedShiftWeekOption?.rangeLabel) return selectedShiftWeekOption.rangeLabel;
+    const start = weeklyDateLabels[0];
+    const end = weeklyDateLabels[weeklyDateLabels.length - 1];
+    return formatIsoDateRangeLabel(start, end);
+  }, [selectedShiftWeekOption, weeklyDateLabels]);
+
+  const weeklyTypeCounters = useMemo(() => {
+    let uygunsuzluk = 0;
+    let capraz = 0;
+
+    shiftTrackRecords.forEach((record) => {
+      if (!weeklyDateLabelSet.has(record.date)) return;
+      if (record.type === 'uygunsuzluk') uygunsuzluk += 1;
+      if (record.type === 'capraz') capraz += 1;
+    });
+
+    return { uygunsuzluk, capraz };
+  }, [shiftTrackRecords, weeklyDateLabelSet]);
+
+  const shiftTrackRecordsForChart = useMemo(() => {
+    if (!shiftChartTrackType) return [] as ShiftTrackRecord[];
+
+    return shiftTrackRecords.filter((record) =>
+    record.type === shiftChartTrackType && weeklyDateLabelSet.has(record.date)
+    );
+  }, [shiftTrackRecords, shiftChartTrackType, weeklyDateLabelSet]);
+
+  const filteredShiftTrackRecordsForChart = useMemo(() => {
+    if (shiftDepartmentFilter === 'tumu') return shiftTrackRecordsForChart;
+    return shiftTrackRecordsForChart.filter((record) => record.departmentGroup === shiftDepartmentFilter);
+  }, [shiftTrackRecordsForChart, shiftDepartmentFilter]);
+
+  const vardiyaChartRows = useMemo<ShiftChartRow[]>(() => {
+    const rows: ShiftChartRow[] = [];
+    const rowMap = new Map<string, ShiftChartRow>();
+
+    weeklyDateLabels.forEach((dateLabel) => {
+      const dayLabel = formatIsoWeekdayShortLabel(dateLabel);
+      ([1, 2, 3] as const).forEach((shiftNo) => {
+        const key = `${dateLabel}|${shiftNo}`;
+        const row: ShiftChartRow = {
+          key,
+          date: dateLabel,
+          name: `${dayLabel} V${shiftNo}`,
+          mekanik: 0,
+          elektrik: 0,
+          yardimci: 0,
+          total: 0
+        };
+        rows.push(row);
+        rowMap.set(key, row);
+      });
+    });
+
+    filteredShiftTrackRecordsForChart.forEach((record) => {
+      const shiftNo = shiftToNo(record.shift);
+      if (!shiftNo) return;
+      const row = rowMap.get(`${record.date}|${shiftNo}`);
+      if (!row) return;
+
+      if (record.departmentGroup === 'mekanik') row.mekanik += 1;
+      if (record.departmentGroup === 'elektrik') row.elektrik += 1;
+      if (record.departmentGroup === 'yardimci') row.yardimci += 1;
+      row.total = row.mekanik + row.elektrik + row.yardimci;
+    });
+
+    return rows;
+  }, [weeklyDateLabels, filteredShiftTrackRecordsForChart]);
+
+  const toplamMekanik = vardiyaChartRows.reduce((sum, row) => sum + row.mekanik, 0);
+  const toplamElektrik = vardiyaChartRows.reduce((sum, row) => sum + row.elektrik, 0);
+  const toplamYardimci = vardiyaChartRows.reduce((sum, row) => sum + row.yardimci, 0);
+  const toplamVardiyaKayit = vardiyaChartRows.reduce((sum, row) => sum + row.total, 0);
+  const showMekanikBar = shiftDepartmentFilter === 'tumu' || shiftDepartmentFilter === 'mekanik';
+  const showElektrikBar = shiftDepartmentFilter === 'tumu' || shiftDepartmentFilter === 'elektrik';
+  const showYardimciBar = shiftDepartmentFilter === 'tumu' || shiftDepartmentFilter === 'yardimci';
 
   const selectedMissingCardRaw = missingCardsWithRows.find((card) => card.id === selectedReport.id);
   const selectedMissingCard = useMemo<SelectedMissingCardView | null>(() => {
@@ -1006,6 +1502,212 @@ export default function IsSagligiGuvenligi() {
           </div>
         </div>
       </section>
+
+      {showShiftChartSection &&
+      <section className="card p-6">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              {shiftChartTrackType === 'uygunsuzluk' ?
+              'Uygunsuzluk - Haftalik Grafik' :
+              'Capraz Denetim Uygunsuzluk - Haftalik Grafik'}
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              Tamamlanan Isler kayitlarindan, secilen haftada (Pazartesi-Pazar) tum vardiyalar ayri ayri (V1, V2, V3) gosterilir.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs font-medium">
+            <span className="rounded-full bg-blue-100 px-3 py-1 text-blue-700">
+              Mekanik: {toplamMekanik}
+            </span>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-700">
+              Elektrik: {toplamElektrik}
+            </span>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-700">
+              Yardimci: {toplamYardimci}
+            </span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+              Toplam: {toplamVardiyaKayit}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex w-full flex-col gap-3">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <Calendar className="h-4 w-4 shrink-0 text-gray-500" />
+              {weeklyRangeLabel}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-slate-600">Hafta</span>
+              <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!canSelectPreviousShiftWeek) return;
+                    const previousOption = shiftWeekOptions[selectedShiftWeekIndex - 1];
+                    if (previousOption) setSelectedShiftWeekStart(previousOption.key);
+                  }}
+                  disabled={!canSelectPreviousShiftWeek}
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                  canSelectPreviousShiftWeek ?
+                  'text-slate-700 hover:bg-slate-100' :
+                  'cursor-not-allowed text-slate-300'}`
+                  }
+                  aria-label="Onceki hafta">
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="min-w-[250px] text-center text-xs font-semibold text-slate-700">
+                  {selectedShiftWeekOption?.label || '-'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!canSelectNextShiftWeek) return;
+                    const nextOption = shiftWeekOptions[selectedShiftWeekIndex + 1];
+                    if (nextOption) setSelectedShiftWeekStart(nextOption.key);
+                  }}
+                  disabled={!canSelectNextShiftWeek}
+                  className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                  canSelectNextShiftWeek ?
+                  'text-slate-700 hover:bg-slate-100' :
+                  'cursor-not-allowed text-slate-300'}`
+                  }
+                  aria-label="Sonraki hafta">
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+              { key: 'tumu' as const, label: 'Tumu' },
+              { key: 'elektrik' as const, label: 'Elektrik' },
+              { key: 'mekanik' as const, label: 'Mekanik' },
+              { key: 'yardimci' as const, label: 'Yardimci Tesisler' }].
+              map((option) =>
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => setShiftDepartmentFilter(option.key)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                shiftDepartmentFilter === option.key ?
+                'bg-slate-800 text-white' :
+                'bg-white text-slate-600 hover:bg-slate-100'}`
+                }>
+
+                  {option.label}
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                Gun Sayisi: {weeklyDateLabels.length}
+              </span>
+              <span className="rounded-full bg-orange-100 px-3 py-1 text-orange-700">
+                Uygunsuzluk: {weeklyTypeCounters.uygunsuzluk}
+              </span>
+              <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-700">
+                Capraz Uygunsuzluk: {weeklyTypeCounters.capraz}
+              </span>
+            </div>
+          </div>
+
+          <div className="inline-flex rounded-lg bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setShiftChartMode('stacked')}
+              className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+              shiftChartMode === 'stacked' ?
+              'bg-white text-slate-900 shadow-sm' :
+              'text-slate-600 hover:bg-white/80'}`
+              }>
+
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Yigin
+            </button>
+            <button
+              type="button"
+              onClick={() => setShiftChartMode('grouped')}
+              className={`inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+              shiftChartMode === 'grouped' ?
+              'bg-white text-slate-900 shadow-sm' :
+              'text-slate-600 hover:bg-white/80'}`
+              }>
+
+              <BarChart3 className="h-3.5 w-3.5" />
+              Grup
+            </button>
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          Mavi: Mekanik, Sari: Elektrik, Yesil: Yardimci Tesisler. Veri olmayan gunlerde deger 0 gosterilir.
+        </p>
+
+        {filteredShiftTrackRecordsForChart.length === 0 &&
+        <div className="mt-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+            Secili filtrelerde kayit bulunamadi. Grafik 0 degerleri ile gosteriliyor.
+          </div>
+        }
+
+        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-gray-900">Tek Grafik</h3>
+          <div className="mt-4 h-[420px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={vardiyaChartRows}
+                margin={{ top: 20, right: 16, left: 0, bottom: 12 }}>
+
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  interval={0}
+                  height={42} />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  width={36} />
+                <Tooltip cursor={{ fill: '#f8fafc' }} />
+                <Legend
+                  wrapperStyle={{ paddingTop: '12px' }}
+                  iconType="circle" />
+                {showMekanikBar &&
+                <Bar
+                  dataKey="mekanik"
+                  name="Mekanik"
+                  stackId={shiftChartMode === 'stacked' ? 'a' : undefined}
+                  fill="#5b7be1"
+                  radius={shiftChartMode === 'stacked' ? [0, 0, 4, 4] : [4, 4, 0, 0]}
+                  maxBarSize={60} />
+                }
+                {showElektrikBar &&
+                <Bar
+                  dataKey="elektrik"
+                  name="Elektrik"
+                  stackId={shiftChartMode === 'stacked' ? 'a' : undefined}
+                  fill="#d4af37"
+                  radius={shiftChartMode === 'stacked' ? [0, 0, 0, 0] : [4, 4, 0, 0]}
+                  maxBarSize={60} />
+                }
+                {showYardimciBar &&
+                <Bar
+                  dataKey="yardimci"
+                  name="Yardimci Tesisler"
+                  stackId={shiftChartMode === 'stacked' ? 'a' : undefined}
+                  fill="#6fb581"
+                  radius={shiftChartMode === 'stacked' ? [4, 4, 0, 0] : [4, 4, 0, 0]}
+                  maxBarSize={60} />
+                }
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </section>
+      }
 
       {showDepartmentRates &&
       <section className="card p-6">

@@ -26,34 +26,39 @@ type UserIdentity = {
   sicilNo?: string | null;
 };
 
+const READ_ONLY_INSPECTOR_SICIL_NO = 'izleyici';
+const READ_ONLY_INSPECTOR_EMAIL = 'izleyici@cmms.local';
+
 export function normalizeAuthText(value: string | null | undefined): string {
   return String(value || '')
     .toLocaleLowerCase('tr-TR')
-    .replace(/ı/g, 'i')
+    .replace(/\u0131/g, 'i')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
+const BERKE_ADMIN_SICIL_NOS = new Set(
+  String(process.env.BERKE_ADMIN_SICIL_NOS || 'BERKE')
+    .split(',')
+    .map((value) => normalizeAuthText(value))
+    .filter(Boolean)
+);
+
 export function isBerkeUser(identity: UserIdentity | null | undefined): boolean {
   if (!identity) return false;
-
-  const ad = normalizeAuthText(identity.ad);
-  const soyad = normalizeAuthText(identity.soyad);
-  const fullName = normalizeAuthText(identity.adSoyad || `${identity.ad || ''} ${identity.soyad || ''}`);
-  const email = normalizeAuthText(identity.email);
   const sicilNo = normalizeAuthText(identity.sicilNo);
+  return Boolean(sicilNo && BERKE_ADMIN_SICIL_NOS.has(sicilNo));
+}
 
-  const fullNameLooksLikeBerke = fullName.includes('berke') && fullName.includes('karayan');
-  const splitNameLooksLikeBerke = ad === 'berke' && soyad.includes('karayan');
+export function isReadOnlyInspectorUser(identity: UserIdentity | null | undefined): boolean {
+  if (!identity) return false;
 
-  return (
-    fullNameLooksLikeBerke
-    || splitNameLooksLikeBerke
-    || email.includes('berke')
-    || sicilNo === 'berke'
-  );
+  const sicilNo = normalizeAuthText(identity.sicilNo);
+  const email = normalizeAuthText(identity.email);
+
+  return sicilNo === READ_ONLY_INSPECTOR_SICIL_NO || email === READ_ONLY_INSPECTOR_EMAIL;
 }
 
 export function resolveEffectiveRole(identity: UserIdentity | null | undefined): AppRole {
@@ -142,6 +147,16 @@ export async function authenticate(
       ...user,
       role: resolveEffectiveRole(user)
     };
+
+    const requestMethod = String(req.method || '').toUpperCase();
+    const isReadOnlyMethod = requestMethod === 'GET' || requestMethod === 'HEAD' || requestMethod === 'OPTIONS';
+    if (isReadOnlyInspectorUser(req.user) && !isReadOnlyMethod) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu hesap sadece goruntuleme islemleri yapabilir'
+      });
+    }
+
     next();
   } catch {
     return res.status(401).json({
