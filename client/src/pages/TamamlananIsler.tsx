@@ -164,7 +164,7 @@ export default function TamamlananIsler() {
   const [isLoading, setIsLoading] = useState(true);
   const [isler, setIsler] = useState<CompletedJob[]>([]);
   const [search, setSearch] = useState('');
-  const [filterTarih, setFilterTarih] = useState('');
+  const [filterTarih, setFilterTarih] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [filterBolum, setFilterBolum] = useState('');
   const [filterVardiya, setFilterVardiya] = useState('');
   const [isAnalizModalOpen, setIsAnalizModalOpen] = useState(false);
