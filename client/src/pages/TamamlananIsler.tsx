@@ -596,16 +596,18 @@ export default function TamamlananIsler() {
     );
 
     const toplamFarkliIsci = uniqueIsciSiciller.size;
-    const toplamSure = filteredIsler.reduce((sum, is) => sum + (Number(is.sureDakika) || 0), 0);
+    const toplamSure = isciSatirlar.reduce((sum, satir) => sum + (Number(satir.is.sureDakika) || 0), 0);
     const ortalamaSure = toplamFarkliIsci > 0
       ? Math.round(toplamSure / toplamFarkliIsci)
       : 0;
 
     return {
+      toplamIsciGirisi: isciSatirlar.length,
       toplamFarkliIsci,
+      toplamSure,
       ortalamaSure
     };
-  }, [filteredSatirlar, filteredIsler, unvanMap]);
+  }, [filteredSatirlar, unvanMap]);
 
   const uzunDurusKayitlari = useMemo(
     () => filteredIsler.filter((is) => (Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI),
@@ -847,18 +849,22 @@ export default function TamamlananIsler() {
           </div>
           <div>
             <span className="text-gray-500">Toplam Süre:</span>
-            <span className="ml-2 font-semibold">{filteredIsler.reduce((sum, is) => sum + is.sureDakika, 0)} dk</span>
+            <span className="ml-2 font-semibold">{isciMetrikleri.toplamSure} dk</span>
           </div>
           <div>
             <span className="text-gray-500">Toplam Personel Girişi:</span>
             <span className="ml-2 font-semibold">{filteredSatirlar.length}</span>
           </div>
           <div>
+            <span className="text-gray-500">Toplam İşçi Girişi:</span>
+            <span className="ml-2 font-semibold">{isciMetrikleri.toplamIsciGirisi}</span>
+          </div>
+          <div>
             <span className="text-gray-500">Toplam Farklı İşçi:</span>
             <span className="ml-2 font-semibold">{isciMetrikleri.toplamFarkliIsci}</span>
           </div>
           <div>
-            <span className="text-gray-500">Ortalama Süre:</span>
+            <span className="text-gray-500">Ortalama Giriş Süresi:</span>
             <span className="ml-2 font-semibold">{isciMetrikleri.ortalamaSure} dk</span>
           </div>
           <div>

@@ -13,8 +13,7 @@ import {
   YAxis } from
 'recharts';
 import { APP_STATE_KEYS } from '../constants/appState';
-import { appStateApi, jobEntriesApi } from '../services/api';
-import type { CompletedJob } from '../types/jobEntries';
+import { appStateApi } from '../services/api';
 
 type DurusDataset = {
   sourceFileName: string;
@@ -120,18 +119,6 @@ type WeeklyDowntimeWeekOption = {
   label: string;
 };
 
-type SystemDowntimeRateMode = 'monthly' | 'weekly' | 'shift';
-type SystemDowntimeRateShift = 'VARDIYA 1' | 'VARDIYA 2' | 'VARDIYA 3';
-
-type SystemDowntimeRateRow = {
-  key: string;
-  date: string;
-  label: string;
-  downtimeMinutes: number;
-  possibleMinutes: number;
-  rate: number;
-};
-
 type ParetoPoint = {
   id: string;
   label: string;
@@ -152,8 +139,6 @@ type ParetoChartProps = {
 
 const DETAIL_MACHINE_ALL = 'ALL';
 const DETAIL_MACHINE_ALL_PIPE = 'ALL_BORU';
-const POSSIBLE_MINUTES_PER_SHIFT = 8 * 60;
-const POSSIBLE_MINUTES_PER_DAY = POSSIBLE_MINUTES_PER_SHIFT * 3;
 
 function buildDefaultDurusCustomMachineGroupsState(): DurusCustomMachineGroupsState {
   return {
@@ -799,11 +784,41 @@ function parseShiftNoFromText(value: string): 1 | 2 | 3 | null {
   replace(/[\u0300-\u036f]/g, '').
   replace(/[^A-Z0-9]+/g, ' ').
   trim();
+  const compact = normalized.replace(/\s+/g, '');
 
   if (!normalized) return null;
-  if (normalized.includes('VARDIYA 1') || normalized.includes('1 VARDIYA') || normalized === '1' || normalized === 'A') return 1;
-  if (normalized.includes('VARDIYA 2') || normalized.includes('2 VARDIYA') || normalized === '2' || normalized === 'B') return 2;
-  if (normalized.includes('VARDIYA 3') || normalized.includes('3 VARDIYA') || normalized === '3' || normalized === 'C') return 3;
+  if (
+    normalized.includes('VARDIYA 1') ||
+    normalized.includes('1 VARDIYA') ||
+    compact === 'VARDIYA1' ||
+    compact === 'VRD1' ||
+    compact === 'V1' ||
+    normalized === '1' ||
+    normalized === 'A')
+  return 1;
+  if (
+    normalized.includes('VARDIYA 2') ||
+    normalized.includes('2 VARDIYA') ||
+    compact === 'VARDIYA2' ||
+    compact === 'VRD2' ||
+    compact === 'V2' ||
+    normalized === '2' ||
+    normalized === 'B')
+  return 2;
+  if (
+    normalized.includes('VARDIYA 3') ||
+    normalized.includes('3 VARDIYA') ||
+    compact === 'VARDIYA3' ||
+    compact === 'VRD3' ||
+    compact === 'V3' ||
+    normalized === '3' ||
+    normalized === 'C')
+  return 3;
+
+  const singleDigitMatch = compact.match(/[123]/g);
+  if (singleDigitMatch && singleDigitMatch.length === 1) {
+    return Number.parseInt(singleDigitMatch[0], 10) as 1 | 2 | 3;
+  }
   return null;
 }
 
@@ -889,12 +904,6 @@ function formatIsoDateLabel(dateValue: string): string {
   return `${day}.${month}`;
 }
 
-function getSystemShiftNo(shift: SystemDowntimeRateShift): 1 | 2 | 3 {
-  if (shift === 'VARDIYA 1') return 1;
-  if (shift === 'VARDIYA 2') return 2;
-  return 3;
-}
-
 function getMachineDepartmentValue(
 row: MachineDepartmentDowntimeRow,
 mode: DepartmentGraphMode,
@@ -955,8 +964,6 @@ export default function DurusAnalizi() {
   const [weeklyChartMode, setWeeklyChartMode] = useState<WeeklyDowntimeChartMode>('grouped');
   const [weeklyDepartmentFilter, setWeeklyDepartmentFilter] = useState<DepartmentGraphDepartment>('all');
   const [selectedWeeklyStartKey, setSelectedWeeklyStartKey] = useState('');
-  const [systemRateMode, setSystemRateMode] = useState<SystemDowntimeRateMode>('weekly');
-  const [systemRateShift, setSystemRateShift] = useState<SystemDowntimeRateShift>('VARDIYA 1');
 
   const {
     data: imports,
@@ -967,15 +974,6 @@ export default function DurusAnalizi() {
     queryFn: async () => {
       const response = await appStateApi.get(APP_STATE_KEYS.settingsDurusAnaliziImports);
       return normalizeImportsState(response.data?.data?.value);
-    }
-  });
-
-  const { data: completedJobs = [] } = useQuery({
-    queryKey: ['durus-analizi-completed-jobs'],
-    queryFn: async () => {
-      const response = await jobEntriesApi.getCompleted();
-      const rows = response.data?.data;
-      return Array.isArray(rows) ? rows as CompletedJob[] : [];
     }
   });
 
@@ -1271,8 +1269,8 @@ export default function DurusAnalizi() {
     () => weeklyWeekOptions.findIndex((option) => option.key === (selectedWeeklyWeekOption?.key || '')),
     [selectedWeeklyWeekOption, weeklyWeekOptions]
   );
-  const canSelectPreviousWeeklyOption = selectedWeeklyWeekIndex > 0;
-  const canSelectNextWeeklyOption = selectedWeeklyWeekIndex >= 0 && selectedWeeklyWeekIndex < weeklyWeekOptions.length - 1;
+  const canSelectPreviousWeeklyOption = selectedWeeklyWeekIndex >= 0 && selectedWeeklyWeekIndex < weeklyWeekOptions.length - 1;
+  const canSelectNextWeeklyOption = selectedWeeklyWeekIndex > 0;
   const fallbackWeeklyDateKeys = useMemo(
     () => buildRecentSevenDateKeys(weeklyAnchorDate),
     [weeklyAnchorDate]
@@ -1344,75 +1342,6 @@ export default function DurusAnalizi() {
   const showWeeklyElectricalBar = weeklyDepartmentFilter === 'all' || weeklyDepartmentFilter === 'electrical';
   const showWeeklyMechanicalBar = weeklyDepartmentFilter === 'all' || weeklyDepartmentFilter === 'mechanical';
   const showWeeklyHelperBar = weeklyDepartmentFilter === 'all' || weeklyDepartmentFilter === 'helper';
-
-  const completedJobsInSelectedMonth = useMemo(
-    () => completedJobs.filter((row) => String(row.tarih || '').startsWith(selectedMonth)),
-    [completedJobs, selectedMonth]
-  );
-
-  const completedDailyDowntimeMap = useMemo(() => {
-    const map = new Map<string, {total: number;shift1: number;shift2: number;shift3: number;}>();
-
-    completedJobsInSelectedMonth.forEach((row) => {
-      const dateKey = toIsoDateValue(String(row.tarih || ''));
-      if (!isIsoDateValue(dateKey)) return;
-
-      const shiftNo = parseShiftNoFromText(String(row.vardiya || ''));
-      const downtimeMinutes = Math.max(0, Number(row.sureDakika) || 0);
-      const current = map.get(dateKey) || { total: 0, shift1: 0, shift2: 0, shift3: 0 };
-      current.total += downtimeMinutes;
-      if (shiftNo === 1) current.shift1 += downtimeMinutes;
-      if (shiftNo === 2) current.shift2 += downtimeMinutes;
-      if (shiftNo === 3) current.shift3 += downtimeMinutes;
-      map.set(dateKey, current);
-    });
-
-    return map;
-  }, [completedJobsInSelectedMonth]);
-
-  const systemRateDateKeys = useMemo(() => {
-    if (systemRateMode === 'monthly') {
-      return buildMonthDateKeys(selectedMonth);
-    }
-    return weeklyDateKeys;
-  }, [selectedMonth, systemRateMode, weeklyDateKeys]);
-
-  const systemRateRows = useMemo<SystemDowntimeRateRow[]>(() => {
-    const selectedShiftNo = getSystemShiftNo(systemRateShift);
-    return systemRateDateKeys.map((dateKey) => {
-      const current = completedDailyDowntimeMap.get(dateKey) || { total: 0, shift1: 0, shift2: 0, shift3: 0 };
-      const downtimeMinutes =
-        systemRateMode === 'shift'
-          ? selectedShiftNo === 1
-            ? current.shift1
-            : selectedShiftNo === 2
-              ? current.shift2
-              : current.shift3
-          : current.total;
-      const possibleMinutes = systemRateMode === 'shift' ? POSSIBLE_MINUTES_PER_SHIFT : POSSIBLE_MINUTES_PER_DAY;
-      const rate = possibleMinutes > 0 ? downtimeMinutes / possibleMinutes * 100 : 0;
-
-      return {
-        key: `${dateKey}-${systemRateMode}`,
-        date: dateKey,
-        label: formatIsoDateLabel(dateKey),
-        downtimeMinutes,
-        possibleMinutes,
-        rate
-      };
-    });
-  }, [completedDailyDowntimeMap, systemRateDateKeys, systemRateMode, systemRateShift]);
-
-  const systemRateTotalDowntime = useMemo(
-    () => systemRateRows.reduce((sum, row) => sum + row.downtimeMinutes, 0),
-    [systemRateRows]
-  );
-  const systemRateTotalPossible = useMemo(
-    () => systemRateRows.reduce((sum, row) => sum + row.possibleMinutes, 0),
-    [systemRateRows]
-  );
-  const systemRateTotalRate = systemRateTotalPossible > 0 ? systemRateTotalDowntime / systemRateTotalPossible * 100 : 0;
-  const hasSystemRateData = systemRateRows.some((row) => row.downtimeMinutes > 0);
 
   const parsedOranRows = useMemo(() => parseOranRows(oranRows), [oranRows]);
 
@@ -1727,11 +1656,6 @@ export default function DurusAnalizi() {
 
   const selectedDepartmentLabel = getDepartmentLabel(selectedGraphDepartment);
   const selectedMonthLabel = formatMonthLabel(selectedMonth);
-  const systemRateModeLabel = systemRateMode === 'monthly'
-    ? 'Aylik'
-    : systemRateMode === 'weekly'
-      ? 'Haftalik'
-      : `${systemRateShift} Bazli`;
 
   const selectedDepartmentTotalValue = useMemo(() => {
     if (selectedGraphDepartment === 'electrical') {
@@ -1861,8 +1785,6 @@ export default function DurusAnalizi() {
     setSelectedDetailMachine(DETAIL_MACHINE_ALL);
     setSelectedDepartment('ALL');
     setSelectedShift('ALL');
-    setSystemRateMode('weekly');
-    setSystemRateShift('VARDIYA 1');
   };
 
   if (isLoading) {
@@ -1945,172 +1867,8 @@ export default function DurusAnalizi() {
         </div>
       </div>
 
-      {!isParetoPage &&
-      <section className="card p-6">
-          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Sistemden Duruş Oranı Grafiği</h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Veri kaynağı: Tamamlanan İşler kayıtları. Seçim: {systemRateModeLabel}.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 text-xs font-medium">
-              <span className="rounded-full bg-indigo-100 px-3 py-1 text-indigo-700">
-                Toplam Duruş: {formatNumber(systemRateTotalDowntime, 0)} dk
-              </span>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
-                Toplam Oran: %{formatNumber(systemRateTotalRate, 2)}
-              </span>
-            </div>
-          </div>
 
-          <div className="mb-4 flex flex-col gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setSystemRateMode('monthly')}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                systemRateMode === 'monthly' ?
-                'bg-gray-900 text-white' :
-                'bg-white text-gray-700 hover:bg-gray-100'}`
-                }>
-                Aylık Oran
-              </button>
-              <button
-                type="button"
-                onClick={() => setSystemRateMode('weekly')}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                systemRateMode === 'weekly' ?
-                'bg-gray-900 text-white' :
-                'bg-white text-gray-700 hover:bg-gray-100'}`
-                }>
-                Haftalık Oran
-              </button>
-              <button
-                type="button"
-                onClick={() => setSystemRateMode('shift')}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                systemRateMode === 'shift' ?
-                'bg-gray-900 text-white' :
-                'bg-white text-gray-700 hover:bg-gray-100'}`
-                }>
-                Vardiya Bazlı Oran
-              </button>
-            </div>
-
-            {systemRateMode === 'shift' &&
-            <div className="flex flex-wrap items-center gap-2">
-                {(['VARDIYA 1', 'VARDIYA 2', 'VARDIYA 3'] as const).map((shiftKey) =>
-              <button
-                key={`system-rate-shift-${shiftKey}`}
-                type="button"
-                onClick={() => setSystemRateShift(shiftKey)}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                systemRateShift === shiftKey ?
-                'bg-blue-600 text-white' :
-                'bg-white text-gray-700 hover:bg-gray-100'}`
-                }>
-                  {shiftKey}
-                </button>
-              )}
-              </div>
-            }
-
-            {systemRateMode !== 'monthly' &&
-            <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  <Calendar className="h-4 w-4 shrink-0 text-gray-500" />
-                  {weeklyRangeLabel}
-                </span>
-                <div className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 py-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!canSelectPreviousWeeklyOption) return;
-                      const previousOption = weeklyWeekOptions[selectedWeeklyWeekIndex - 1];
-                      if (previousOption) setSelectedWeeklyStartKey(previousOption.key);
-                    }}
-                    disabled={!canSelectPreviousWeeklyOption}
-                    className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-                    canSelectPreviousWeeklyOption ?
-                    'text-slate-700 hover:bg-slate-100' :
-                    'cursor-not-allowed text-slate-300'}`
-                    }
-                    aria-label="Onceki hafta">
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-                  <span className="min-w-[250px] text-center text-xs font-semibold text-slate-700">
-                    {selectedWeeklyWeekOption?.label || '-'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!canSelectNextWeeklyOption) return;
-                      const nextOption = weeklyWeekOptions[selectedWeeklyWeekIndex + 1];
-                      if (nextOption) setSelectedWeeklyStartKey(nextOption.key);
-                    }}
-                    disabled={!canSelectNextWeeklyOption}
-                    className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
-                    canSelectNextWeeklyOption ?
-                    'text-slate-700 hover:bg-slate-100' :
-                    'cursor-not-allowed text-slate-300'}`
-                    }
-                    aria-label="Sonraki hafta">
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            }
-          </div>
-
-          {systemRateRows.length === 0 ?
-          <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-4 text-sm text-gray-600">
-              Bu dönem için sistemde kayıt yok.
-            </div> :
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-              {!hasSystemRateData &&
-            <div className="mb-3 rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                  Kayıtlar yüklendi ancak seçili kırılımda duruş süresi bulunamadı.
-                </div>
-            }
-              <div className="h-[360px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={systemRateRows} margin={{ top: 20, right: 12, left: 0, bottom: 14 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis
-                      dataKey="label"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#64748b', fontSize: 11 }}
-                      interval={0}
-                      height={40} />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: '#64748b', fontSize: 11 }}
-                      width={48}
-                      domain={[0, 'dataMax + 2']}
-                      tickFormatter={(value: number) => `%${formatNumber(value, 0)}`} />
-                    <Tooltip
-                      formatter={(value: number | string | undefined) => `%${formatNumber(Number(value) || 0, 2)}`}
-                      labelFormatter={(label: unknown) => `Tarih: ${String(label ?? '')}`}
-                      cursor={{ fill: '#f8fafc' }} />
-                    <Legend wrapperStyle={{ paddingTop: '12px' }} iconType="circle" />
-                    <Bar
-                      dataKey="rate"
-                      name="Duruş Oranı (%)"
-                      fill="#2563eb"
-                      maxBarSize={34}
-                      radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          }
-        </section>
-      }
-
-      {!hasData && !hasSystemRateData &&
+      {!hasData &&
       <div className="card p-8 text-center">
           <h2 className="text-lg font-semibold text-gray-900">Analiz verisi bulunamadı</h2>
           <p className="mt-2 text-sm text-gray-600">Seçili dönem: {selectedMonthLabel}. Önce Ayarlar &gt; Duruş Analizi alanından bu ay için Excel dosyalarını yükleyin.</p>
@@ -2126,7 +1884,7 @@ export default function DurusAnalizi() {
                 <div>
                   <h2 className="text-lg font-semibold text-gray-900">Vardiya Bazli Durus Dakika Grafigi</h2>
                   <p className="mt-1 text-sm text-gray-600">
-                    Secilen haftada (Pazartesi-Pazar) tum vardiyalar ayri ayri gosterilir (V1, V2, V3).
+                    Veri kaynagi: Ayarlar &gt; Durus Analizi &gt; Durus Analizi Kayitlari. Secilen haftada (Pazartesi-Pazar) tum vardiyalar ayri ayri dakika bazinda gosterilir (V1, V2, V3).
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-xs font-medium">
@@ -2158,7 +1916,7 @@ export default function DurusAnalizi() {
                         type="button"
                         onClick={() => {
                           if (!canSelectPreviousWeeklyOption) return;
-                          const previousOption = weeklyWeekOptions[selectedWeeklyWeekIndex - 1];
+                          const previousOption = weeklyWeekOptions[selectedWeeklyWeekIndex + 1];
                           if (previousOption) setSelectedWeeklyStartKey(previousOption.key);
                         }}
                         disabled={!canSelectPreviousWeeklyOption}
@@ -2177,7 +1935,7 @@ export default function DurusAnalizi() {
                         type="button"
                         onClick={() => {
                           if (!canSelectNextWeeklyOption) return;
-                          const nextOption = weeklyWeekOptions[selectedWeeklyWeekIndex + 1];
+                          const nextOption = weeklyWeekOptions[selectedWeeklyWeekIndex - 1];
                           if (nextOption) setSelectedWeeklyStartKey(nextOption.key);
                         }}
                         disabled={!canSelectNextWeeklyOption}
