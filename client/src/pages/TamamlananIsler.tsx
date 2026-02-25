@@ -211,6 +211,20 @@ export default function TamamlananIsler() {
     [ayarlarPersoneller]
   );
 
+  // Ünvan (rol) bilgisini sicil numarasına göre Map'e dönüştür
+  const unvanMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const personeller = ayarlarPersoneller || [];
+    personeller.forEach(p => {
+      if (p.sicilNo && p.rol) {
+        const normalizedSicil = String(p.sicilNo).trim().toLocaleUpperCase('tr-TR');
+        const normalizedRol = String(p.rol).trim().toLocaleUpperCase('tr-TR');
+        map.set(normalizedSicil, normalizedRol);
+      }
+    });
+    return map;
+  }, [ayarlarPersoneller]);
+
   useEffect(() => {
     const loadCompletedJobs = async () => {
       try {
@@ -567,6 +581,32 @@ export default function TamamlananIsler() {
     new Map(filteredSatirlar.map(({ is }) => [is.id, is])).values()
   ), [filteredSatirlar]);
 
+  // İşçi metrikleri hesaplama
+  const isciMetrikleri = useMemo(() => {
+    // İşçi personelleri filtrele (sadece rol === 'İŞÇİ' olanlar)
+    const isciSatirlar = filteredSatirlar.filter(satir => {
+      const normalizedSicil = String(satir.personel.sicilNo).trim().toLocaleUpperCase('tr-TR');
+      const unvan = unvanMap.get(normalizedSicil);
+      return unvan === 'İŞÇİ';
+    });
+
+    // Benzersiz işçi sicil numaralarını bul
+    const uniqueIsciSiciller = new Set(
+      isciSatirlar.map(satir => String(satir.personel.sicilNo).trim().toLocaleUpperCase('tr-TR'))
+    );
+
+    const toplamFarkliIsci = uniqueIsciSiciller.size;
+    const toplamSure = filteredIsler.reduce((sum, is) => sum + (Number(is.sureDakika) || 0), 0);
+    const ortalamaSure = toplamFarkliIsci > 0
+      ? Math.round(toplamSure / toplamFarkliIsci)
+      : 0;
+
+    return {
+      toplamFarkliIsci,
+      ortalamaSure
+    };
+  }, [filteredSatirlar, filteredIsler, unvanMap]);
+
   const uzunDurusKayitlari = useMemo(
     () => filteredIsler.filter((is) => (Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI),
     [filteredIsler]
@@ -812,6 +852,14 @@ export default function TamamlananIsler() {
           <div>
             <span className="text-gray-500">Toplam Personel Girişi:</span>
             <span className="ml-2 font-semibold">{filteredSatirlar.length}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Toplam Farklı İşçi:</span>
+            <span className="ml-2 font-semibold">{isciMetrikleri.toplamFarkliIsci}</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Ortalama Süre:</span>
+            <span className="ml-2 font-semibold">{isciMetrikleri.ortalamaSure} dk</span>
           </div>
           <div>
             <span className="text-gray-500">{MIN_DURUS_DAKIKASI} dk Üstü Duruş:</span>
