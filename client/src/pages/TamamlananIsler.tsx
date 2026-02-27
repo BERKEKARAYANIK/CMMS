@@ -153,6 +153,14 @@ type CompletedRow = {
   normalizedBolum: string;
 };
 
+type ShiftWorkSummaryRow = {
+  sicilNo: string;
+  adSoyad: string;
+  bolum: string;
+  toplamDakika: number;
+  kayitSayisi: number;
+};
+
 export default function TamamlananIsler() {
   const currentUser = useAuthStore((state) => state.user);
   const isBerkeViewer = Boolean(currentUser && isBerkeUser(currentUser));
@@ -167,6 +175,7 @@ export default function TamamlananIsler() {
   const [filterTarih, setFilterTarih] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const [filterBolum, setFilterBolum] = useState('');
   const [filterVardiya, setFilterVardiya] = useState('');
+  const [isShiftWorkModalOpen, setIsShiftWorkModalOpen] = useState(false);
   const [isAnalizModalOpen, setIsAnalizModalOpen] = useState(false);
   const [selectedIsId, setSelectedIsId] = useState<string | null>(null);
   const [atananSicilNo, setAtananSicilNo] = useState('');
@@ -609,6 +618,65 @@ export default function TamamlananIsler() {
     };
   }, [filteredSatirlar, unvanMap]);
 
+  const hasShiftWorkFilterSelection = Boolean(
+    isBerkeViewer && filterTarih && filterBolum && filterVardiya
+  );
+
+  const shiftWorkSummaryRows = useMemo<ShiftWorkSummaryRow[]>(() => {
+    if (!isBerkeViewer || !filterTarih || !filterBolum || !filterVardiya) {
+      return [];
+    }
+
+    const filteredRows = satirlar.filter(({ is, personel, normalizedBolum }) => {
+      const hasWorkerIdentity = Boolean(personel.sicilNo && personel.sicilNo !== '-' && personel.adSoyad && personel.adSoyad !== '-');
+      if (!hasWorkerIdentity) return false;
+
+      return (
+        is.tarih === filterTarih &&
+        normalizedBolum === filterBolum &&
+        is.vardiya.includes(filterVardiya)
+      );
+    });
+
+    const grouped = new Map<string, ShiftWorkSummaryRow>();
+    filteredRows.forEach(({ is, personel, normalizedBolum }) => {
+      const sicilNo = String(personel.sicilNo || '').trim();
+      const adSoyad = String(personel.adSoyad || '').trim();
+      if (!sicilNo || !adSoyad) return;
+
+      const key = `${normalizeForSearch(sicilNo)}|${normalizeForSearch(adSoyad)}`;
+      const current = grouped.get(key) || {
+        sicilNo,
+        adSoyad,
+        bolum: normalizedBolum || personel.bolum || '-',
+        toplamDakika: 0,
+        kayitSayisi: 0
+      };
+
+      current.toplamDakika += Number(is.sureDakika) || 0;
+      current.kayitSayisi += 1;
+      grouped.set(key, current);
+    });
+
+    return Array.from(grouped.values()).sort((a, b) =>
+      b.toplamDakika - a.toplamDakika ||
+      b.kayitSayisi - a.kayitSayisi ||
+      a.adSoyad.localeCompare(b.adSoyad, 'tr-TR')
+    );
+  }, [filterBolum, filterTarih, filterVardiya, isBerkeViewer, satirlar]);
+
+  const openShiftWorkModal = () => {
+    if (!hasShiftWorkFilterSelection) {
+      toast.error('Lutfen tarih, bolum ve vardiya secin');
+      return;
+    }
+    setIsShiftWorkModalOpen(true);
+  };
+
+  const closeShiftWorkModal = () => {
+    setIsShiftWorkModalOpen(false);
+  };
+
   const uzunDurusKayitlari = useMemo(
     () => filteredIsler.filter((is) => (Number(is.sureDakika) || 0) > MIN_DURUS_DAKIKASI),
     [filteredIsler]
@@ -726,6 +794,16 @@ export default function TamamlananIsler() {
             <option value="VARDIYA 2">Vardiya 2</option>
             <option value="VARDIYA 3">Vardiya 3</option>
           </select>
+          {isBerkeViewer &&
+          <button
+            type="button"
+            onClick={openShiftWorkModal}
+            className="btn btn-secondary w-full md:w-auto"
+            disabled={!hasShiftWorkFilterSelection || shiftWorkSummaryRows.length === 0}>
+
+              Vardiya Calisma Sureleri
+            </button>
+          }
         </div>
       </div>
 
@@ -877,6 +955,67 @@ export default function TamamlananIsler() {
           </div>
         </div>
       </div>
+
+      {isShiftWorkModalOpen && isBerkeViewer &&
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={closeShiftWorkModal} />
+            <div className="relative w-full max-w-4xl rounded-xl border border-gray-200 bg-white shadow-xl">
+              <div className="border-b px-5 py-4">
+                <h2 className="text-lg font-bold text-gray-900">Vardiya Calisma Sureleri</h2>
+                <p className="mt-1 text-sm text-gray-600">
+                  {filterTarih ? format(parseDateKey(filterTarih), 'dd.MM.yyyy') : '-'} / {filterVardiya || '-'} / {filterBolum || '-'}
+                </p>
+              </div>
+
+              <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+                {shiftWorkSummaryRows.length === 0 ?
+                <p className="text-sm text-gray-500">
+                    Secilen tarih, bolum ve vardiya icin calisan kaydi bulunamadi.
+                  </p> :
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-amber-500 text-white">
+                          <th className="px-3 py-2 text-left font-semibold">Sira</th>
+                          <th className="px-3 py-2 text-left font-semibold">Ad Soyad</th>
+                          <th className="px-3 py-2 text-left font-semibold">Sicil No</th>
+                          <th className="px-3 py-2 text-left font-semibold">Bolum</th>
+                          <th className="px-3 py-2 text-right font-semibold">Toplam Sure (dk)</th>
+                          <th className="px-3 py-2 text-right font-semibold">Kayit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {shiftWorkSummaryRows.map((row, index) =>
+                      <tr key={`${row.sicilNo}-${row.adSoyad}`} className="hover:bg-gray-50">
+                            <td className="px-3 py-2">{index + 1}</td>
+                            <td className="px-3 py-2">{row.adSoyad}</td>
+                            <td className="px-3 py-2 font-mono">{row.sicilNo}</td>
+                            <td className="px-3 py-2">{row.bolum}</td>
+                            <td className="px-3 py-2 text-right font-semibold">{row.toplamDakika}</td>
+                            <td className="px-3 py-2 text-right">{row.kayitSayisi}</td>
+                          </tr>
+                      )}
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+
+              <div className="flex justify-end gap-3 border-t px-5 py-4">
+                <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={closeShiftWorkModal}>
+
+                  Kapat
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
 
       {!canManage &&
       <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">

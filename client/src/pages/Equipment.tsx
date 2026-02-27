@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   Eye,
@@ -11,6 +11,7 @@ import {
 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { isBerkeUser } from '../utils/access';
+import { appStateApi } from '../services/api';
 
 type Department = 'MEKANIK' | 'ELEKTRIK' | 'YARDIMCI_TESISLER';
 type FormType = 'DEMIRBAS_FORMU' | 'BILGI_FORMU';
@@ -49,6 +50,7 @@ const forms: Array<{id: FormType;label: string;}> = [
 const DB_NAME = 'cmms-form-packages';
 const DB_VERSION = 2;
 const STORE_NAME = 'formPackagesByDepartment';
+const FORM_PACKAGES_APP_STATE_KEY = 'forms:demirbas_packages';
 
 function makePackageId(department: Department, formType: FormType): PackageId {
   return `${department}__${formType}` as PackageId;
@@ -64,6 +66,151 @@ const initialPackageState: PackageState = allPackageIds.reduce((acc, id) => {
   acc[id] = null;
   return acc;
 }, {} as PackageState);
+
+function normalizeToken(value: unknown): string {
+  return String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .trim();
+}
+
+function normalizeDepartment(value: unknown): Department | null {
+  const token = normalizeToken(value);
+  if (!token) return null;
+
+  if (token === 'MEKANIK') return 'MEKANIK';
+  if (token === 'ELEKTRIK') return 'ELEKTRIK';
+  if (
+    token === 'YARDIMCI_TESISLER' ||
+    token === 'YARDIMCI_TESISLERI' ||
+    token === 'YARDIMCI_ISLETMELER'
+  ) {
+    return 'YARDIMCI_TESISLER';
+  }
+
+  return null;
+}
+
+function normalizeFormType(value: unknown): FormType | null {
+  const token = normalizeToken(value);
+  if (!token) return null;
+
+  if (token === 'DEMIRBAS_FORMU' || token === 'DEMIRBAS') return 'DEMIRBAS_FORMU';
+  if (token === 'BILGI_FORMU' || token === 'BILGI') return 'BILGI_FORMU';
+
+  return null;
+}
+
+function resolvePackageIdentity(raw: {
+  id?: unknown;
+  department?: unknown;
+  formType?: unknown;
+}): {id: PackageId;department: Department;formType: FormType;} | null {
+  const fromId = String(raw.id || '').trim();
+  if (fromId.includes('__')) {
+    const [depPart, formPart] = fromId.split('__');
+    const department = normalizeDepartment(depPart);
+    const formType = normalizeFormType(formPart);
+    if (department && formType) {
+      return {
+        id: makePackageId(department, formType),
+        department,
+        formType
+      };
+    }
+  }
+
+  const department = normalizeDepartment(raw.department);
+  const formType = normalizeFormType(raw.formType);
+  if (!department || !formType) return null;
+
+  return {
+    id: makePackageId(department, formType),
+    department,
+    formType
+  };
+}
+
+function isNewerPackage(candidate: StoredFormPackage, current: StoredFormPackage | null): boolean {
+  if (!current) return true;
+  const candidateTime = new Date(candidate.uploadedAt).getTime();
+  const currentTime = new Date(current.uploadedAt).getTime();
+
+  if (Number.isNaN(candidateTime)) return false;
+  if (Number.isNaN(currentTime)) return true;
+  return candidateTime >= currentTime;
+}
+
+function normalizePackageState(raw: unknown): PackageState {
+  const nextState: PackageState = { ...initialPackageState };
+
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      const normalized = normalizeStoredPackage(item);
+      if (normalized && isNewerPackage(normalized, nextState[normalized.id])) {
+        nextState[normalized.id] = normalized;
+      }
+    });
+    return nextState;
+  }
+
+  if (!raw || typeof raw !== 'object') return nextState;
+
+  Object.entries(raw as Record<string, unknown>).forEach(([key, value]) => {
+    if (!value || typeof value !== 'object') return;
+    const normalized = normalizeStoredPackage({ ...(value as Record<string, unknown>), id: (value as any).id || key });
+    if (normalized && isNewerPackage(normalized, nextState[normalized.id])) {
+      nextState[normalized.id] = normalized;
+    }
+  });
+
+  return nextState;
+}
+
+function buildAppStatePayload(packages: PackageState): Record<string, StoredFormPackage> {
+  const payload: Record<string, StoredFormPackage> = {};
+  allPackageIds.forEach((id) => {
+    const item = packages[id];
+    if (item) {
+      payload[id] = item;
+    }
+  });
+  return payload;
+}
+
+function hasAnyPackage(packages: PackageState): boolean {
+  return allPackageIds.some((id) => Boolean(packages[id]));
+}
+
+function arePackageStatesEqual(left: PackageState, right: PackageState): boolean {
+  return allPackageIds.every((id) => {
+    const leftItem = left[id];
+    const rightItem = right[id];
+
+    if (!leftItem && !rightItem) return true;
+    if (!leftItem || !rightItem) return false;
+
+    return (
+      leftItem.id === rightItem.id &&
+      leftItem.department === rightItem.department &&
+      leftItem.formType === rightItem.formType &&
+      leftItem.approvalStatus === rightItem.approvalStatus &&
+      leftItem.formNumber === rightItem.formNumber &&
+      leftItem.pypNo === rightItem.pypNo &&
+      leftItem.formName === rightItem.formName &&
+      leftItem.fileName === rightItem.fileName &&
+      leftItem.mimeType === rightItem.mimeType &&
+      leftItem.size === rightItem.size &&
+      leftItem.uploadedAt === rightItem.uploadedAt &&
+      leftItem.uploadedByName === rightItem.uploadedByName &&
+      leftItem.uploadedBySicilNo === rightItem.uploadedBySicilNo &&
+      leftItem.dataUrl === rightItem.dataUrl
+    );
+  });
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -84,15 +231,17 @@ function openDatabase(): Promise<IDBDatabase> {
 function normalizeStoredPackage(raw: unknown): StoredFormPackage | null {
   if (!raw || typeof raw !== 'object') return null;
 
-  const value = raw as Partial<StoredFormPackage>;
-  if (!value.id || !value.department || !value.formType || !value.fileName || !value.dataUrl) {
+  const value = raw as Partial<StoredFormPackage> & Record<string, unknown>;
+  const identity = resolvePackageIdentity(value);
+
+  if (!identity || !value.fileName || !value.dataUrl) {
     return null;
   }
 
   return {
-    id: value.id,
-    department: value.department,
-    formType: value.formType,
+    id: identity.id,
+    department: identity.department,
+    formType: identity.formType,
     approvalStatus: value.approvalStatus === 'RED' ?
     'RED' :
     value.approvalStatus === 'KABUL' ? 'KABUL' : 'BEKLIYOR',
@@ -109,16 +258,21 @@ function normalizeStoredPackage(raw: unknown): StoredFormPackage | null {
   };
 }
 
-async function getStoredPackage(id: PackageId): Promise<StoredFormPackage | null> {
+async function getAllStoredPackages(): Promise<StoredFormPackage[]> {
   const db = await openDatabase();
 
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
-    const request = store.get(id);
+    const request = store.getAll();
 
     request.onsuccess = () => {
-      resolve(normalizeStoredPackage(request.result));
+      const rows = Array.isArray(request.result) ? request.result : [];
+      resolve(
+        rows
+          .map((item) => normalizeStoredPackage(item))
+          .filter((item): item is StoredFormPackage => Boolean(item))
+      );
     };
 
     request.onerror = () => reject(request.error);
@@ -216,30 +370,70 @@ export default function EquipmentPage() {
   const [bilgiFile, setBilgiFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isDecisionSaving, setIsDecisionSaving] = useState(false);
+  const [isPackagesReady, setIsPackagesReady] = useState(false);
+
+  const refreshPackagesFromSources = useCallback(async () => {
+    const [cloudResult, localResult] = await Promise.allSettled([
+      appStateApi.get(FORM_PACKAGES_APP_STATE_KEY),
+      getAllStoredPackages()
+    ]);
+
+    const cloudState =
+    cloudResult.status === 'fulfilled' ?
+    normalizePackageState(cloudResult.value.data?.data?.value) :
+    { ...initialPackageState };
+
+    const localState =
+    localResult.status === 'fulfilled' ?
+    normalizePackageState(localResult.value) :
+    { ...initialPackageState };
+
+    const cloudHasData = hasAnyPackage(cloudState);
+    const localHasData = hasAnyPackage(localState);
+
+    // Cloud state is authoritative after first successful sync.
+    // Local state is used only as bootstrap when cloud is still empty/unavailable.
+    let nextState: PackageState;
+    if (cloudResult.status === 'fulfilled') {
+      nextState = cloudHasData ? cloudState : localHasData ? localState : cloudState;
+    } else {
+      nextState = localState;
+    }
+
+    if (cloudResult.status === 'rejected' && localResult.status === 'rejected') {
+      toast.error('Paketler okunamadi');
+    }
+
+    return nextState;
+  }, []);
+
+  const refreshPackagesFromCloud = useCallback(async () => {
+    try {
+      const response = await appStateApi.get(FORM_PACKAGES_APP_STATE_KEY);
+      const cloudState = normalizePackageState(response.data?.data?.value);
+
+      setPackages((prev) => {
+        const cloudHasData = hasAnyPackage(cloudState);
+        if (!cloudHasData && hasAnyPackage(prev)) {
+          return prev;
+        }
+        return arePackageStatesEqual(prev, cloudState) ? prev : cloudState;
+      });
+    } catch {
+      // periodic refresh should not interrupt local usage on transient network errors
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadPackages = async () => {
-      try {
-        const values = await Promise.all(allPackageIds.map((id) => getStoredPackage(id)));
+      const nextState = await refreshPackagesFromSources();
+      if (cancelled) return;
 
-        if (!cancelled) {
-          const nextState: PackageState = { ...initialPackageState };
-          allPackageIds.forEach((id, index) => {
-            nextState[id] = values[index];
-          });
-          setPackages(nextState);
-        }
-      } catch {
-        if (!cancelled) {
-          toast.error('Paketler okunamadi');
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
+      setPackages((prev) => arePackageStatesEqual(prev, nextState) ? prev : nextState);
+      setIsPackagesReady(true);
+      setIsLoading(false);
     };
 
     void loadPackages();
@@ -247,7 +441,42 @@ export default function EquipmentPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [refreshPackagesFromSources]);
+
+  useEffect(() => {
+    if (!isPackagesReady) return;
+
+    const syncCloudState = async () => {
+      try {
+        await appStateApi.set(FORM_PACKAGES_APP_STATE_KEY, buildAppStatePayload(packages));
+      } catch {
+        // local state remains usable even when cloud sync fails
+      }
+    };
+
+    void syncCloudState();
+  }, [isPackagesReady, packages]);
+
+  useEffect(() => {
+    if (!isPackagesReady) return;
+
+    const intervalId = window.setInterval(() => {
+      void refreshPackagesFromCloud();
+    }, 30000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshPackagesFromCloud();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isPackagesReady, refreshPackagesFromCloud]);
 
   const resetUploadModal = () => {
     setSelectedDepartment(activeDepartment || 'MEKANIK');
