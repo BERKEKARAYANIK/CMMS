@@ -641,7 +641,7 @@ export default function EquipmentPage() {
 
     const trimmedPypNo = rowPypNoInput.trim();
     if (status === 'KABUL' && !trimmedPypNo) {
-      toast.error('Kabul için PYP No zorunludur');
+      toast.error('Kabul için SBT No zorunludur');
       return;
     }
 
@@ -800,7 +800,7 @@ export default function EquipmentPage() {
                   <tr className="bg-amber-500 text-white">
                     <th className="px-3 py-3 text-left font-semibold">Form No</th>
                     <th className="px-3 py-3 text-left font-semibold">Karar</th>
-                    <th className="px-3 py-3 text-left font-semibold">PYP No</th>
+                    <th className="px-3 py-3 text-left font-semibold">SBT No</th>
                     <th className="px-3 py-3 text-left font-semibold">Form Adi</th>
                     <th className="px-3 py-3 text-left font-semibold">Demirbas Dosyasi</th>
                     <th className="px-3 py-3 text-left font-semibold">Bilgi Dosyasi</th>
@@ -951,7 +951,7 @@ export default function EquipmentPage() {
                                   <input
                                 type="text"
                                 className="input !h-8 !w-28 text-xs"
-                                placeholder="PYP No"
+                                placeholder="SBT No"
                                 value={rowPypNoInput}
                                 onChange={(event) => setRowPypNoInput(event.target.value)}
                                 disabled={isDecisionSaving} />
