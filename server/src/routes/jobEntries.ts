@@ -522,13 +522,72 @@ router.get('/planned', authenticate, async (req: AuthRequest, res: Response) => 
   try {
     await prisma.$transaction((tx) => cleanupStalePlannedJobsTx(tx));
 
+    const isBerke = canManageEntries(req.user);
+    const activeBolum = getAuthenticatedDepartment(req);
+    const requestedBolum = normalizeDepartment(req.query?.bolum);
+    const targetBolum = isBerke ? requestedBolum : activeBolum;
+
+    if (!isBerke && !activeBolum) {
+      return res.json({
+        success: true,
+        data: []
+      });
+    }
+
     const plannedJobs = await prisma.planlananIs.findMany({
       orderBy: { createdAt: 'desc' }
     });
 
+    if (!targetBolum) {
+      return res.json({
+        success: true,
+        data: plannedJobs.map(mapPlannedJob)
+      });
+    }
+
+    const plannerSicilNoList = Array.from(
+      new Set(
+        plannedJobs
+          .map((job) => normalizeText(job.planlayanSicilNo))
+          .filter(Boolean)
+      )
+    );
+
+    const plannerDepartmentMap = new Map<string, string>();
+    if (plannerSicilNoList.length > 0) {
+      const plannerUsers = await prisma.user.findMany({
+        where: {
+          sicilNo: { in: plannerSicilNoList }
+        },
+        select: {
+          sicilNo: true,
+          departman: true
+        }
+      });
+
+      plannerUsers.forEach((user) => {
+        plannerDepartmentMap.set(
+          normalizeIdentity(user.sicilNo),
+          normalizeDepartment(user.departman)
+        );
+      });
+    }
+
+    const filteredPlannedJobs = plannedJobs.filter((job) => {
+      const plannerDepartment = plannerDepartmentMap.get(
+        normalizeIdentity(job.planlayanSicilNo)
+      ) || '';
+      const assignedDepartment = normalizeDepartment(job.atananBolum);
+
+      return (
+        plannerDepartment === targetBolum
+        || assignedDepartment === targetBolum
+      );
+    });
+
     res.json({
       success: true,
-      data: plannedJobs.map(mapPlannedJob)
+      data: filteredPlannedJobs.map(mapPlannedJob)
     });
   } catch (error) {
     console.error('Get planned jobs error:', error);

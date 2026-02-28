@@ -15,6 +15,15 @@ import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
 const PLANLI_BAKIM_TURU = 'Planlı Bakım';
 const CONVERT_KEY = 'cmms_planlanan_is_to_is_emri';
+const BERKE_DEPARTMENT_FILTER_OPTIONS = [
+  'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA',
+  'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM',
+  'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER',
+  'YARDIMCI TESISLER'
+] as const;
 
 function sortByCreatedAtDesc(items: PlannedJob[]): PlannedJob[] {
   return [...items].sort((a, b) =>
@@ -30,6 +39,7 @@ export default function PlanlananIsler() {
   const [isler, setIsler] = useState<PlannedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filterBolum, setFilterBolum] = useState('');
   const [filterMakina, setFilterMakina] = useState('');
   const [makina, setMakina] = useState('');
   const [aciklama, setAciklama] = useState('');
@@ -40,8 +50,12 @@ export default function PlanlananIsler() {
     const loadPlannedJobs = async () => {
       try {
         setIsLoading(true);
+        const plannedParams =
+          canManagePlanlanan && filterBolum
+            ? { bolum: filterBolum }
+            : undefined;
         const [plannedResponse, listsResponse] = await Promise.all([
-        jobEntriesApi.getPlanned(),
+        jobEntriesApi.getPlanned(plannedParams),
         appStateApi.get(APP_STATE_KEYS.settingsLists)]
         );
         const data = plannedResponse.data?.data as PlannedJob[] | undefined;
@@ -59,7 +73,7 @@ export default function PlanlananIsler() {
     };
 
     void loadPlannedJobs();
-  }, [canManagePlanlanan]);
+  }, [canManagePlanlanan, filterBolum]);
 
   const handleKaydet = async () => {
     if (!makina) {
@@ -302,7 +316,22 @@ export default function PlanlananIsler() {
         <div className="overflow-x-auto">
           <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div className="text-sm font-semibold text-gray-700">Planlı İşler</div>
-            <div className="w-full md:w-72">
+            <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+              {canManagePlanlanan &&
+              <div className="w-full md:w-72">
+                  <select
+                  value={filterBolum}
+                  onChange={(e) => setFilterBolum(e.target.value)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm">
+                  
+                    <option value="">Tüm Bölümler</option>
+                    {BERKE_DEPARTMENT_FILTER_OPTIONS.map((bolum) =>
+                  <option key={bolum} value={bolum}>{bolum}</option>
+                  )}
+                  </select>
+                </div>
+              }
+              <div className="w-full md:w-72">
               <select
                 value={filterMakina}
                 onChange={(e) => setFilterMakina(e.target.value)}
@@ -313,6 +342,7 @@ export default function PlanlananIsler() {
                 <option key={m.id} value={m.ad}>{m.ad}</option>
                 )}
               </select>
+            </div>
             </div>
           </div>
 
