@@ -1307,45 +1307,35 @@ export default function IsSagligiGuvenligi() {
   }, [weeklyDateLabels, filteredShiftTrackRecordsForChart]);
 
   const vardiyaAverageDurationRows = useMemo<ShiftAverageDurationRow[]>(() => {
-    type PersonDurationAggregate = {
-      durationSum: number;
-      entryCount: number;
-    };
-    type PersonAggregateMap = Map<string, PersonDurationAggregate>;
-
-    const updatePersonAggregate = (map: PersonAggregateMap, personKey: string, durationMinutes: number) => {
-      const current = map.get(personKey) || { durationSum: 0, entryCount: 0 };
-      current.durationSum += durationMinutes;
-      current.entryCount += 1;
-      map.set(personKey, current);
-    };
-
-    const toAverageFromPersonMap = (map: PersonAggregateMap): number | null => {
-      if (map.size === 0) return null;
-      let personAverageTotal = 0;
-      map.forEach((value) => {
-        personAverageTotal += value.entryCount > 0 ? value.durationSum / value.entryCount : 0;
-      });
-      return Math.round(personAverageTotal / map.size);
-    };
-
     const accumulator = new Map<string, {
-      mekanik: PersonAggregateMap;
-      elektrik: PersonAggregateMap;
-      elektrikAna: PersonAggregateMap;
-      elektrikEk: PersonAggregateMap;
-      yardimci: PersonAggregateMap;
-      total: PersonAggregateMap;
+      mekanikSum: number;
+      mekanikCount: number;
+      elektrikSum: number;
+      elektrikCount: number;
+      elektrikAnaSum: number;
+      elektrikAnaCount: number;
+      elektrikEkSum: number;
+      elektrikEkCount: number;
+      yardimciSum: number;
+      yardimciCount: number;
+      totalSum: number;
+      totalCount: number;
     }>();
 
     vardiyaChartRows.forEach((row) => {
       accumulator.set(row.key, {
-        mekanik: new Map<string, PersonDurationAggregate>(),
-        elektrik: new Map<string, PersonDurationAggregate>(),
-        elektrikAna: new Map<string, PersonDurationAggregate>(),
-        elektrikEk: new Map<string, PersonDurationAggregate>(),
-        yardimci: new Map<string, PersonDurationAggregate>(),
-        total: new Map<string, PersonDurationAggregate>()
+        mekanikSum: 0,
+        mekanikCount: 0,
+        elektrikSum: 0,
+        elektrikCount: 0,
+        elektrikAnaSum: 0,
+        elektrikAnaCount: 0,
+        elektrikEkSum: 0,
+        elektrikEkCount: 0,
+        yardimciSum: 0,
+        yardimciCount: 0,
+        totalSum: 0,
+        totalCount: 0
       });
     });
 
@@ -1357,22 +1347,28 @@ export default function IsSagligiGuvenligi() {
       const bucket = accumulator.get(`${record.date}|${shiftNo}`);
       if (!bucket) return;
 
-      updatePersonAggregate(bucket.total, record.personKey, durationMinutes);
+      bucket.totalSum += durationMinutes;
+      bucket.totalCount += 1;
 
       if (record.departmentGroup === 'mekanik') {
-        updatePersonAggregate(bucket.mekanik, record.personKey, durationMinutes);
+        bucket.mekanikSum += durationMinutes;
+        bucket.mekanikCount += 1;
       }
       if (record.departmentGroup === 'elektrik') {
-        updatePersonAggregate(bucket.elektrik, record.personKey, durationMinutes);
+        bucket.elektrikSum += durationMinutes;
+        bucket.elektrikCount += 1;
         if (record.electricSubgroup === 'ana') {
-          updatePersonAggregate(bucket.elektrikAna, record.personKey, durationMinutes);
+          bucket.elektrikAnaSum += durationMinutes;
+          bucket.elektrikAnaCount += 1;
         }
         if (record.electricSubgroup === 'ek') {
-          updatePersonAggregate(bucket.elektrikEk, record.personKey, durationMinutes);
+          bucket.elektrikEkSum += durationMinutes;
+          bucket.elektrikEkCount += 1;
         }
       }
       if (record.departmentGroup === 'yardimci') {
-        updatePersonAggregate(bucket.yardimci, record.personKey, durationMinutes);
+        bucket.yardimciSum += durationMinutes;
+        bucket.yardimciCount += 1;
       }
     });
 
@@ -1381,18 +1377,18 @@ export default function IsSagligiGuvenligi() {
       return {
         key: row.key,
         shiftLabel: row.name,
-        mekanikAverage: toAverageFromPersonMap(values.mekanik),
-        elektrikAverage: toAverageFromPersonMap(values.elektrik),
-        elektrikAnaAverage: toAverageFromPersonMap(values.elektrikAna),
-        elektrikEkAverage: toAverageFromPersonMap(values.elektrikEk),
-        yardimciAverage: toAverageFromPersonMap(values.yardimci),
-        totalAverage: toAverageFromPersonMap(values.total),
-        mekanikCount: values.mekanik.size,
-        elektrikCount: values.elektrik.size,
-        elektrikAnaCount: values.elektrikAna.size,
-        elektrikEkCount: values.elektrikEk.size,
-        yardimciCount: values.yardimci.size,
-        totalCount: values.total.size
+        mekanikAverage: values.mekanikCount > 0 ? Math.round(values.mekanikSum / values.mekanikCount) : null,
+        elektrikAverage: values.elektrikCount > 0 ? Math.round(values.elektrikSum / values.elektrikCount) : null,
+        elektrikAnaAverage: values.elektrikAnaCount > 0 ? Math.round(values.elektrikAnaSum / values.elektrikAnaCount) : null,
+        elektrikEkAverage: values.elektrikEkCount > 0 ? Math.round(values.elektrikEkSum / values.elektrikEkCount) : null,
+        yardimciAverage: values.yardimciCount > 0 ? Math.round(values.yardimciSum / values.yardimciCount) : null,
+        totalAverage: values.totalCount > 0 ? Math.round(values.totalSum / values.totalCount) : null,
+        mekanikCount: values.mekanikCount,
+        elektrikCount: values.elektrikCount,
+        elektrikAnaCount: values.elektrikAnaCount,
+        elektrikEkCount: values.elektrikEkCount,
+        yardimciCount: values.yardimciCount,
+        totalCount: values.totalCount
       };
     });
   }, [shiftTrackPersonRecordsForAverage, vardiyaChartRows]);
@@ -1857,7 +1853,7 @@ export default function IsSagligiGuvenligi() {
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
-          Mavi: Mekanik, Sari: Elektrik Ana Bina, Koyu Sari: Elektrik Ek Bina, Yesil: Yardimci Tesisler. Degerler Tamamlanan Isler &gt; Vardiya Calisma Sureleri mantigindaki kisi basi ortalama giris suresiyle hesaplanir.
+          Mavi: Mekanik, Sari: Elektrik Ana Bina, Koyu Sari: Elektrik Ek Bina, Yesil: Yardimci Tesisler. Hesap: toplam girilen sure / toplam giris yapan isci.
         </p>
 
         {filteredShiftTrackRecordsForChart.length === 0 &&
