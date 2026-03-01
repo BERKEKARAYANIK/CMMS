@@ -168,6 +168,16 @@ type ShiftTrackRecord = {
   isClosed: boolean;
 };
 
+type ShiftTrackPersonRecord = {
+  date: string;
+  shift: string;
+  departmentGroup: DepartmentGroupKey;
+  electricSubgroup: ElectricDepartmentSubgroup | null;
+  durationMinutes: number;
+  type: ShiftTrackType;
+  personKey: string;
+};
+
 type DepartmentGroupKey = 'elektrik' | 'mekanik' | 'yardimci';
 type ElectricDepartmentSubgroup = 'ana' | 'ek';
 
@@ -1120,6 +1130,43 @@ export default function IsSagligiGuvenligi() {
     });
   }, [completedJobs]);
 
+  const shiftTrackPersonRecords = useMemo<ShiftTrackPersonRecord[]>(() => {
+    return completedJobs.flatMap((job) => {
+      const date = toIsoDateLabel(String(job.tarih || '').trim());
+      if (!isIsoDateLabel(date)) return [];
+
+      const type = resolveCompletedJobTrackType(job);
+      if (!type) return [];
+
+      const shift = resolveShiftLabel(job.vardiya);
+      if (!shiftToNo(shift)) return [];
+
+      const durationMinutes = Number(job.sureDakika) || 0;
+      const personeller = Array.isArray(job.personeller) ? job.personeller : [];
+      if (personeller.length === 0) return [];
+
+      return personeller.flatMap((personel) => {
+        const sicilNo = String(personel?.sicilNo || '').trim();
+        const adSoyad = String(personel?.adSoyad || '').trim();
+        if (!sicilNo || !adSoyad || sicilNo === '-' || adSoyad === '-') return [];
+
+        const department = String(personel?.bolum || '').trim();
+        const departmentGroup = classifyDepartmentGroup(department);
+        if (!departmentGroup) return [];
+
+        return [{
+          date,
+          shift,
+          departmentGroup,
+          electricSubgroup: departmentGroup === 'elektrik' ? classifyElectricDepartmentSubgroup(department) : null,
+          durationMinutes,
+          type,
+          personKey: `${normalizeText(sicilNo)}|${normalizeText(adSoyad)}`
+        }];
+      });
+    });
+  }, [completedJobs]);
+
   const shiftChartTrackType = useMemo<ShiftTrackType | null>(() => {
     if (selectedReport.id === 'uygunsuzluk-yillik') return 'uygunsuzluk';
     if (selectedReport.id === 'capraz-denetim') return 'capraz';
@@ -1218,6 +1265,16 @@ export default function IsSagligiGuvenligi() {
     return shiftTrackRecordsForChart.filter((record) => record.departmentGroup === shiftDepartmentFilter);
   }, [shiftTrackRecordsForChart, shiftDepartmentFilter]);
 
+  const shiftTrackPersonRecordsForAverage = useMemo(() => {
+    if (!shiftChartTrackType) return [] as ShiftTrackPersonRecord[];
+
+    return shiftTrackPersonRecords.filter((record) =>
+      record.type === shiftChartTrackType &&
+      weeklyDateLabelSet.has(record.date) &&
+      (shiftDepartmentFilter === 'tumu' || record.departmentGroup === shiftDepartmentFilter)
+    );
+  }, [shiftChartTrackType, shiftDepartmentFilter, shiftTrackPersonRecords, weeklyDateLabelSet]);
+
   const vardiyaChartRows = useMemo<ShiftChartRow[]>(() => {
     const rows: ShiftChartRow[] = [];
     const rowMap = new Map<string, ShiftChartRow>();
@@ -1257,39 +1314,49 @@ export default function IsSagligiGuvenligi() {
   }, [weeklyDateLabels, filteredShiftTrackRecordsForChart]);
 
   const vardiyaAverageDurationRows = useMemo<ShiftAverageDurationRow[]>(() => {
+    type PersonDurationAggregate = {
+      durationSum: number;
+      entryCount: number;
+    };
+    type PersonAggregateMap = Map<string, PersonDurationAggregate>;
+
+    const updatePersonAggregate = (map: PersonAggregateMap, personKey: string, durationMinutes: number) => {
+      const current = map.get(personKey) || { durationSum: 0, entryCount: 0 };
+      current.durationSum += durationMinutes;
+      current.entryCount += 1;
+      map.set(personKey, current);
+    };
+
+    const toAverageFromPersonMap = (map: PersonAggregateMap): number | null => {
+      if (map.size === 0) return null;
+      let personAverageTotal = 0;
+      map.forEach((value) => {
+        personAverageTotal += value.entryCount > 0 ? value.durationSum / value.entryCount : 0;
+      });
+      return Math.round(personAverageTotal / map.size);
+    };
+
     const accumulator = new Map<string, {
-      mekanikSum: number;
-      mekanikCount: number;
-      elektrikSum: number;
-      elektrikCount: number;
-      elektrikAnaSum: number;
-      elektrikAnaCount: number;
-      elektrikEkSum: number;
-      elektrikEkCount: number;
-      yardimciSum: number;
-      yardimciCount: number;
-      totalSum: number;
-      totalCount: number;
+      mekanik: PersonAggregateMap;
+      elektrik: PersonAggregateMap;
+      elektrikAna: PersonAggregateMap;
+      elektrikEk: PersonAggregateMap;
+      yardimci: PersonAggregateMap;
+      total: PersonAggregateMap;
     }>();
 
     vardiyaChartRows.forEach((row) => {
       accumulator.set(row.key, {
-        mekanikSum: 0,
-        mekanikCount: 0,
-        elektrikSum: 0,
-        elektrikCount: 0,
-        elektrikAnaSum: 0,
-        elektrikAnaCount: 0,
-        elektrikEkSum: 0,
-        elektrikEkCount: 0,
-        yardimciSum: 0,
-        yardimciCount: 0,
-        totalSum: 0,
-        totalCount: 0
+        mekanik: new Map<string, PersonDurationAggregate>(),
+        elektrik: new Map<string, PersonDurationAggregate>(),
+        elektrikAna: new Map<string, PersonDurationAggregate>(),
+        elektrikEk: new Map<string, PersonDurationAggregate>(),
+        yardimci: new Map<string, PersonDurationAggregate>(),
+        total: new Map<string, PersonDurationAggregate>()
       });
     });
 
-    filteredShiftTrackRecordsForChart.forEach((record) => {
+    shiftTrackPersonRecordsForAverage.forEach((record) => {
       const shiftNo = shiftToNo(record.shift);
       const durationMinutes = Number(record.durationMinutes);
       if (!shiftNo || !Number.isFinite(durationMinutes) || durationMinutes < 0) return;
@@ -1297,28 +1364,22 @@ export default function IsSagligiGuvenligi() {
       const bucket = accumulator.get(`${record.date}|${shiftNo}`);
       if (!bucket) return;
 
-      bucket.totalSum += durationMinutes;
-      bucket.totalCount += 1;
+      updatePersonAggregate(bucket.total, record.personKey, durationMinutes);
 
       if (record.departmentGroup === 'mekanik') {
-        bucket.mekanikSum += durationMinutes;
-        bucket.mekanikCount += 1;
+        updatePersonAggregate(bucket.mekanik, record.personKey, durationMinutes);
       }
       if (record.departmentGroup === 'elektrik') {
-        bucket.elektrikSum += durationMinutes;
-        bucket.elektrikCount += 1;
+        updatePersonAggregate(bucket.elektrik, record.personKey, durationMinutes);
         if (record.electricSubgroup === 'ana') {
-          bucket.elektrikAnaSum += durationMinutes;
-          bucket.elektrikAnaCount += 1;
+          updatePersonAggregate(bucket.elektrikAna, record.personKey, durationMinutes);
         }
         if (record.electricSubgroup === 'ek') {
-          bucket.elektrikEkSum += durationMinutes;
-          bucket.elektrikEkCount += 1;
+          updatePersonAggregate(bucket.elektrikEk, record.personKey, durationMinutes);
         }
       }
       if (record.departmentGroup === 'yardimci') {
-        bucket.yardimciSum += durationMinutes;
-        bucket.yardimciCount += 1;
+        updatePersonAggregate(bucket.yardimci, record.personKey, durationMinutes);
       }
     });
 
@@ -1327,21 +1388,21 @@ export default function IsSagligiGuvenligi() {
       return {
         key: row.key,
         shiftLabel: row.name,
-        mekanikAverage: values.mekanikCount > 0 ? Math.round(values.mekanikSum / values.mekanikCount) : null,
-        elektrikAverage: values.elektrikCount > 0 ? Math.round(values.elektrikSum / values.elektrikCount) : null,
-        elektrikAnaAverage: values.elektrikAnaCount > 0 ? Math.round(values.elektrikAnaSum / values.elektrikAnaCount) : null,
-        elektrikEkAverage: values.elektrikEkCount > 0 ? Math.round(values.elektrikEkSum / values.elektrikEkCount) : null,
-        yardimciAverage: values.yardimciCount > 0 ? Math.round(values.yardimciSum / values.yardimciCount) : null,
-        totalAverage: values.totalCount > 0 ? Math.round(values.totalSum / values.totalCount) : null,
-        mekanikCount: values.mekanikCount,
-        elektrikCount: values.elektrikCount,
-        elektrikAnaCount: values.elektrikAnaCount,
-        elektrikEkCount: values.elektrikEkCount,
-        yardimciCount: values.yardimciCount,
-        totalCount: values.totalCount
+        mekanikAverage: toAverageFromPersonMap(values.mekanik),
+        elektrikAverage: toAverageFromPersonMap(values.elektrik),
+        elektrikAnaAverage: toAverageFromPersonMap(values.elektrikAna),
+        elektrikEkAverage: toAverageFromPersonMap(values.elektrikEk),
+        yardimciAverage: toAverageFromPersonMap(values.yardimci),
+        totalAverage: toAverageFromPersonMap(values.total),
+        mekanikCount: values.mekanik.size,
+        elektrikCount: values.elektrik.size,
+        elektrikAnaCount: values.elektrikAna.size,
+        elektrikEkCount: values.elektrikEk.size,
+        yardimciCount: values.yardimci.size,
+        totalCount: values.total.size
       };
     });
-  }, [filteredShiftTrackRecordsForChart, vardiyaChartRows]);
+  }, [shiftTrackPersonRecordsForAverage, vardiyaChartRows]);
 
   const vardiyaAverageByShift = useMemo(() => {
     const map = new Map<string, {
@@ -1353,10 +1414,10 @@ export default function IsSagligiGuvenligi() {
 
     vardiyaAverageDurationRows.forEach((row) => {
       map.set(row.shiftLabel, {
-        mekanik: row.mekanikAverage !== null ? `${row.mekanikAverage} dk` : '-',
-        elektrikAna: row.elektrikAnaAverage !== null ? `${row.elektrikAnaAverage} dk` : '-',
-        elektrikEk: row.elektrikEkAverage !== null ? `${row.elektrikEkAverage} dk` : '-',
-        yardimci: row.yardimciAverage !== null ? `${row.yardimciAverage} dk` : '-'
+        mekanik: row.mekanikAverage !== null ? String(row.mekanikAverage) : '-',
+        elektrikAna: row.elektrikAnaAverage !== null ? String(row.elektrikAnaAverage) : '-',
+        elektrikEk: row.elektrikEkAverage !== null ? String(row.elektrikEkAverage) : '-',
+        yardimci: row.yardimciAverage !== null ? String(row.yardimciAverage) : '-'
       });
     });
 
@@ -1803,7 +1864,7 @@ export default function IsSagligiGuvenligi() {
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
-          Mavi: Mekanik, Sari: Elektrik Ana Bina, Koyu Sari: Elektrik Ek Bina, Yesil: Yardimci Tesisler. Degerler Tamamlanan Isler kayitlarindan hesaplanir.
+          Mavi: Mekanik, Sari: Elektrik Ana Bina, Koyu Sari: Elektrik Ek Bina, Yesil: Yardimci Tesisler. Degerler Tamamlanan Isler &gt; Vardiya Calisma Sureleri mantigindaki kisi basi ortalama giris suresiyle hesaplanir.
         </p>
 
         {filteredShiftTrackRecordsForChart.length === 0 &&
