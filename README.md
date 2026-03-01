@@ -41,7 +41,8 @@ Bu repo icinde Caddy tabanli HTTPS deployment dosyalari vardir:
 ### Kurulum
 
 1. Sunucuda DNS kaydini ayarla:
-   - `CMMS_DOMAIN` -> sunucu public IP
+   - `CMMS_DOMAIN=erwbakimmerkezi.com` (ornek canli alan adi)
+   - Canli deploy adresi: `https://www.erwbakimmerkezi.com`
 2. `deploy/.env.example` dosyasini `.env` olarak kopyala ve doldur:
    - `CMMS_DOMAIN`
    - `JWT_SECRET`

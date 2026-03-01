@@ -1,6 +1,6 @@
 {$CMMS_DOMAIN}, www.{$CMMS_DOMAIN} {
-  @www host www.{$CMMS_DOMAIN}
-  redir @www https://{$CMMS_DOMAIN}{uri} permanent
+  @root host {$CMMS_DOMAIN}
+  redir @root https://www.{$CMMS_DOMAIN}{uri} permanent
 
   encode gzip zstd
 

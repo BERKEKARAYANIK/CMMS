@@ -36,3 +36,4 @@ Her yeni islemde tarihli not dusulur ve canli durum kaydi tutulur.
 
 ## Oturum Kayitlari
 - 2026-02-23 05:20 | Kalici not talebi | Bu dosya olusturuldu ve takip kurali tanimlandi | Canli: Hayir
+- 2026-03-01 22:07 | Deploy domain kaydi | `www.erwbakimmerkezi.com` deploy adresi README ve deploy dosyalarina eklendi, Caddy yonlendirmesi root -> www olacak sekilde guncellendi | Canli: Evet
