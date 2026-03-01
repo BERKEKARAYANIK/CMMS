@@ -1412,6 +1412,7 @@ export default function IsSagligiGuvenligi() {
 
     return map;
   }, [vardiyaAverageDurationRows]);
+  const firstShiftLabelForWeek = vardiyaChartRows[0]?.name || '';
 
   const toplamMekanik = vardiyaChartRows.reduce((sum, row) => sum + row.mekanik, 0);
   const toplamElektrik = vardiyaChartRows.reduce((sum, row) => sum + row.elektrik, 0);
@@ -1885,6 +1886,7 @@ export default function IsSagligiGuvenligi() {
                       elektrikEk: '-',
                       yardimci: '-'
                     };
+                    const showRowPrefix = label === firstShiftLabelForWeek;
                     return (
                       <g transform={`translate(${x},${y})`}>
                         <text
@@ -1904,7 +1906,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#5b7be1"
                           fontSize={9}
                           fontWeight={600}>
-                          Mek: {average.mekanik}
+                          {showRowPrefix ? 'Mek: ' : ''}{average.mekanik}
                         </text>
                         <text
                           x={0}
@@ -1914,7 +1916,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#d4af37"
                           fontSize={9}
                           fontWeight={600}>
-                          Elk Ana: {average.elektrikAna}
+                          {showRowPrefix ? 'Elk Ana: ' : ''}{average.elektrikAna}
                         </text>
                         <text
                           x={0}
@@ -1924,7 +1926,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#b88a1d"
                           fontSize={9}
                           fontWeight={600}>
-                          Elk Ek: {average.elektrikEk}
+                          {showRowPrefix ? 'Elk Ek: ' : ''}{average.elektrikEk}
                         </text>
                         <text
                           x={0}
@@ -1934,7 +1936,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#6fb581"
                           fontSize={9}
                           fontWeight={600}>
-                          Yrd: {average.yardimci}
+                          {showRowPrefix ? 'Yrd: ' : ''}{average.yardimci}
                         </text>
                       </g>
                     );
