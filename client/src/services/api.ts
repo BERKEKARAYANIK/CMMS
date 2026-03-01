@@ -144,6 +144,12 @@ export const appStateApi = {
     api.put(`/app-state/${encodeURIComponent(key)}`, { value })
 };
 
+export const accessLogsApi = {
+  getAll: (params?: QueryParams) => api.get('/access-logs', { params }),
+  getEvents: (params?: QueryParams) => api.get('/access-logs/events', { params }),
+  getSummary: (params?: QueryParams) => api.get('/access-logs/summary', { params })
+};
+
 export const backupsApi = {
   getSettings: () => api.get('/backups/settings'),
   updateSettings: (data: Partial<BackupSettings>) => api.put('/backups/settings', data),

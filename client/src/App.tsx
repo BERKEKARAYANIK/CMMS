@@ -19,6 +19,7 @@ import IsSagligiGuvenligi from './pages/IsSagligiGuvenligi';
 import DurusAnalizi from './pages/DurusAnalizi';
 import GunlukPerformansGenelBakis from './pages/GunlukPerformansGenelBakis';
 import WorkOrders from './pages/WorkOrders';
+import AccessLogs from './pages/AccessLogs';
 import { isBerkeUser, isSystemAdminUser } from './utils/access';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -88,6 +89,14 @@ function App() {
           element={(
             <SettingsRoute>
               <Ayarlar />
+            </SettingsRoute>
+          )}
+        />
+        <Route
+          path="access-logs"
+          element={(
+            <SettingsRoute>
+              <AccessLogs />
             </SettingsRoute>
           )}
         />

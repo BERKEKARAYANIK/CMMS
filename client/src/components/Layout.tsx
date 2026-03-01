@@ -31,6 +31,7 @@ const navigation = [
   { name: 'Tamamlanan İşler', href: '/tamamlanan-isler', icon: CheckSquare, enabled: true },
   { name: 'Planlanan İşler', href: '/planlanan-isler', icon: ListChecks, enabled: true },
   { name: 'Bakım Takip Merkezi', href: '/bakim-takip-merkezi', icon: LayoutDashboard, enabled: true },
+  { name: 'Erisim Loglari', href: '/access-logs', icon: BarChart3, enabled: true },
   { name: 'Personel', href: '/personnel', icon: Users, enabled: true },
   { name: 'Günlük Performans Genel Bakış', href: '/gunluk-performans-genel-bakis', icon: BarChart3, enabled: true },
   { name: 'Tekrarlayan Arıza Analizi', href: '/tekrarlayan-ariza-analizi', icon: BarChart3, enabled: false },
@@ -63,8 +64,12 @@ export default function Layout() {
     '/reports',
     '/preventive-maintenance'
   ]);
+  const adminOnlyPaths = new Set([
+    '/access-logs'
+  ]);
   const visibleNavigation = navigation.filter((item) => {
     if (berkeOnlyPaths.has(item.href) && !isBerke) return false;
+    if (adminOnlyPaths.has(item.href) && !isSystemAdmin) return false;
     return true;
   });
 

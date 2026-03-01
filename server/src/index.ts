@@ -13,6 +13,7 @@ import { dashboardRouter } from './routes/dashboard.js';
 import { jobEntriesRouter } from './routes/jobEntries.js';
 import { appStateRouter } from './routes/appState.js';
 import { backupsRouter } from './routes/backups.js';
+import { accessLogsRouter } from './routes/accessLogs.js';
 import { initializeBackupScheduler } from './services/backupService.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { prisma } from './lib/prisma.js';
@@ -39,6 +40,7 @@ app.use('/api/dashboard', dashboardRouter);
 app.use('/api/job-entries', jobEntriesRouter);
 app.use('/api/app-state', appStateRouter);
 app.use('/api/backups', backupsRouter);
+app.use('/api/access-logs', accessLogsRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });

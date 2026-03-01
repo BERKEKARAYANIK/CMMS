@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import {
@@ -20,6 +21,7 @@ import {
   isPasswordPolicyCompliant,
   PASSWORD_POLICY_MESSAGE
 } from '../utils/passwordPolicy.js';
+import { logAccessEvent } from '../services/accessLogService.js';
 
 const router = Router();
 
@@ -68,12 +70,42 @@ function matchesLoginIdentifier(user: LoginUser, loginId: string): boolean {
   );
 }
 
+function getTokenFromRequest(req: AuthRequest): string | null {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.slice('Bearer '.length).trim();
+  }
+
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) {
+    return null;
+  }
+
+  const cookie = cookieHeader
+    .split(';')
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(`${AUTH_COOKIE_NAME}=`));
+
+  if (!cookie) {
+    return null;
+  }
+
+  return decodeURIComponent(cookie.slice(`${AUTH_COOKIE_NAME}=`.length));
+}
+
 router.post('/login', async (req, res) => {
   try {
     const { email, identifier, password } = req.body;
     const loginId = (identifier || email || '').trim();
 
     if (!loginId || !password) {
+      await logAccessEvent({
+        req,
+        eventType: 'LOGIN_FAILED',
+        identifier: loginId || undefined,
+        success: false,
+        reason: 'MISSING_CREDENTIALS'
+      });
       return res.status(400).json({
         success: false,
         message: 'Kullanici adi ve sifre gereklidir'
@@ -98,6 +130,13 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user || !user.password) {
+      await logAccessEvent({
+        req,
+        eventType: 'LOGIN_FAILED',
+        identifier: loginId,
+        success: false,
+        reason: 'INVALID_CREDENTIALS'
+      });
       return res.status(401).json({
         success: false,
         message: 'Gecersiz kullanici adi veya sifre'
@@ -106,6 +145,14 @@ router.post('/login', async (req, res) => {
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
+      await logAccessEvent({
+        req,
+        eventType: 'LOGIN_FAILED',
+        identifier: loginId,
+        user,
+        success: false,
+        reason: 'INVALID_CREDENTIALS'
+      });
       return res.status(401).json({
         success: false,
         message: 'Gecersiz kullanici adi veya sifre'
@@ -113,17 +160,34 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user.aktif) {
+      await logAccessEvent({
+        req,
+        eventType: 'LOGIN_FAILED',
+        identifier: loginId,
+        user,
+        success: false,
+        reason: 'USER_INACTIVE'
+      });
       return res.status(401).json({
         success: false,
         message: 'Hesabiniz pasif durumda'
       });
     }
 
-    const token = jwt.sign({ userId: user.id }, JWT_SECRET, {
+    const sessionId = randomUUID();
+    const token = jwt.sign({ userId: user.id, sessionId }, JWT_SECRET, {
       expiresIn: '24h'
     });
 
     res.cookie(AUTH_COOKIE_NAME, token, authCookieOptions);
+
+    await logAccessEvent({
+      req,
+      eventType: 'LOGIN_SUCCESS',
+      user,
+      sessionId,
+      success: true
+    });
 
     res.json({
       success: true,
@@ -148,7 +212,46 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.post('/logout', (req, res) => {
+router.post('/logout', async (req: AuthRequest, res) => {
+  let user: LoginUser | null = null;
+  let sessionId = '';
+
+  const token = getTokenFromRequest(req);
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as {userId?: number;sessionId?: string;};
+      sessionId = String(decoded.sessionId || '').trim();
+      if (decoded.userId && Number.isFinite(decoded.userId)) {
+        user = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          select: {
+            id: true,
+            sicilNo: true,
+            ad: true,
+            soyad: true,
+            adSoyad: true,
+            email: true,
+            password: true,
+            role: true,
+            departman: true,
+            aktif: true
+          }
+        });
+      }
+    } catch {
+      // Token invalid/expired; logout should still succeed without blocking.
+    }
+  }
+
+  await logAccessEvent({
+    req,
+    eventType: 'LOGOUT',
+    user,
+    sessionId: sessionId || undefined,
+    success: true,
+    reason: 'USER_INITIATED'
+  });
+
   res.clearCookie(AUTH_COOKIE_NAME, clearCookieOptions);
   res.json({ success: true });
 });
