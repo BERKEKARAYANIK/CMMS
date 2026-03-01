@@ -1285,11 +1285,21 @@ export default function IsSagligiGuvenligi() {
     });
   }, [filteredShiftTrackRecordsForChart, vardiyaChartRows]);
 
-  const vardiyaAverageLabelByShift = useMemo(() => {
-    const map = new Map<string, string>();
+  const vardiyaAverageByShift = useMemo(() => {
+    const map = new Map<string, {
+      mekanik: string;
+      elektrik: string;
+      yardimci: string;
+    }>();
+
     vardiyaAverageDurationRows.forEach((row) => {
-      map.set(row.shiftLabel, row.totalAverage !== null ? `${row.totalAverage} dk` : '-');
+      map.set(row.shiftLabel, {
+        mekanik: row.mekanikAverage !== null ? `${row.mekanikAverage} dk` : '-',
+        elektrik: row.elektrikAverage !== null ? `${row.elektrikAverage} dk` : '-',
+        yardimci: row.yardimciAverage !== null ? `${row.yardimciAverage} dk` : '-'
+      });
     });
+
     return map;
   }, [vardiyaAverageDurationRows]);
 
@@ -1733,7 +1743,7 @@ export default function IsSagligiGuvenligi() {
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
-          Mavi: Mekanik, Sari: Elektrik, Yesil: Yardimci Tesisler. Veri olmayan gunlerde deger 0 gosterilir.
+          Mavi: Mekanik, Sari: Elektrik, Yesil: Yardimci Tesisler. Her gun/vardiya etiketinin altinda ilgili birimlerin ortalama sureleri gosterilir.
         </p>
 
         {filteredShiftTrackRecordsForChart.length === 0 &&
@@ -1748,7 +1758,7 @@ export default function IsSagligiGuvenligi() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={vardiyaChartRows}
-                margin={{ top: 20, right: 16, left: 0, bottom: 28 }}>
+                margin={{ top: 20, right: 16, left: 0, bottom: 62 }}>
 
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis
@@ -1759,7 +1769,11 @@ export default function IsSagligiGuvenligi() {
                     const x = Number(props?.x ?? 0);
                     const y = Number(props?.y ?? 0);
                     const label = String(props?.payload?.value ?? '');
-                    const averageLabel = vardiyaAverageLabelByShift.get(label) || '-';
+                    const average = vardiyaAverageByShift.get(label) || {
+                      mekanik: '-',
+                      elektrik: '-',
+                      yardimci: '-'
+                    };
                     return (
                       <g transform={`translate(${x},${y})`}>
                         <text
@@ -1776,16 +1790,36 @@ export default function IsSagligiGuvenligi() {
                           y={0}
                           dy={24}
                           textAnchor="middle"
-                          fill="#0f766e"
-                          fontSize={10}
+                          fill="#5b7be1"
+                          fontSize={9}
                           fontWeight={600}>
-                          {averageLabel}
+                          Mek: {average.mekanik}
+                        </text>
+                        <text
+                          x={0}
+                          y={0}
+                          dy={36}
+                          textAnchor="middle"
+                          fill="#d4af37"
+                          fontSize={9}
+                          fontWeight={600}>
+                          Elk: {average.elektrik}
+                        </text>
+                        <text
+                          x={0}
+                          y={0}
+                          dy={48}
+                          textAnchor="middle"
+                          fill="#6fb581"
+                          fontSize={9}
+                          fontWeight={600}>
+                          Yrd: {average.yardimci}
                         </text>
                       </g>
                     );
                   }}
                   interval={0}
-                  height={58} />
+                  height={82} />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
@@ -1827,44 +1861,6 @@ export default function IsSagligiGuvenligi() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-gray-900">Gun/Vardiya Bazli Ortalama Calisma Sureleri (dk)</h3>
-          <p className="mt-1 text-xs text-gray-500">
-            Secili haftada her satir (or: Sal V3) icin birim bazli ortalama mudahale suresi.
-          </p>
-          <div className="mt-3 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600">Gun - Vardiya</th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Mekanik</th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Elektrik</th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Yardimci</th>
-                  <th className="px-3 py-2 text-right font-semibold text-gray-600">Genel Ortalama</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {vardiyaAverageDurationRows.map((row) =>
-                <tr key={`avg-${row.key}`}>
-                    <td className="px-3 py-2 font-medium text-gray-800">{row.shiftLabel}</td>
-                    <td className="px-3 py-2 text-right text-gray-700">
-                      {row.mekanikAverage !== null ? `${row.mekanikAverage} dk` : '-'}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-700">
-                      {row.elektrikAverage !== null ? `${row.elektrikAverage} dk` : '-'}
-                    </td>
-                    <td className="px-3 py-2 text-right text-gray-700">
-                      {row.yardimciAverage !== null ? `${row.yardimciAverage} dk` : '-'}
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold text-gray-800">
-                      {row.totalAverage !== null ? `${row.totalAverage} dk` : '-'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </section>
       }
 
