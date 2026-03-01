@@ -40,7 +40,7 @@ import {
   type IsgTopicMissingBreakdown,
   type IsgMissingTopicId } from
 '../data/isgMissing';
-import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
+import { APP_STATE_KEYS } from '../constants/appState';
 import { appStateApi, jobEntriesApi } from '../services/api';
 import type { CompletedJob } from '../types/jobEntries';
 
@@ -174,7 +174,6 @@ type ShiftTrackPersonRecord = {
   departmentGroup: DepartmentGroupKey;
   electricSubgroup: ElectricDepartmentSubgroup | null;
   durationMinutes: number;
-  type: ShiftTrackType;
   personKey: string;
 };
 
@@ -992,29 +991,6 @@ export default function IsSagligiGuvenligi() {
       }
     }
   });
-  const { data: settingsPersonelList = [] } = useQuery({
-    queryKey: ['isg-shift-track-settings-personel-list'],
-    queryFn: async () => {
-      try {
-        const response = await appStateApi.get(APP_STATE_KEYS.settingsLists);
-        const lists = normalizeSettingsLists(response.data?.data?.value);
-        return lists.personelListesi;
-      } catch {
-        return [];
-      }
-    }
-  });
-  const personelRoleMap = useMemo(() => {
-    const map = new Map<string, string>();
-    settingsPersonelList.forEach((personel) => {
-      const sicilNo = String(personel?.sicilNo || '').trim();
-      const rol = String(personel?.rol || '').trim();
-      if (!sicilNo || !rol) return;
-      map.set(normalizeText(sicilNo), normalizeText(rol));
-    });
-    return map;
-  }, [settingsPersonelList]);
-
   const importedCaprazComputation = useMemo(() => {
     if (!importedIsg?.caprazDenetim) return null;
     return computeCaprazBreakdown(importedIsg.caprazDenetim);
@@ -1157,9 +1133,6 @@ export default function IsSagligiGuvenligi() {
       const date = toIsoDateLabel(String(job.tarih || '').trim());
       if (!isIsoDateLabel(date)) return [];
 
-      const type = resolveCompletedJobTrackType(job);
-      if (!type) return [];
-
       const shift = resolveShiftLabel(job.vardiya);
       if (!shiftToNo(shift)) return [];
 
@@ -1173,8 +1146,6 @@ export default function IsSagligiGuvenligi() {
         if (!sicilNo || !adSoyad || sicilNo === '-' || adSoyad === '-') return [];
 
         const normalizedSicilNo = normalizeText(sicilNo);
-        const personRole = personelRoleMap.get(normalizedSicilNo);
-        if (personRole !== 'ISCI') return [];
 
         const department = String(personel?.bolum || '').trim();
         const departmentGroup = classifyDepartmentGroup(department);
@@ -1186,12 +1157,11 @@ export default function IsSagligiGuvenligi() {
           departmentGroup,
           electricSubgroup: departmentGroup === 'elektrik' ? classifyElectricDepartmentSubgroup(department) : null,
           durationMinutes,
-          type,
           personKey: `${normalizedSicilNo}|${normalizeText(adSoyad)}`
         }];
       });
     });
-  }, [completedJobs, personelRoleMap]);
+  }, [completedJobs]);
 
   const shiftChartTrackType = useMemo<ShiftTrackType | null>(() => {
     if (selectedReport.id === 'uygunsuzluk-yillik') return 'uygunsuzluk';
