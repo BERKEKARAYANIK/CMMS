@@ -173,6 +173,7 @@ type ShiftChartRow = {
   key: string;
   date: string;
   name: string;
+  shiftNo: 1 | 2 | 3;
   mekanik: number;
   elektrik: number;
   yardimci: number;
@@ -180,7 +181,7 @@ type ShiftChartRow = {
 };
 
 type ShiftAverageDurationRow = {
-  shiftNo: 1 | 2 | 3;
+  key: string;
   shiftLabel: string;
   mekanikAverage: number | null;
   elektrikAverage: number | null;
@@ -1179,78 +1180,11 @@ export default function IsSagligiGuvenligi() {
     return shiftTrackRecordsForChart.filter((record) => record.departmentGroup === shiftDepartmentFilter);
   }, [shiftTrackRecordsForChart, shiftDepartmentFilter]);
 
-  const vardiyaAverageDurationRows = useMemo<ShiftAverageDurationRow[]>(() => {
-    const accumulator = new Map<1 | 2 | 3, {
-      mekanikSum: number;
-      mekanikCount: number;
-      elektrikSum: number;
-      elektrikCount: number;
-      yardimciSum: number;
-      yardimciCount: number;
-      totalSum: number;
-      totalCount: number;
-    }>();
-
-    ([1, 2, 3] as const).forEach((shiftNo) => {
-      accumulator.set(shiftNo, {
-        mekanikSum: 0,
-        mekanikCount: 0,
-        elektrikSum: 0,
-        elektrikCount: 0,
-        yardimciSum: 0,
-        yardimciCount: 0,
-        totalSum: 0,
-        totalCount: 0
-      });
-    });
-
-    filteredShiftTrackRecordsForChart.forEach((record) => {
-      const shiftNo = shiftToNo(record.shift);
-      const durationMinutes = Number(record.durationMinutes);
-      if (!shiftNo || !Number.isFinite(durationMinutes) || durationMinutes < 0) return;
-
-      const bucket = accumulator.get(shiftNo);
-      if (!bucket) return;
-
-      bucket.totalSum += durationMinutes;
-      bucket.totalCount += 1;
-
-      if (record.departmentGroup === 'mekanik') {
-        bucket.mekanikSum += durationMinutes;
-        bucket.mekanikCount += 1;
-      }
-      if (record.departmentGroup === 'elektrik') {
-        bucket.elektrikSum += durationMinutes;
-        bucket.elektrikCount += 1;
-      }
-      if (record.departmentGroup === 'yardimci') {
-        bucket.yardimciSum += durationMinutes;
-        bucket.yardimciCount += 1;
-      }
-    });
-
-    return ([1, 2, 3] as const).map((shiftNo) => {
-      const values = accumulator.get(shiftNo)!;
-      return {
-        shiftNo,
-        shiftLabel: `Vardiya ${shiftNo}`,
-        mekanikAverage: values.mekanikCount > 0 ? Math.round(values.mekanikSum / values.mekanikCount) : null,
-        elektrikAverage: values.elektrikCount > 0 ? Math.round(values.elektrikSum / values.elektrikCount) : null,
-        yardimciAverage: values.yardimciCount > 0 ? Math.round(values.yardimciSum / values.yardimciCount) : null,
-        totalAverage: values.totalCount > 0 ? Math.round(values.totalSum / values.totalCount) : null,
-        mekanikCount: values.mekanikCount,
-        elektrikCount: values.elektrikCount,
-        yardimciCount: values.yardimciCount,
-        totalCount: values.totalCount
-      };
-    });
-  }, [filteredShiftTrackRecordsForChart]);
-
   const vardiyaChartRows = useMemo<ShiftChartRow[]>(() => {
     const rows: ShiftChartRow[] = [];
     const rowMap = new Map<string, ShiftChartRow>();
 
-    weeklyDateLabels.forEach((dateLabel) => {
+        weeklyDateLabels.forEach((dateLabel) => {
       const dayLabel = formatIsoWeekdayShortLabel(dateLabel);
       ([1, 2, 3] as const).forEach((shiftNo) => {
         const key = `${dateLabel}|${shiftNo}`;
@@ -1258,6 +1192,7 @@ export default function IsSagligiGuvenligi() {
           key,
           date: dateLabel,
           name: `${dayLabel} V${shiftNo}`,
+          shiftNo,
           mekanik: 0,
           elektrik: 0,
           yardimci: 0,
@@ -1282,6 +1217,73 @@ export default function IsSagligiGuvenligi() {
 
     return rows;
   }, [weeklyDateLabels, filteredShiftTrackRecordsForChart]);
+
+  const vardiyaAverageDurationRows = useMemo<ShiftAverageDurationRow[]>(() => {
+    const accumulator = new Map<string, {
+      mekanikSum: number;
+      mekanikCount: number;
+      elektrikSum: number;
+      elektrikCount: number;
+      yardimciSum: number;
+      yardimciCount: number;
+      totalSum: number;
+      totalCount: number;
+    }>();
+
+    vardiyaChartRows.forEach((row) => {
+      accumulator.set(row.key, {
+        mekanikSum: 0,
+        mekanikCount: 0,
+        elektrikSum: 0,
+        elektrikCount: 0,
+        yardimciSum: 0,
+        yardimciCount: 0,
+        totalSum: 0,
+        totalCount: 0
+      });
+    });
+
+    filteredShiftTrackRecordsForChart.forEach((record) => {
+      const shiftNo = shiftToNo(record.shift);
+      const durationMinutes = Number(record.durationMinutes);
+      if (!shiftNo || !Number.isFinite(durationMinutes) || durationMinutes < 0) return;
+
+      const bucket = accumulator.get(`${record.date}|${shiftNo}`);
+      if (!bucket) return;
+
+      bucket.totalSum += durationMinutes;
+      bucket.totalCount += 1;
+
+      if (record.departmentGroup === 'mekanik') {
+        bucket.mekanikSum += durationMinutes;
+        bucket.mekanikCount += 1;
+      }
+      if (record.departmentGroup === 'elektrik') {
+        bucket.elektrikSum += durationMinutes;
+        bucket.elektrikCount += 1;
+      }
+      if (record.departmentGroup === 'yardimci') {
+        bucket.yardimciSum += durationMinutes;
+        bucket.yardimciCount += 1;
+      }
+    });
+
+    return vardiyaChartRows.map((row) => {
+      const values = accumulator.get(row.key)!;
+      return {
+        key: row.key,
+        shiftLabel: row.name,
+        mekanikAverage: values.mekanikCount > 0 ? Math.round(values.mekanikSum / values.mekanikCount) : null,
+        elektrikAverage: values.elektrikCount > 0 ? Math.round(values.elektrikSum / values.elektrikCount) : null,
+        yardimciAverage: values.yardimciCount > 0 ? Math.round(values.yardimciSum / values.yardimciCount) : null,
+        totalAverage: values.totalCount > 0 ? Math.round(values.totalSum / values.totalCount) : null,
+        mekanikCount: values.mekanikCount,
+        elektrikCount: values.elektrikCount,
+        yardimciCount: values.yardimciCount,
+        totalCount: values.totalCount
+      };
+    });
+  }, [filteredShiftTrackRecordsForChart, vardiyaChartRows]);
 
   const toplamMekanik = vardiyaChartRows.reduce((sum, row) => sum + row.mekanik, 0);
   const toplamElektrik = vardiyaChartRows.reduce((sum, row) => sum + row.elektrik, 0);
@@ -1790,15 +1792,15 @@ export default function IsSagligiGuvenligi() {
         </div>
 
         <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
-          <h3 className="text-sm font-semibold text-gray-900">Vardiya Bazli Ortalama Calisma Sureleri (dk)</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Gun/Vardiya Bazli Ortalama Calisma Sureleri (dk)</h3>
           <p className="mt-1 text-xs text-gray-500">
-            Secili haftada grafikteki kayitlar icin birim bazli ortalama mudahale suresi.
+            Secili haftada her satir (or: Sal V3) icin birim bazli ortalama mudahale suresi.
           </p>
           <div className="mt-3 overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 py-2 text-left font-semibold text-gray-600">Vardiya</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-600">Gun - Vardiya</th>
                   <th className="px-3 py-2 text-right font-semibold text-gray-600">Mekanik</th>
                   <th className="px-3 py-2 text-right font-semibold text-gray-600">Elektrik</th>
                   <th className="px-3 py-2 text-right font-semibold text-gray-600">Yardimci</th>
@@ -1807,7 +1809,7 @@ export default function IsSagligiGuvenligi() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {vardiyaAverageDurationRows.map((row) =>
-                <tr key={`avg-${row.shiftNo}`}>
+                <tr key={`avg-${row.key}`}>
                     <td className="px-3 py-2 font-medium text-gray-800">{row.shiftLabel}</td>
                     <td className="px-3 py-2 text-right text-gray-700">
                       {row.mekanikAverage !== null ? `${row.mekanikAverage} dk` : '-'}
