@@ -1309,33 +1309,33 @@ export default function IsSagligiGuvenligi() {
   const vardiyaAverageDurationRows = useMemo<ShiftAverageDurationRow[]>(() => {
     const accumulator = new Map<string, {
       mekanikSum: number;
-      mekanikCount: number;
+      mekanikWorkers: Set<string>;
       elektrikSum: number;
-      elektrikCount: number;
+      elektrikWorkers: Set<string>;
       elektrikAnaSum: number;
-      elektrikAnaCount: number;
+      elektrikAnaWorkers: Set<string>;
       elektrikEkSum: number;
-      elektrikEkCount: number;
+      elektrikEkWorkers: Set<string>;
       yardimciSum: number;
-      yardimciCount: number;
+      yardimciWorkers: Set<string>;
       totalSum: number;
-      totalCount: number;
+      totalWorkers: Set<string>;
     }>();
 
     vardiyaChartRows.forEach((row) => {
       accumulator.set(row.key, {
         mekanikSum: 0,
-        mekanikCount: 0,
+        mekanikWorkers: new Set<string>(),
         elektrikSum: 0,
-        elektrikCount: 0,
+        elektrikWorkers: new Set<string>(),
         elektrikAnaSum: 0,
-        elektrikAnaCount: 0,
+        elektrikAnaWorkers: new Set<string>(),
         elektrikEkSum: 0,
-        elektrikEkCount: 0,
+        elektrikEkWorkers: new Set<string>(),
         yardimciSum: 0,
-        yardimciCount: 0,
+        yardimciWorkers: new Set<string>(),
         totalSum: 0,
-        totalCount: 0
+        totalWorkers: new Set<string>()
       });
     });
 
@@ -1348,27 +1348,27 @@ export default function IsSagligiGuvenligi() {
       if (!bucket) return;
 
       bucket.totalSum += durationMinutes;
-      bucket.totalCount += 1;
+      bucket.totalWorkers.add(record.personKey);
 
       if (record.departmentGroup === 'mekanik') {
         bucket.mekanikSum += durationMinutes;
-        bucket.mekanikCount += 1;
+        bucket.mekanikWorkers.add(record.personKey);
       }
       if (record.departmentGroup === 'elektrik') {
         bucket.elektrikSum += durationMinutes;
-        bucket.elektrikCount += 1;
+        bucket.elektrikWorkers.add(record.personKey);
         if (record.electricSubgroup === 'ana') {
           bucket.elektrikAnaSum += durationMinutes;
-          bucket.elektrikAnaCount += 1;
+          bucket.elektrikAnaWorkers.add(record.personKey);
         }
         if (record.electricSubgroup === 'ek') {
           bucket.elektrikEkSum += durationMinutes;
-          bucket.elektrikEkCount += 1;
+          bucket.elektrikEkWorkers.add(record.personKey);
         }
       }
       if (record.departmentGroup === 'yardimci') {
         bucket.yardimciSum += durationMinutes;
-        bucket.yardimciCount += 1;
+        bucket.yardimciWorkers.add(record.personKey);
       }
     });
 
@@ -1377,18 +1377,18 @@ export default function IsSagligiGuvenligi() {
       return {
         key: row.key,
         shiftLabel: row.name,
-        mekanikAverage: values.mekanikCount > 0 ? Math.round(values.mekanikSum / values.mekanikCount) : null,
-        elektrikAverage: values.elektrikCount > 0 ? Math.round(values.elektrikSum / values.elektrikCount) : null,
-        elektrikAnaAverage: values.elektrikAnaCount > 0 ? Math.round(values.elektrikAnaSum / values.elektrikAnaCount) : null,
-        elektrikEkAverage: values.elektrikEkCount > 0 ? Math.round(values.elektrikEkSum / values.elektrikEkCount) : null,
-        yardimciAverage: values.yardimciCount > 0 ? Math.round(values.yardimciSum / values.yardimciCount) : null,
-        totalAverage: values.totalCount > 0 ? Math.round(values.totalSum / values.totalCount) : null,
-        mekanikCount: values.mekanikCount,
-        elektrikCount: values.elektrikCount,
-        elektrikAnaCount: values.elektrikAnaCount,
-        elektrikEkCount: values.elektrikEkCount,
-        yardimciCount: values.yardimciCount,
-        totalCount: values.totalCount
+        mekanikAverage: values.mekanikWorkers.size > 0 ? Math.round(values.mekanikSum / values.mekanikWorkers.size) : null,
+        elektrikAverage: values.elektrikWorkers.size > 0 ? Math.round(values.elektrikSum / values.elektrikWorkers.size) : null,
+        elektrikAnaAverage: values.elektrikAnaWorkers.size > 0 ? Math.round(values.elektrikAnaSum / values.elektrikAnaWorkers.size) : null,
+        elektrikEkAverage: values.elektrikEkWorkers.size > 0 ? Math.round(values.elektrikEkSum / values.elektrikEkWorkers.size) : null,
+        yardimciAverage: values.yardimciWorkers.size > 0 ? Math.round(values.yardimciSum / values.yardimciWorkers.size) : null,
+        totalAverage: values.totalWorkers.size > 0 ? Math.round(values.totalSum / values.totalWorkers.size) : null,
+        mekanikCount: values.mekanikWorkers.size,
+        elektrikCount: values.elektrikWorkers.size,
+        elektrikAnaCount: values.elektrikAnaWorkers.size,
+        elektrikEkCount: values.elektrikEkWorkers.size,
+        yardimciCount: values.yardimciWorkers.size,
+        totalCount: values.totalWorkers.size
       };
     });
   }, [shiftTrackPersonRecordsForAverage, vardiyaChartRows]);
@@ -1853,7 +1853,7 @@ export default function IsSagligiGuvenligi() {
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
-          Mavi: Mekanik, Sari: Elektrik Ana Bina, Koyu Sari: Elektrik Ek Bina, Yesil: Yardimci Tesisler. Hesap: toplam girilen sure / toplam giris yapan isci.
+          Mavi: Mekanik, Sari: Elektrik Ana Bina, Koyu Sari: Elektrik Ek Bina, Yesil: Yardimci Tesisler. Hesap: toplam girilen sure / vardiyadaki farkli isci sayisi.
         </p>
 
         {filteredShiftTrackRecordsForChart.length === 0 &&
