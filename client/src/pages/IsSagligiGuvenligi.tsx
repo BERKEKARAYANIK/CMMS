@@ -161,6 +161,7 @@ type ShiftTrackRecord = {
   shift: string;
   department: string;
   departmentGroup: DepartmentGroupKey;
+  electricSubgroup: ElectricDepartmentSubgroup | null;
   durationMinutes: number;
   type: ShiftTrackType;
   typeLabel: string;
@@ -168,6 +169,7 @@ type ShiftTrackRecord = {
 };
 
 type DepartmentGroupKey = 'elektrik' | 'mekanik' | 'yardimci';
+type ElectricDepartmentSubgroup = 'ana' | 'ek';
 
 type ShiftChartRow = {
   key: string;
@@ -185,10 +187,14 @@ type ShiftAverageDurationRow = {
   shiftLabel: string;
   mekanikAverage: number | null;
   elektrikAverage: number | null;
+  elektrikAnaAverage: number | null;
+  elektrikEkAverage: number | null;
   yardimciAverage: number | null;
   totalAverage: number | null;
   mekanikCount: number;
   elektrikCount: number;
+  elektrikAnaCount: number;
+  elektrikEkCount: number;
   yardimciCount: number;
   totalCount: number;
 };
@@ -427,6 +433,29 @@ function classifyDepartmentGroup(department: string): DepartmentGroupKey | null 
   return null;
 }
 
+function classifyElectricDepartmentSubgroup(department: string): ElectricDepartmentSubgroup | null {
+  const normalized = normalizeText(department);
+  if (!normalized) return null;
+
+  if (
+    normalized.includes('EK BINA') ||
+    normalized.includes('E BAKIM 2') ||
+    normalized.includes('ELEKTRIK BAKIM 2')
+  ) {
+    return 'ek';
+  }
+
+  if (
+    normalized.includes('ANA BINA') ||
+    normalized.includes('E BAKIM 1') ||
+    normalized.includes('ELEKTRIK BAKIM 1')
+  ) {
+    return 'ana';
+  }
+
+  return null;
+}
+
 function shiftToNo(shift: string): 1 | 2 | 3 | null {
   const normalized = normalizeText(shift);
   if (
@@ -481,14 +510,22 @@ function resolveCompletedJobTrackType(job: CompletedJob): ShiftTrackType | null 
   return null;
 }
 
-function resolveCompletedJobDepartment(job: CompletedJob): {department: string;departmentGroup: DepartmentGroupKey;} | null {
+function resolveCompletedJobDepartment(job: CompletedJob): {
+  department: string;
+  departmentGroup: DepartmentGroupKey;
+  electricSubgroup: ElectricDepartmentSubgroup | null;
+} | null {
   const personeller = Array.isArray(job.personeller) ? job.personeller : [];
 
   for (const personel of personeller) {
     const department = String(personel?.bolum || '').trim();
     const departmentGroup = classifyDepartmentGroup(department);
     if (departmentGroup) {
-      return { department: department || '-', departmentGroup };
+      return {
+        department: department || '-',
+        departmentGroup,
+        electricSubgroup: departmentGroup === 'elektrik' ? classifyElectricDepartmentSubgroup(department) : null
+      };
     }
   }
 
@@ -1074,6 +1111,7 @@ export default function IsSagligiGuvenligi() {
         shift,
         department: departmentInfo.department,
         departmentGroup: departmentInfo.departmentGroup,
+        electricSubgroup: departmentInfo.electricSubgroup,
         durationMinutes: Number(job.sureDakika) || 0,
         type,
         typeLabel: type === 'capraz' ? 'Capraz Denetim' : 'Uygunsuzluk',
@@ -1224,6 +1262,10 @@ export default function IsSagligiGuvenligi() {
       mekanikCount: number;
       elektrikSum: number;
       elektrikCount: number;
+      elektrikAnaSum: number;
+      elektrikAnaCount: number;
+      elektrikEkSum: number;
+      elektrikEkCount: number;
       yardimciSum: number;
       yardimciCount: number;
       totalSum: number;
@@ -1236,6 +1278,10 @@ export default function IsSagligiGuvenligi() {
         mekanikCount: 0,
         elektrikSum: 0,
         elektrikCount: 0,
+        elektrikAnaSum: 0,
+        elektrikAnaCount: 0,
+        elektrikEkSum: 0,
+        elektrikEkCount: 0,
         yardimciSum: 0,
         yardimciCount: 0,
         totalSum: 0,
@@ -1261,6 +1307,14 @@ export default function IsSagligiGuvenligi() {
       if (record.departmentGroup === 'elektrik') {
         bucket.elektrikSum += durationMinutes;
         bucket.elektrikCount += 1;
+        if (record.electricSubgroup === 'ana') {
+          bucket.elektrikAnaSum += durationMinutes;
+          bucket.elektrikAnaCount += 1;
+        }
+        if (record.electricSubgroup === 'ek') {
+          bucket.elektrikEkSum += durationMinutes;
+          bucket.elektrikEkCount += 1;
+        }
       }
       if (record.departmentGroup === 'yardimci') {
         bucket.yardimciSum += durationMinutes;
@@ -1275,10 +1329,14 @@ export default function IsSagligiGuvenligi() {
         shiftLabel: row.name,
         mekanikAverage: values.mekanikCount > 0 ? Math.round(values.mekanikSum / values.mekanikCount) : null,
         elektrikAverage: values.elektrikCount > 0 ? Math.round(values.elektrikSum / values.elektrikCount) : null,
+        elektrikAnaAverage: values.elektrikAnaCount > 0 ? Math.round(values.elektrikAnaSum / values.elektrikAnaCount) : null,
+        elektrikEkAverage: values.elektrikEkCount > 0 ? Math.round(values.elektrikEkSum / values.elektrikEkCount) : null,
         yardimciAverage: values.yardimciCount > 0 ? Math.round(values.yardimciSum / values.yardimciCount) : null,
         totalAverage: values.totalCount > 0 ? Math.round(values.totalSum / values.totalCount) : null,
         mekanikCount: values.mekanikCount,
         elektrikCount: values.elektrikCount,
+        elektrikAnaCount: values.elektrikAnaCount,
+        elektrikEkCount: values.elektrikEkCount,
         yardimciCount: values.yardimciCount,
         totalCount: values.totalCount
       };
@@ -1288,14 +1346,16 @@ export default function IsSagligiGuvenligi() {
   const vardiyaAverageByShift = useMemo(() => {
     const map = new Map<string, {
       mekanik: string;
-      elektrik: string;
+      elektrikAna: string;
+      elektrikEk: string;
       yardimci: string;
     }>();
 
     vardiyaAverageDurationRows.forEach((row) => {
       map.set(row.shiftLabel, {
         mekanik: row.mekanikAverage !== null ? `${row.mekanikAverage} dk` : '-',
-        elektrik: row.elektrikAverage !== null ? `${row.elektrikAverage} dk` : '-',
+        elektrikAna: row.elektrikAnaAverage !== null ? `${row.elektrikAnaAverage} dk` : '-',
+        elektrikEk: row.elektrikEkAverage !== null ? `${row.elektrikEkAverage} dk` : '-',
         yardimci: row.yardimciAverage !== null ? `${row.yardimciAverage} dk` : '-'
       });
     });
@@ -1743,7 +1803,7 @@ export default function IsSagligiGuvenligi() {
         </div>
 
         <p className="mt-3 text-xs text-gray-500">
-          Mavi: Mekanik, Sari: Elektrik, Yesil: Yardimci Tesisler. Her gun/vardiya etiketinin altinda ilgili birimlerin ortalama sureleri gosterilir.
+          Mavi: Mekanik, Sari: Elektrik Ana Bina, Koyu Sari: Elektrik Ek Bina, Yesil: Yardimci Tesisler. Degerler Tamamlanan Isler kayitlarindan hesaplanir.
         </p>
 
         {filteredShiftTrackRecordsForChart.length === 0 &&
@@ -1758,7 +1818,7 @@ export default function IsSagligiGuvenligi() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={vardiyaChartRows}
-                margin={{ top: 20, right: 16, left: 0, bottom: 62 }}>
+                margin={{ top: 20, right: 16, left: 0, bottom: 74 }}>
 
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis
@@ -1771,7 +1831,8 @@ export default function IsSagligiGuvenligi() {
                     const label = String(props?.payload?.value ?? '');
                     const average = vardiyaAverageByShift.get(label) || {
                       mekanik: '-',
-                      elektrik: '-',
+                      elektrikAna: '-',
+                      elektrikEk: '-',
                       yardimci: '-'
                     };
                     return (
@@ -1793,7 +1854,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#5b7be1"
                           fontSize={9}
                           fontWeight={600}>
-                          Mek: {average.mekanik}
+                          {average.mekanik}
                         </text>
                         <text
                           x={0}
@@ -1803,23 +1864,33 @@ export default function IsSagligiGuvenligi() {
                           fill="#d4af37"
                           fontSize={9}
                           fontWeight={600}>
-                          Elk: {average.elektrik}
+                          {average.elektrikAna}
                         </text>
                         <text
                           x={0}
                           y={0}
                           dy={48}
                           textAnchor="middle"
+                          fill="#b88a1d"
+                          fontSize={9}
+                          fontWeight={600}>
+                          {average.elektrikEk}
+                        </text>
+                        <text
+                          x={0}
+                          y={0}
+                          dy={60}
+                          textAnchor="middle"
                           fill="#6fb581"
                           fontSize={9}
                           fontWeight={600}>
-                          Yrd: {average.yardimci}
+                          {average.yardimci}
                         </text>
                       </g>
                     );
                   }}
                   interval={0}
-                  height={82} />
+                  height={96} />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
