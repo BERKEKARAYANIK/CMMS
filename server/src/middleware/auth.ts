@@ -62,6 +62,7 @@ export function isReadOnlyInspectorUser(identity: UserIdentity | null | undefine
 }
 
 export function resolveEffectiveRole(identity: UserIdentity | null | undefined): AppRole {
+  if (isReadOnlyInspectorUser(identity)) return 'OPERATOR';
   if (isBerkeUser(identity)) return 'ADMIN';
 
   const role = String(identity?.role || '').toUpperCase();
