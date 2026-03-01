@@ -159,6 +159,7 @@ type ShiftWorkSummaryRow = {
   bolum: string;
   toplamDakika: number;
   kayitSayisi: number;
+  ortalamaDakika: number;
 };
 
 export default function TamamlananIsler() {
@@ -605,16 +606,21 @@ export default function TamamlananIsler() {
     );
 
     const toplamFarkliIsci = uniqueIsciSiciller.size;
+    const toplamIsciGirisi = isciSatirlar.length;
     const toplamSure = isciSatirlar.reduce((sum, satir) => sum + (Number(satir.is.sureDakika) || 0), 0);
-    const ortalamaSure = toplamFarkliIsci > 0
+    const ortalamaGirisSuresi = toplamIsciGirisi > 0
+      ? Math.round(toplamSure / toplamIsciGirisi)
+      : 0;
+    const ortalamaIsciSuresi = toplamFarkliIsci > 0
       ? Math.round(toplamSure / toplamFarkliIsci)
       : 0;
 
     return {
-      toplamIsciGirisi: isciSatirlar.length,
+      toplamIsciGirisi,
       toplamFarkliIsci,
       toplamSure,
-      ortalamaSure
+      ortalamaGirisSuresi,
+      ortalamaIsciSuresi
     };
   }, [filteredSatirlar, unvanMap]);
 
@@ -650,7 +656,8 @@ export default function TamamlananIsler() {
         adSoyad,
         bolum: normalizedBolum || personel.bolum || '-',
         toplamDakika: 0,
-        kayitSayisi: 0
+        kayitSayisi: 0,
+        ortalamaDakika: 0
       };
 
       current.toplamDakika += Number(is.sureDakika) || 0;
@@ -658,7 +665,11 @@ export default function TamamlananIsler() {
       grouped.set(key, current);
     });
 
-    return Array.from(grouped.values()).sort((a, b) =>
+    return Array.from(grouped.values()).map((row) => ({
+      ...row,
+      ortalamaDakika: row.kayitSayisi > 0 ? Math.round(row.toplamDakika / row.kayitSayisi) : 0
+    })).sort((a, b) =>
+      b.ortalamaDakika - a.ortalamaDakika ||
       b.toplamDakika - a.toplamDakika ||
       b.kayitSayisi - a.kayitSayisi ||
       a.adSoyad.localeCompare(b.adSoyad, 'tr-TR')
@@ -943,7 +954,11 @@ export default function TamamlananIsler() {
           </div>
           <div>
             <span className="text-gray-500">Ortalama Giriş Süresi:</span>
-            <span className="ml-2 font-semibold">{isciMetrikleri.ortalamaSure} dk</span>
+            <span className="ml-2 font-semibold">{isciMetrikleri.ortalamaGirisSuresi} dk</span>
+          </div>
+          <div>
+            <span className="text-gray-500">Kisi Basi Ortalama Sure:</span>
+            <span className="ml-2 font-semibold">{isciMetrikleri.ortalamaIsciSuresi} dk</span>
           </div>
           <div>
             <span className="text-gray-500">{MIN_DURUS_DAKIKASI} dk Üstü Duruş:</span>
@@ -983,6 +998,7 @@ export default function TamamlananIsler() {
                           <th className="px-3 py-2 text-left font-semibold">Sicil No</th>
                           <th className="px-3 py-2 text-left font-semibold">Bolum</th>
                           <th className="px-3 py-2 text-right font-semibold">Toplam Sure (dk)</th>
+                          <th className="px-3 py-2 text-right font-semibold">Ortalama Giris (dk)</th>
                           <th className="px-3 py-2 text-right font-semibold">Kayit</th>
                         </tr>
                       </thead>
@@ -994,6 +1010,7 @@ export default function TamamlananIsler() {
                             <td className="px-3 py-2 font-mono">{row.sicilNo}</td>
                             <td className="px-3 py-2">{row.bolum}</td>
                             <td className="px-3 py-2 text-right font-semibold">{row.toplamDakika}</td>
+                            <td className="px-3 py-2 text-right">{row.ortalamaDakika}</td>
                             <td className="px-3 py-2 text-right">{row.kayitSayisi}</td>
                           </tr>
                       )}
