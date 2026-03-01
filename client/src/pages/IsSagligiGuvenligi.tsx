@@ -1285,6 +1285,14 @@ export default function IsSagligiGuvenligi() {
     });
   }, [filteredShiftTrackRecordsForChart, vardiyaChartRows]);
 
+  const vardiyaAverageLabelByShift = useMemo(() => {
+    const map = new Map<string, string>();
+    vardiyaAverageDurationRows.forEach((row) => {
+      map.set(row.shiftLabel, row.totalAverage !== null ? `${row.totalAverage} dk` : '-');
+    });
+    return map;
+  }, [vardiyaAverageDurationRows]);
+
   const toplamMekanik = vardiyaChartRows.reduce((sum, row) => sum + row.mekanik, 0);
   const toplamElektrik = vardiyaChartRows.reduce((sum, row) => sum + row.elektrik, 0);
   const toplamYardimci = vardiyaChartRows.reduce((sum, row) => sum + row.yardimci, 0);
@@ -1740,16 +1748,44 @@ export default function IsSagligiGuvenligi() {
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={vardiyaChartRows}
-                margin={{ top: 20, right: 16, left: 0, bottom: 12 }}>
+                margin={{ top: 20, right: 16, left: 0, bottom: 28 }}>
 
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                 <XAxis
                   dataKey="name"
                   axisLine={false}
                   tickLine={false}
-                  tick={{ fill: '#64748b', fontSize: 11 }}
+                  tick={(props: any) => {
+                    const x = Number(props?.x ?? 0);
+                    const y = Number(props?.y ?? 0);
+                    const label = String(props?.payload?.value ?? '');
+                    const averageLabel = vardiyaAverageLabelByShift.get(label) || '-';
+                    return (
+                      <g transform={`translate(${x},${y})`}>
+                        <text
+                          x={0}
+                          y={0}
+                          dy={11}
+                          textAnchor="middle"
+                          fill="#64748b"
+                          fontSize={11}>
+                          {label}
+                        </text>
+                        <text
+                          x={0}
+                          y={0}
+                          dy={24}
+                          textAnchor="middle"
+                          fill="#0f766e"
+                          fontSize={10}
+                          fontWeight={600}>
+                          {averageLabel}
+                        </text>
+                      </g>
+                    );
+                  }}
                   interval={0}
-                  height={42} />
+                  height={58} />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
