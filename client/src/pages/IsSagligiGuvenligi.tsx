@@ -1904,7 +1904,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#5b7be1"
                           fontSize={9}
                           fontWeight={600}>
-                          {average.mekanik}
+                          Mek: {average.mekanik}
                         </text>
                         <text
                           x={0}
@@ -1914,7 +1914,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#d4af37"
                           fontSize={9}
                           fontWeight={600}>
-                          {average.elektrikAna}
+                          Elk Ana: {average.elektrikAna}
                         </text>
                         <text
                           x={0}
@@ -1924,7 +1924,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#b88a1d"
                           fontSize={9}
                           fontWeight={600}>
-                          {average.elektrikEk}
+                          Elk Ek: {average.elektrikEk}
                         </text>
                         <text
                           x={0}
@@ -1934,7 +1934,7 @@ export default function IsSagligiGuvenligi() {
                           fill="#6fb581"
                           fontSize={9}
                           fontWeight={600}>
-                          {average.yardimci}
+                          Yrd: {average.yardimci}
                         </text>
                       </g>
                     );
