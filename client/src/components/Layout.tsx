@@ -55,6 +55,7 @@ export default function Layout() {
   const isSystemAdmin = isSystemAdminUser(user);
   const isBerke = isBerkeUser(user);
   const berkeOnlyPaths = new Set([
+    '/access-logs',
     '/dc-motor-bakim',
     '/personnel',
     '/gunluk-performans-genel-bakis',

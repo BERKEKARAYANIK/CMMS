@@ -9,7 +9,7 @@ import type { User } from '../types';
 import { isBerkeUser, isSystemAdminUser } from '../utils/access';
 import { appStateApi, jobEntriesApi, usersApi, workOrdersApi } from '../services/api';
 import type { CompletedJob } from '../types/jobEntries';
-import type { Personel } from '../data/lists';
+import { vardiyalar as defaultVardiyalar, type Personel, type Vardiya } from '../data/lists';
 import { APP_STATE_KEYS, normalizeSettingsLists } from '../constants/appState';
 
 const MIN_DURUS_DAKIKASI = 45;
@@ -108,6 +108,131 @@ function calculateDurationMinutes(startText: string, endText: string): number | 
   return endMinutes - startMinutes;
 }
 
+type DayIntervalMinutes = {
+  start: number;
+  end: number;
+};
+
+type ShiftDefinition = {
+  id: string;
+  ad: string;
+  start: number;
+  end: number;
+};
+
+function parseClockToMinutes(value: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(value || '').trim());
+  if (!match) return null;
+  return Number.parseInt(match[1], 10) * 60 + Number.parseInt(match[2], 10);
+}
+
+function buildDayIntervalMinutes(startText: string, endText: string): DayIntervalMinutes | null {
+  const start = parseClockToMinutes(startText);
+  const endRaw = parseClockToMinutes(endText);
+  if (start === null || endRaw === null) return null;
+
+  const end = endRaw <= start ? endRaw + 24 * 60 : endRaw;
+  return { start, end };
+}
+
+function buildShiftDefinitions(shifts: Vardiya[]): ShiftDefinition[] {
+  return shifts.flatMap((shift, index) => {
+    const match = /^([01]\d|2[0-3]):([0-5]\d)\s*-\s*([01]\d|2[0-3]):([0-5]\d)$/.exec(String(shift.saat || '').trim());
+    if (!match) return [];
+
+    const start = Number.parseInt(match[1], 10) * 60 + Number.parseInt(match[2], 10);
+    const endRaw = Number.parseInt(match[3], 10) * 60 + Number.parseInt(match[4], 10);
+    const end = endRaw <= start ? endRaw + 24 * 60 : endRaw;
+
+    return [{
+      id: String(shift.id || `SHIFT_${index + 1}`),
+      ad: String(shift.ad || '').trim(),
+      start,
+      end
+    }];
+  });
+}
+
+function resolveShiftNo(value: string): 1 | 2 | 3 | null {
+  const normalized = normalizeForSearch(value);
+  if (
+    normalized.includes('a vardiya')
+    || normalized.includes('1 vardiya')
+    || normalized.includes('vardiya 1')
+    || normalized.includes('vardiya1')
+    || normalized === 'a'
+    || normalized === '1'
+  ) {
+    return 1;
+  }
+  if (
+    normalized.includes('b vardiya')
+    || normalized.includes('2 vardiya')
+    || normalized.includes('vardiya 2')
+    || normalized.includes('vardiya2')
+    || normalized === 'b'
+    || normalized === '2'
+  ) {
+    return 2;
+  }
+  if (
+    normalized.includes('c vardiya')
+    || normalized.includes('3 vardiya')
+    || normalized.includes('vardiya 3')
+    || normalized.includes('vardiya3')
+    || normalized === 'c'
+    || normalized === '3'
+  ) {
+    return 3;
+  }
+  return null;
+}
+
+function doesIntervalOverlap(a: DayIntervalMinutes, b: DayIntervalMinutes): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+function doesJobOverlapShift(job: CompletedJob, shift: ShiftDefinition): boolean {
+  const jobInterval = buildDayIntervalMinutes(job.baslangicSaati, job.bitisSaati);
+  if (!jobInterval) return false;
+
+  const offsets = [-24 * 60, 0, 24 * 60];
+  return offsets.some((offset) =>
+    doesIntervalOverlap(jobInterval, {
+      start: shift.start + offset,
+      end: shift.end + offset
+    })
+  );
+}
+
+function doesShiftMatchFilter(shift: ShiftDefinition, filterVardiya: string): boolean {
+  const normalizedFilter = normalizeForSearch(filterVardiya);
+  if (!normalizedFilter) return true;
+
+  const normalizedShiftName = normalizeForSearch(shift.ad);
+  if (normalizedShiftName.includes(normalizedFilter)) return true;
+
+  const filterNo = resolveShiftNo(filterVardiya);
+  const shiftNo = resolveShiftNo(shift.ad);
+  return Boolean(filterNo && shiftNo && filterNo === shiftNo);
+}
+
+function matchJobByShiftFilter(
+  job: CompletedJob,
+  filterVardiya: string,
+  shiftDefinitions: ShiftDefinition[]
+): boolean {
+  if (!filterVardiya) return true;
+
+  const candidateShifts = shiftDefinitions.filter((shift) => doesShiftMatchFilter(shift, filterVardiya));
+  if (candidateShifts.length > 0) {
+    const matchedByOverlap = candidateShifts.some((shift) => doesJobOverlapShift(job, shift));
+    if (matchedByOverlap) return true;
+  }
+
+  return String(job.vardiya || '').includes(filterVardiya);
+}
+
 function canManageCompletedJobs(user: User | null): boolean {
   if (!user) return false;
   if (isBerkeUser(user)) return true;
@@ -123,6 +248,21 @@ function canManageCompletedJobs(user: User | null): boolean {
     email.includes('berke') ||
     sicilNo === 'berke');
 
+}
+
+function hasEngineerOrChiefTitle(value: unknown): boolean {
+  const normalized = normalizeForSearch(String(value || ''));
+  return (
+    normalized.includes('muhendis') ||
+    normalized.includes('sef')
+  );
+}
+
+function canViewShiftWorkDurations(user: User | null, titleFromSettings?: string): boolean {
+  if (!user) return false;
+  if (isBerkeUser(user)) return true;
+  if (user.role === 'BAKIM_MUDURU' || user.role === 'BAKIM_SEFI') return true;
+  return hasEngineerOrChiefTitle(titleFromSettings);
 }
 
 function canSelfManageCompletedJob(job: CompletedJob, user: User | null): boolean {
@@ -193,17 +333,19 @@ export default function TamamlananIsler() {
   const [editAciklama, setEditAciklama] = useState('');
   const [editMalzeme, setEditMalzeme] = useState('');
   const [isEditKaydediliyor, setIsEditKaydediliyor] = useState(false);
+  const effectiveShiftWorkDepartment = useMemo(() => {
+    if (isBerkeViewer) return filterBolum;
+    return normalizeDepartment(currentUser?.departman || '');
+  }, [currentUser?.departman, filterBolum, isBerkeViewer]);
 
   const {
-    data: ayarlarPersoneller,
-    isLoading: ayarlarPersonellerYukleniyor
+    data: ayarlarListeleri,
+    isLoading: ayarlarListeleriYukleniyor
   } = useQuery({
-    queryKey: ['tamamlanan-analiz-settings-personel-list'],
-    enabled: canAssignWorkOrders,
+    queryKey: ['tamamlanan-settings-lists'],
     queryFn: async () => {
       const response = await appStateApi.get(APP_STATE_KEYS.settingsLists);
-      const lists = normalizeSettingsLists(response.data?.data?.value);
-      return lists.personelListesi as Personel[];
+      return normalizeSettingsLists(response.data?.data?.value);
     }
   });
 
@@ -216,15 +358,27 @@ export default function TamamlananIsler() {
     }
   });
 
-  const atamaPersonelListesi = useMemo(
-    () => ayarlarPersoneller || [],
-    [ayarlarPersoneller]
+  const atamaPersonelListesi = useMemo<Personel[]>(
+    () => canAssignWorkOrders ? (ayarlarListeleri?.personelListesi || []) : [],
+    [ayarlarListeleri?.personelListesi, canAssignWorkOrders]
   );
+
+  const vardiyaListesi = useMemo<Vardiya[]>(() => {
+    const fromSettings = ayarlarListeleri?.vardiyalar || [];
+    return fromSettings.length > 0 ? fromSettings : defaultVardiyalar;
+  }, [ayarlarListeleri?.vardiyalar]);
+
+  const vardiyaTanimlari = useMemo(
+    () => buildShiftDefinitions(vardiyaListesi),
+    [vardiyaListesi]
+  );
+
+  const ayarlarPersonellerYukleniyor = canAssignWorkOrders && ayarlarListeleriYukleniyor;
 
   // Ünvan (rol) bilgisini sicil numarasına göre Map'e dönüştür
   const unvanMap = useMemo(() => {
     const map = new Map<string, string>();
-    const personeller = ayarlarPersoneller || [];
+    const personeller = ayarlarListeleri?.personelListesi || [];
     personeller.forEach(p => {
       if (p.sicilNo && p.rol) {
         const normalizedSicil = String(p.sicilNo).trim().toLocaleUpperCase('tr-TR');
@@ -233,7 +387,18 @@ export default function TamamlananIsler() {
       }
     });
     return map;
-  }, [ayarlarPersoneller]);
+  }, [ayarlarListeleri?.personelListesi]);
+
+  const currentUserTitleFromSettings = useMemo(() => {
+    const key = String(currentUser?.sicilNo || '').trim().toLocaleUpperCase('tr-TR');
+    if (!key) return '';
+    return unvanMap.get(key) || '';
+  }, [currentUser?.sicilNo, unvanMap]);
+
+  const canViewShiftWork = useMemo(
+    () => canViewShiftWorkDurations(currentUser, currentUserTitleFromSettings),
+    [currentUser, currentUserTitleFromSettings]
+  );
 
   useEffect(() => {
     const loadCompletedJobs = async () => {
@@ -570,6 +735,18 @@ export default function TamamlananIsler() {
     return [...defaults, ...extras];
   }, [satirlar]);
 
+  const vardiyaSecenekleri = useMemo(() => {
+    const known = Array.from(
+      new Set(
+        vardiyaListesi
+          .map((vardiya) => String(vardiya.ad || '').trim())
+          .filter(Boolean)
+      )
+    );
+    if (known.length > 0) return known;
+    return ['VARDIYA 1', 'VARDIYA 2', 'VARDIYA 3'];
+  }, [vardiyaListesi]);
+
   const filteredSatirlar = useMemo(() => satirlar.filter(({ is, personel, normalizedBolum }) => {
     const searchText = normalizeForSearch(search);
     const matchSearch = !searchText ||
@@ -582,10 +759,10 @@ export default function TamamlananIsler() {
 
     const matchTarih = !filterTarih || is.tarih === filterTarih;
     const matchBolum = !isBerkeViewer || !filterBolum || normalizedBolum === filterBolum;
-    const matchVardiya = !filterVardiya || is.vardiya.includes(filterVardiya);
+    const matchVardiya = matchJobByShiftFilter(is, filterVardiya, vardiyaTanimlari);
 
     return matchSearch && matchTarih && matchBolum && matchVardiya;
-  }), [filterBolum, filterTarih, filterVardiya, isBerkeViewer, satirlar, search]);
+  }), [filterBolum, filterTarih, filterVardiya, isBerkeViewer, satirlar, search, vardiyaTanimlari]);
 
   const filteredIsler = useMemo(() => Array.from(
     new Map(filteredSatirlar.map(({ is }) => [is.id, is])).values()
@@ -625,11 +802,11 @@ export default function TamamlananIsler() {
   }, [filteredSatirlar, unvanMap]);
 
   const hasShiftWorkFilterSelection = Boolean(
-    isBerkeViewer && filterTarih && filterBolum && filterVardiya
+    canViewShiftWork && filterTarih && effectiveShiftWorkDepartment && filterVardiya
   );
 
   const shiftWorkSummaryRows = useMemo<ShiftWorkSummaryRow[]>(() => {
-    if (!isBerkeViewer || !filterTarih || !filterBolum || !filterVardiya) {
+    if (!canViewShiftWork || !filterTarih || !effectiveShiftWorkDepartment || !filterVardiya) {
       return [];
     }
 
@@ -639,8 +816,8 @@ export default function TamamlananIsler() {
 
       return (
         is.tarih === filterTarih &&
-        normalizedBolum === filterBolum &&
-        is.vardiya.includes(filterVardiya)
+        normalizedBolum === effectiveShiftWorkDepartment &&
+        matchJobByShiftFilter(is, filterVardiya, vardiyaTanimlari)
       );
     });
 
@@ -674,11 +851,11 @@ export default function TamamlananIsler() {
       b.kayitSayisi - a.kayitSayisi ||
       a.adSoyad.localeCompare(b.adSoyad, 'tr-TR')
     );
-  }, [filterBolum, filterTarih, filterVardiya, isBerkeViewer, satirlar]);
+  }, [canViewShiftWork, effectiveShiftWorkDepartment, filterTarih, filterVardiya, satirlar, vardiyaTanimlari]);
 
   const openShiftWorkModal = () => {
     if (!hasShiftWorkFilterSelection) {
-      toast.error('Lutfen tarih, bolum ve vardiya secin');
+      toast.error(isBerkeViewer ? 'Lutfen tarih, bolum ve vardiya secin' : 'Lutfen tarih ve vardiya secin');
       return;
     }
     setIsShiftWorkModalOpen(true);
@@ -795,17 +972,25 @@ export default function TamamlananIsler() {
             )}
             </select>
           }
+          {canViewShiftWork && !isBerkeViewer &&
+          <input
+            type="text"
+            value={effectiveShiftWorkDepartment || '-'}
+            className="input w-full md:w-64 bg-gray-100"
+            readOnly
+            title="Bolum filtrelemesi giris yapan kullanicinin bolumune gore otomatik uygulanir" />
+          }
           <select
             value={filterVardiya}
             onChange={(e) => setFilterVardiya(e.target.value)}
             className="input w-full md:w-44">
             
             <option value="">Tüm Vardiyalar</option>
-            <option value="VARDIYA 1">Vardiya 1</option>
-            <option value="VARDIYA 2">Vardiya 2</option>
-            <option value="VARDIYA 3">Vardiya 3</option>
+            {vardiyaSecenekleri.map((vardiyaAdi) =>
+            <option key={vardiyaAdi} value={vardiyaAdi}>{vardiyaAdi}</option>
+            )}
           </select>
-          {isBerkeViewer &&
+          {canViewShiftWork &&
           <button
             type="button"
             onClick={openShiftWorkModal}
@@ -971,7 +1156,7 @@ export default function TamamlananIsler() {
         </div>
       </div>
 
-      {isShiftWorkModalOpen && isBerkeViewer &&
+      {isShiftWorkModalOpen && canViewShiftWork &&
       <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-screen items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={closeShiftWorkModal} />
@@ -979,14 +1164,14 @@ export default function TamamlananIsler() {
               <div className="border-b px-5 py-4">
                 <h2 className="text-lg font-bold text-gray-900">Vardiya Calisma Sureleri</h2>
                 <p className="mt-1 text-sm text-gray-600">
-                  {filterTarih ? format(parseDateKey(filterTarih), 'dd.MM.yyyy') : '-'} / {filterVardiya || '-'} / {filterBolum || '-'}
+                  {filterTarih ? format(parseDateKey(filterTarih), 'dd.MM.yyyy') : '-'} / {filterVardiya || '-'} / {effectiveShiftWorkDepartment || '-'}
                 </p>
               </div>
 
               <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
                 {shiftWorkSummaryRows.length === 0 ?
                 <p className="text-sm text-gray-500">
-                    Secilen tarih, bolum ve vardiya icin calisan kaydi bulunamadi.
+                    Secilen filtreler icin calisan kaydi bulunamadi.
                   </p> :
 
                 <div className="overflow-x-auto">

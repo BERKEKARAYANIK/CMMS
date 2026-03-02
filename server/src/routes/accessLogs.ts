@@ -2,8 +2,7 @@ import { Router, Response } from 'express';
 import {
   authenticate,
   AuthRequest,
-  isBerkeUser,
-  isSystemAdminUser
+  isBerkeUser
 } from '../middleware/auth.js';
 import {
   AccessLogEventType,
@@ -41,7 +40,7 @@ function parseEventType(value: unknown): AccessLogEventType | undefined {
 
 function canViewAccessLogs(user: AuthRequest['user'] | undefined): boolean {
   if (!user) return false;
-  return isBerkeUser(user) || isSystemAdminUser(user);
+  return isBerkeUser(user);
 }
 
 function buildFilters(req: AuthRequest): AccessLogFilters {
@@ -60,7 +59,7 @@ router.get('/events', authenticate, async (req: AuthRequest, res: Response) => {
     if (!canViewAccessLogs(req.user)) {
       return res.status(403).json({
         success: false,
-        message: 'Bu kayitlari sadece sistem yoneticisi goruntuleyebilir'
+        message: 'Bu kayitlari sadece Berke yoneticisi goruntuleyebilir'
       });
     }
 
@@ -84,7 +83,7 @@ router.get('/summary', authenticate, async (req: AuthRequest, res: Response) => 
     if (!canViewAccessLogs(req.user)) {
       return res.status(403).json({
         success: false,
-        message: 'Bu kayitlari sadece sistem yoneticisi goruntuleyebilir'
+        message: 'Bu kayitlari sadece Berke yoneticisi goruntuleyebilir'
       });
     }
 
@@ -108,7 +107,7 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
     if (!canViewAccessLogs(req.user)) {
       return res.status(403).json({
         success: false,
-        message: 'Bu kayitlari sadece sistem yoneticisi goruntuleyebilir'
+        message: 'Bu kayitlari sadece Berke yoneticisi goruntuleyebilir'
       });
     }
 

@@ -5,7 +5,9 @@ import toast from 'react-hot-toast';
 import { Edit2, Save, Trash2 } from 'lucide-react';
 import {
   makinaListesi as defaultMakinaListesi,
-  type Makina } from
+  bolumler as defaultBolumler,
+  type Makina,
+  type Personel } from
 '../data/lists';
 import { useAuthStore } from '../store/authStore';
 import { isBerkeUser } from '../utils/access';
@@ -25,26 +27,94 @@ const BERKE_DEPARTMENT_FILTER_OPTIONS = [
   'YARDIMCI TESISLER'
 ] as const;
 
+const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
+  'ELEKTRIK': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM ANA BINA': 'ELEKTRIK BAKIM ANA BINA',
+  'ELEKTRIK BAKIM EK BINA': 'ELEKTRIK BAKIM EK BINA',
+  'ELEKTRIK BAKIM YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'ELEKTRIK YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'MEKANIK': 'MEKANIK BAKIM',
+  'MEKANIK BAKIM': 'MEKANIK BAKIM',
+  'ISK ELEKTRIK BAKIM': 'ISK ELEKTRIK BAKIM',
+  'ISK ELEKTRIK BAKIM YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'ISK ELEKTRIK YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'ISK MEKANIK BAKIM': 'ISK MEKANIK BAKIM',
+  'ISK YARDIMCI TESISLER': 'ISK YARDIMCI TESISLER',
+  'YARDIMCI ISLETMELER': 'YARDIMCI TESISLER',
+  'YARDIMCI TESISLER': 'YARDIMCI TESISLER',
+  'YONETIM': 'YONETIM'
+};
+
 function sortByCreatedAtDesc(items: PlannedJob[]): PlannedJob[] {
   return [...items].sort((a, b) =>
   new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 }
 
+function normalizeDepartment(value: unknown): string {
+  const key = String(value || '')
+    .toLocaleUpperCase('tr-TR')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!key) return '';
+  return DEPARTMENT_ALIAS_MAP[key] || key;
+}
+
+function buildDepartmentOptions(personeller: Personel[], currentDepartment: string): string[] {
+  const normalizedDefaults = defaultBolumler
+    .map((bolum) => normalizeDepartment(bolum))
+    .filter(Boolean);
+  const knownDepartments = new Set(normalizedDefaults);
+
+  personeller.forEach((personel) => {
+    const department = normalizeDepartment(personel.bolum);
+    if (department) knownDepartments.add(department);
+  });
+  if (currentDepartment) {
+    knownDepartments.add(currentDepartment);
+  }
+
+  const extras = Array.from(knownDepartments)
+    .filter((bolum) => !normalizedDefaults.includes(bolum))
+    .sort((a, b) => a.localeCompare(b, 'tr-TR', { sensitivity: 'base' }));
+
+  return [...normalizedDefaults, ...extras];
+}
+
 export default function PlanlananIsler() {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
+  const currentUserDepartment = useMemo(
+    () => normalizeDepartment(currentUser?.departman),
+    [currentUser?.departman]
+  );
   const canManagePlanlanan = isBerkeUser(currentUser);
   const [makinaListesi, setMakinaListesi] = useState<Makina[]>(defaultMakinaListesi);
+  const [bolumSecenekleri, setBolumSecenekleri] = useState<string[]>([
+    ...defaultBolumler.map((bolum) => normalizeDepartment(bolum)).filter(Boolean)
+  ]);
   const [isler, setIsler] = useState<PlannedJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterBolum, setFilterBolum] = useState('');
   const [filterMakina, setFilterMakina] = useState('');
   const [makina, setMakina] = useState('');
+  const [atananBolum, setAtananBolum] = useState('');
   const [aciklama, setAciklama] = useState('');
   const [malzeme, setMalzeme] = useState('');
   const [editId, setEditId] = useState<string | null>(null);
+
+  const defaultAtananBolum = useMemo(() => {
+    if (currentUserDepartment && bolumSecenekleri.includes(currentUserDepartment)) {
+      return currentUserDepartment;
+    }
+    return bolumSecenekleri[0] || currentUserDepartment || '';
+  }, [bolumSecenekleri, currentUserDepartment]);
 
   useEffect(() => {
     const loadPlannedJobs = async () => {
@@ -65,6 +135,19 @@ export default function PlanlananIsler() {
         const listsPayload = listsResponse.data?.data?.value;
         const normalizedLists = normalizeSettingsLists(listsPayload);
         setMakinaListesi(normalizedLists.makinaListesi);
+
+        const departmentOptions = buildDepartmentOptions(
+          normalizedLists.personelListesi,
+          currentUserDepartment
+        );
+        setBolumSecenekleri(departmentOptions);
+        setAtananBolum((prev) => {
+          if (prev && departmentOptions.includes(prev)) return prev;
+          if (currentUserDepartment && departmentOptions.includes(currentUserDepartment)) {
+            return currentUserDepartment;
+          }
+          return departmentOptions[0] || currentUserDepartment || '';
+        });
       } catch {
         toast.error("Planlanan işler yüklenemedi");
       } finally {
@@ -73,7 +156,11 @@ export default function PlanlananIsler() {
     };
 
     void loadPlannedJobs();
-  }, [canManagePlanlanan, filterBolum]);
+  }, [canManagePlanlanan, currentUserDepartment, filterBolum]);
+
+  useEffect(() => {
+    setAtananBolum((prev) => prev || defaultAtananBolum);
+  }, [defaultAtananBolum]);
 
   const handleKaydet = async () => {
     if (!makina) {
@@ -82,6 +169,10 @@ export default function PlanlananIsler() {
     }
     if (!aciklama.trim()) {
       toast.error('Müdahale açıklaması giriniz');
+      return;
+    }
+    if (!atananBolum) {
+      toast.error('İşi yapacak bölüm seçiniz');
       return;
     }
 
@@ -95,7 +186,8 @@ export default function PlanlananIsler() {
         const response = await jobEntriesApi.updatePlanned(editId, {
           makina,
           aciklama: aciklama.trim(),
-          malzeme: malzeme.trim()
+          malzeme: malzeme.trim(),
+          atananBolum
         });
         const updated = response.data?.data as PlannedJob | undefined;
         if (!updated) throw new Error('Invalid response');
@@ -104,6 +196,7 @@ export default function PlanlananIsler() {
         setSelectedId(editId);
         setEditId(null);
         setMakina('');
+        setAtananBolum(defaultAtananBolum);
         setAciklama('');
         setMalzeme('');
         toast.success("Planlı is güncellendi");
@@ -115,6 +208,7 @@ export default function PlanlananIsler() {
         mudahaleTuru: PLANLI_BAKIM_TURU,
         aciklama: aciklama.trim(),
         malzeme: malzeme.trim(),
+        atananBolum,
         gorevTipi: 'PLANLI_BAKIM'
       });
       const created = response.data?.data as PlannedJob | undefined;
@@ -145,6 +239,7 @@ export default function PlanlananIsler() {
       if (editId === id) {
         setEditId(null);
         setMakina('');
+        setAtananBolum(defaultAtananBolum);
         setAciklama('');
         setMalzeme('');
       }
@@ -166,6 +261,7 @@ export default function PlanlananIsler() {
 
     setEditId(is.id);
     setMakina(is.makina);
+    setAtananBolum(normalizeDepartment(is.atananBolum) || defaultAtananBolum);
     setAciklama(is.aciklama || '');
     setMalzeme(is.malzeme || '');
     setSelectedId(is.id);
@@ -174,6 +270,7 @@ export default function PlanlananIsler() {
   const handleEditIptal = () => {
     setEditId(null);
     setMakina('');
+    setAtananBolum(defaultAtananBolum);
     setAciklama('');
     setMalzeme('');
   };
@@ -231,6 +328,19 @@ export default function PlanlananIsler() {
           </div>
 
           <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">İşi Yapacak Bölüm</label>
+            <select
+              value={atananBolum}
+              onChange={(e) => setAtananBolum(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-md">
+              <option value="">Seçiniz...</option>
+              {bolumSecenekleri.map((bolum) =>
+                <option key={bolum} value={bolum}>{bolum}</option>
+              )}
+            </select>
+          </div>
+
+          <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Müdahale Açıklaması</label>
             <textarea
               value={aciklama}
@@ -283,6 +393,7 @@ export default function PlanlananIsler() {
               <p><span className="text-gray-500">Makina:</span> {selectedIs.makina}</p>
               <p><span className="text-gray-500">Tur:</span> {selectedIs.mudahaleTuru}</p>
               <p><span className="text-gray-500">Müdahale Açıklaması:</span> {selectedIs.aciklama}</p>
+              <p><span className="text-gray-500">İşi Yapacak Bölüm:</span> {selectedIs.atananBolum || '-'}</p>
               <p>
                 <span className="text-gray-500">Planlayan:</span>{' '}
                 {selectedIs.planlayanAdSoyad
@@ -355,6 +466,7 @@ export default function PlanlananIsler() {
                 <th className="px-4 py-3 text-left font-semibold">Müdahale Türü</th>
                 <th className="px-4 py-3 text-left font-semibold">Müdahale Açıklaması</th>
                 <th className="px-4 py-3 text-left font-semibold">Planlayan</th>
+                <th className="px-4 py-3 text-left font-semibold">İşi Yapacak Bölüm</th>
                 <th className="px-4 py-3 text-left font-semibold">Atanan</th>
                 <th className="px-4 py-3 text-center font-semibold">İşlem</th>
               </tr>
@@ -362,11 +474,11 @@ export default function PlanlananIsler() {
             <tbody className="divide-y divide-gray-200">
               {isLoading ?
               <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">Yükleniyor...</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">Yükleniyor...</td>
                 </tr> :
               filteredIsler.length === 0 ?
               <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">Planlı is bulunamadı</td>
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">Planlı is bulunamadı</td>
                 </tr> :
 
               filteredIsler.map((is) =>
@@ -388,6 +500,9 @@ export default function PlanlananIsler() {
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-700 align-top">
                       {is.planlayanAdSoyad ? `${is.planlayanAdSoyad}${is.planlayanSicilNo ? ` (${is.planlayanSicilNo})` : ''}` : '-'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-700 align-top">
+                      {is.atananBolum || '-'}
                     </td>
                     <td className="px-4 py-3 text-xs text-gray-700">
                       {is.atananAdSoyad ? `${is.atananAdSoyad}${is.atananSicilNo ? ` (${is.atananSicilNo})` : ''}` : '-'}

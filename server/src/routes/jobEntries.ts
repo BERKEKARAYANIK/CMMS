@@ -604,6 +604,9 @@ router.post('/planned', authenticate, async (req: AuthRequest, res: Response) =>
     const mudahaleTuru = normalizeText(req.body?.mudahaleTuru || 'Planli Bakim');
     const aciklama = normalizeText(req.body?.aciklama);
     const malzeme = normalizeText(req.body?.malzeme);
+    const requestedAtananBolum = normalizeDepartment(req.body?.atananBolum);
+    const defaultAtananBolum = getAuthenticatedDepartment(req);
+    const atananBolum = requestedAtananBolum || defaultAtananBolum;
     const planlayanSicilNo = normalizeText(req.user?.sicilNo);
     const planlayanAdSoyad = normalizeText(`${req.user?.ad || ''} ${req.user?.soyad || ''}`);
 
@@ -611,6 +614,13 @@ router.post('/planned', authenticate, async (req: AuthRequest, res: Response) =>
       return res.status(400).json({
         success: false,
         message: 'Makina ve aciklama zorunludur'
+      });
+    }
+
+    if (!atananBolum) {
+      return res.status(400).json({
+        success: false,
+        message: 'Isi yapacak bolum zorunludur'
       });
     }
 
@@ -626,7 +636,7 @@ router.post('/planned', authenticate, async (req: AuthRequest, res: Response) =>
         planlayanAdSoyad: planlayanAdSoyad || null,
         atananSicilNo: normalizeText(req.body?.atananSicilNo) || null,
         atananAdSoyad: normalizeText(req.body?.atananAdSoyad) || null,
-        atananBolum: normalizeText(req.body?.atananBolum) || null,
+        atananBolum,
         backendWorkOrderId: parseOptionalInt(req.body?.backendWorkOrderId) ?? null,
         backendWorkOrderNo: normalizeText(req.body?.backendWorkOrderNo) || null,
         backendGonderimTarihi: parseOptionalDate(req.body?.backendGonderimTarihi) ?? null,
@@ -668,7 +678,10 @@ router.put('/planned/:recordId', authenticate, async (req: AuthRequest, res: Res
 
     const existing = await prisma.planlananIs.findUnique({
       where: { recordId },
-      select: { id: true }
+      select: {
+        id: true,
+        atananBolum: true
+      }
     });
 
     if (!existing) {
@@ -681,6 +694,8 @@ router.put('/planned/:recordId', authenticate, async (req: AuthRequest, res: Res
     const makina = normalizeText(req.body?.makina);
     const aciklama = normalizeText(req.body?.aciklama);
     const malzeme = normalizeText(req.body?.malzeme);
+    const requestedAtananBolum = normalizeDepartment(req.body?.atananBolum);
+    const nextAtananBolum = requestedAtananBolum || normalizeDepartment(existing.atananBolum);
 
     if (!makina || !aciklama) {
       return res.status(400).json({
@@ -689,12 +704,20 @@ router.put('/planned/:recordId', authenticate, async (req: AuthRequest, res: Res
       });
     }
 
+    if (!nextAtananBolum) {
+      return res.status(400).json({
+        success: false,
+        message: 'Isi yapacak bolum zorunludur'
+      });
+    }
+
     const updated = await prisma.planlananIs.update({
       where: { recordId },
       data: {
         makina,
         aciklama,
-        malzeme: malzeme || null
+        malzeme: malzeme || null,
+        atananBolum: nextAtananBolum
       }
     });
 

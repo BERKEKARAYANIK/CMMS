@@ -95,9 +95,9 @@ function App() {
         <Route
           path="access-logs"
           element={(
-            <SettingsRoute>
+            <BerkeOnlyRoute>
               <AccessLogs />
-            </SettingsRoute>
+            </BerkeOnlyRoute>
           )}
         />
         <Route

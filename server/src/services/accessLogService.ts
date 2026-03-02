@@ -8,6 +8,7 @@ const ACCESS_LOG_EVENT_TYPES = new Set<AccessLogEventType>([
   'LOGIN_FAILED',
   'LOGOUT'
 ]);
+const SQLITE_TURKEY_OFFSET = '+3 hours';
 
 export type AccessLogUserIdentity = {
   id?: number | null;
@@ -85,6 +86,19 @@ let ensureTablePromise: Promise<void> | null = null;
 
 function normalizeText(value: unknown): string {
   return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeCreatedAtIsoUtc(value: unknown): string {
+  const raw = normalizeText(value);
+  if (!raw) return '';
+
+  const normalized = raw.includes('T') ? raw : raw.replace(' ', 'T');
+  const hasTimeZone = /(?:Z|[+-]\d{2}:\d{2})$/i.test(normalized);
+  const withTimeZone = hasTimeZone ? normalized : `${normalized}Z`;
+  const parsed = new Date(withTimeZone);
+
+  if (Number.isNaN(parsed.getTime())) return raw;
+  return parsed.toISOString();
 }
 
 function normalizeEventType(value: unknown): AccessLogEventType | undefined {
@@ -333,7 +347,7 @@ export async function listAccessLogs(filters: AccessLogFilters): Promise<AccessL
     success: Number(row.success || 0) === 1,
     reason: normalizeText(row.reason),
     metadata: parseMetadata(row.metadataJson),
-    createdAt: normalizeText(row.createdAt)
+    createdAt: normalizeCreatedAtIsoUtc(row.createdAt)
   }));
 }
 
@@ -370,24 +384,24 @@ export async function getAccessLogSummary(filters: AccessLogFilters): Promise<Ac
 
   const hourlyDistribution = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
     `SELECT
-      strftime('%H', created_at) AS hour,
+      strftime('%H', datetime(created_at, '${SQLITE_TURKEY_OFFSET}')) AS hour,
       COUNT(*) AS loginCount
     FROM user_access_logs
     ${whereSql ? `${whereSql} AND` : 'WHERE'} event_type = 'LOGIN_SUCCESS'
-    GROUP BY strftime('%H', created_at)
+    GROUP BY strftime('%H', datetime(created_at, '${SQLITE_TURKEY_OFFSET}'))
     ORDER BY hour ASC`,
     ...params
   );
 
   const dailyDistribution = await prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
     `SELECT
-      date(created_at) AS day,
+      date(datetime(created_at, '${SQLITE_TURKEY_OFFSET}')) AS day,
       COALESCE(SUM(CASE WHEN event_type = 'LOGIN_SUCCESS' THEN 1 ELSE 0 END), 0) AS loginSuccess,
       COALESCE(SUM(CASE WHEN event_type = 'LOGIN_FAILED' THEN 1 ELSE 0 END), 0) AS loginFailed,
       COALESCE(SUM(CASE WHEN event_type = 'LOGOUT' THEN 1 ELSE 0 END), 0) AS logoutCount
     FROM user_access_logs
     ${whereSql}
-    GROUP BY date(created_at)
+    GROUP BY date(datetime(created_at, '${SQLITE_TURKEY_OFFSET}'))
     ORDER BY day DESC
     LIMIT 30`,
     ...params

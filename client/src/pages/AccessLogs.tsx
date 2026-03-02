@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { accessLogsApi } from '../services/api';
 import { useAuthStore } from '../store/authStore';
-import { isBerkeUser, isSystemAdminUser } from '../utils/access';
+import { isBerkeUser } from '../utils/access';
 
 type AccessLogEventType = 'LOGIN_SUCCESS' | 'LOGIN_FAILED' | 'LOGOUT';
 
@@ -62,7 +62,7 @@ function toDateInputValue(date: Date): string {
 function formatDateTime(value: string): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return '-';
-  return parsed.toLocaleString('tr-TR');
+  return parsed.toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });
 }
 
 function eventBadgeClass(eventType: AccessLogEventType): string {
@@ -79,7 +79,7 @@ function eventLabel(eventType: AccessLogEventType): string {
 
 export default function AccessLogs() {
   const currentUser = useAuthStore((state) => state.user);
-  const canViewLogs = Boolean(currentUser && (isSystemAdminUser(currentUser) || isBerkeUser(currentUser)));
+  const canViewLogs = Boolean(currentUser && isBerkeUser(currentUser));
 
   const [isLoading, setIsLoading] = useState(false);
   const [fromDate, setFromDate] = useState(() => {
@@ -110,8 +110,8 @@ export default function AccessLogs() {
     try {
       setIsLoading(true);
       const response = await accessLogsApi.getAll({
-        from: fromDate ? `${fromDate}T00:00:00.000Z` : undefined,
-        to: toDate ? `${toDate}T23:59:59.999Z` : undefined,
+        from: fromDate ? `${fromDate}T00:00:00.000+03:00` : undefined,
+        to: toDate ? `${toDate}T23:59:59.999+03:00` : undefined,
         department: department || undefined,
         eventType: eventType || undefined,
         limit: Number.parseInt(limit || '200', 10) || 200
@@ -135,7 +135,7 @@ export default function AccessLogs() {
   if (!canViewLogs) {
     return (
       <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Bu sayfayi sadece sistem yoneticisi goruntuleyebilir.
+        Bu sayfayi sadece Berke yoneticisi goruntuleyebilir.
       </div>
     );
   }

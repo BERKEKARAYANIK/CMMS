@@ -1,7 +1,12 @@
 import { Router, Response } from 'express';
 import type { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { authenticate, AuthRequest, isSystemAdminUser } from '../middleware/auth.js';
+import {
+  authenticate,
+  AuthRequest,
+  isReadOnlyInspectorUser,
+  isSystemAdminUser
+} from '../middleware/auth.js';
 import { prisma } from '../lib/prisma.js';
 import { buildDefaultUserPassword } from '../utils/passwordPolicy.js';
 
@@ -30,6 +35,12 @@ function normalizeKey(value: unknown): string | null {
   const key = String(value || '').trim();
   if (!key || !KEY_PATTERN.test(key)) return null;
   return key;
+}
+
+function isSettingsKey(value: unknown): boolean {
+  const key = normalizeKey(value);
+  if (!key) return false;
+  return key.startsWith('settings:');
 }
 
 function serializeValue(value: unknown): string {
@@ -283,6 +294,13 @@ router.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       });
     }
 
+    if (isReadOnlyInspectorUser(req.user) && keys.some((key) => isSettingsKey(key))) {
+      return res.status(403).json({
+        success: false,
+        message: 'Sistem izleyicisi ayarlara erisemez'
+      });
+    }
+
     const rows = await prisma.appState.findMany({
       where: {
         appKey: {
@@ -320,6 +338,13 @@ router.get('/:key', authenticate, async (req: AuthRequest, res: Response) => {
       return res.status(400).json({
         success: false,
         message: 'Gecersiz key'
+      });
+    }
+
+    if (isReadOnlyInspectorUser(req.user) && isSettingsKey(key)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Sistem izleyicisi ayarlara erisemez'
       });
     }
 
