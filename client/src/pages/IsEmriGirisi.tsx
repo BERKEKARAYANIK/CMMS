@@ -29,8 +29,10 @@ const MINUTE_OPTIONS = Array.from(
   { length: 60 / TIME_STEP_MINUTES },
   (_, index) => String(index * TIME_STEP_MINUTES).padStart(2, '0')
 );
-const WHEEL_ROW_HEIGHT = 40;
-const WHEEL_SPACER_HEIGHT = WHEEL_ROW_HEIGHT * 2;
+const WHEEL_ROW_HEIGHT = 44;
+const WHEEL_VISIBLE_ROWS = 5;
+const WHEEL_SPACER_HEIGHT = Math.floor(WHEEL_VISIBLE_ROWS / 2) * WHEEL_ROW_HEIGHT;
+const WHEEL_SNAP_DEBOUNCE_MS = 90;
 const DEPARTMENT_ALIAS_MAP: Record<string, string> = {
   'ELEKTRIK': 'ELEKTRIK BAKIM ANA BINA',
   'ELEKTRIK BAKIM': 'ELEKTRIK BAKIM ANA BINA',
@@ -280,20 +282,123 @@ function TimeWheelPicker({
   value,
   onChange,
   placeholder
-
-
-
-
 }: {value: string;onChange: (value: string) => void;placeholder: string;}) {
   const [isOpen, setIsOpen] = useState(false);
   const [hour, setHour] = useState('00');
   const [minute, setMinute] = useState('00');
+  const [isHourScrolling, setIsHourScrolling] = useState(false);
+  const [isMinuteScrolling, setIsMinuteScrolling] = useState(false);
   const hourRef = useRef<HTMLDivElement | null>(null);
   const minuteRef = useRef<HTMLDivElement | null>(null);
+  const hourScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const minuteScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const normalizedValue = /^([01]\d|2[0-3]):([0-5]\d)$/.test(value) ? value : '';
 
-  const syncScroller = (ref: HTMLDivElement | null, index: number) => {
+  const clearScrollTimeouts = () => {
+    if (hourScrollTimeoutRef.current) {
+      clearTimeout(hourScrollTimeoutRef.current);
+      hourScrollTimeoutRef.current = null;
+    }
+    if (minuteScrollTimeoutRef.current) {
+      clearTimeout(minuteScrollTimeoutRef.current);
+      minuteScrollTimeoutRef.current = null;
+    }
+  };
+
+  const scrollToIndex = (
+    ref: HTMLDivElement | null,
+    index: number,
+    behavior: ScrollBehavior = 'smooth'
+  ) => {
     if (!ref) return;
-    ref.scrollTo({ top: index * WHEEL_ROW_HEIGHT, behavior: 'auto' });
+    ref.scrollTo({
+      top: index * WHEEL_ROW_HEIGHT,
+      behavior
+    });
+  };
+
+  const getIndexFromScroll = (
+    scroller: HTMLDivElement | null,
+    optionsLength: number,
+    fallbackValue: string,
+    options: string[]
+  ) => {
+    if (!scroller) {
+      const stateIndex = options.indexOf(fallbackValue);
+      return clampIndex(stateIndex < 0 ? 0 : stateIndex, optionsLength - 1);
+    }
+    return clampIndex(
+      Math.round(scroller.scrollTop / WHEEL_ROW_HEIGHT),
+      optionsLength - 1
+    );
+  };
+
+  const finalizeHourSelection = (behavior: ScrollBehavior = 'smooth') => {
+    const index = getIndexFromScroll(
+      hourRef.current,
+      HOUR_OPTIONS.length,
+      hour,
+      HOUR_OPTIONS
+    );
+    const next = HOUR_OPTIONS[index] || '00';
+    if (next !== hour) setHour(next);
+    scrollToIndex(hourRef.current, index, behavior);
+    return index;
+  };
+
+  const finalizeMinuteSelection = (behavior: ScrollBehavior = 'smooth') => {
+    const index = getIndexFromScroll(
+      minuteRef.current,
+      MINUTE_OPTIONS.length,
+      minute,
+      MINUTE_OPTIONS
+    );
+    const next = MINUTE_OPTIONS[index] || '00';
+    if (next !== minute) setMinute(next);
+    scrollToIndex(minuteRef.current, index, behavior);
+    return index;
+  };
+
+  const flushHourSelection = (behavior: ScrollBehavior = 'smooth') => {
+    if (hourScrollTimeoutRef.current) {
+      clearTimeout(hourScrollTimeoutRef.current);
+      hourScrollTimeoutRef.current = null;
+    }
+    setIsHourScrolling(false);
+    return finalizeHourSelection(behavior);
+  };
+
+  const flushMinuteSelection = (behavior: ScrollBehavior = 'smooth') => {
+    if (minuteScrollTimeoutRef.current) {
+      clearTimeout(minuteScrollTimeoutRef.current);
+      minuteScrollTimeoutRef.current = null;
+    }
+    setIsMinuteScrolling(false);
+    return finalizeMinuteSelection(behavior);
+  };
+
+  const handleHourScroll = () => {
+    setIsHourScrolling(true);
+    if (hourScrollTimeoutRef.current) {
+      clearTimeout(hourScrollTimeoutRef.current);
+    }
+    hourScrollTimeoutRef.current = setTimeout(() => {
+      setIsHourScrolling(false);
+      finalizeHourSelection('smooth');
+      hourScrollTimeoutRef.current = null;
+    }, WHEEL_SNAP_DEBOUNCE_MS);
+  };
+
+  const handleMinuteScroll = () => {
+    setIsMinuteScrolling(true);
+    if (minuteScrollTimeoutRef.current) {
+      clearTimeout(minuteScrollTimeoutRef.current);
+    }
+    minuteScrollTimeoutRef.current = setTimeout(() => {
+      setIsMinuteScrolling(false);
+      finalizeMinuteSelection('smooth');
+      minuteScrollTimeoutRef.current = null;
+    }, WHEEL_SNAP_DEBOUNCE_MS);
   };
 
   const openPicker = () => {
@@ -303,149 +408,185 @@ function TimeWheelPicker({
     setIsOpen(true);
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const hourIndex = HOUR_OPTIONS.indexOf(hour);
-    const minuteIndex = MINUTE_OPTIONS.indexOf(minute);
-
-    const rafId = requestAnimationFrame(() => {
-      syncScroller(hourRef.current, hourIndex < 0 ? 0 : hourIndex);
-      syncScroller(minuteRef.current, minuteIndex < 0 ? 0 : minuteIndex);
-    });
-
-    return () => cancelAnimationFrame(rafId);
-  }, [isOpen, hour, minute]);
-
-  const handleHourScroll = () => {
-    const scroller = hourRef.current;
-    if (!scroller) return;
-    const index = clampIndex(
-      Math.round(scroller.scrollTop / WHEEL_ROW_HEIGHT),
-      HOUR_OPTIONS.length - 1
-    );
-    const next = HOUR_OPTIONS[index];
-    if (next !== hour) setHour(next);
+  const closePicker = () => {
+    clearScrollTimeouts();
+    setIsOpen(false);
   };
 
-  const handleMinuteScroll = () => {
-    const scroller = minuteRef.current;
-    if (!scroller) return;
-    const index = clampIndex(
-      Math.round(scroller.scrollTop / WHEEL_ROW_HEIGHT),
-      MINUTE_OPTIONS.length - 1
-    );
-    const next = MINUTE_OPTIONS[index];
-    if (next !== minute) setMinute(next);
+  const applyPicker = () => {
+    clearScrollTimeouts();
+    const hourIndex = finalizeHourSelection('auto');
+    const minuteIndex = finalizeMinuteSelection('auto');
+    const finalHour = HOUR_OPTIONS[hourIndex] || '00';
+    const finalMinute = MINUTE_OPTIONS[minuteIndex] || '00';
+    setHour(finalHour);
+    setMinute(finalMinute);
+    onChange(`${finalHour}:${finalMinute}`);
+    setIsOpen(false);
   };
 
   const selectHour = (next: string) => {
-    setHour(next);
     const index = HOUR_OPTIONS.indexOf(next);
-    syncScroller(hourRef.current, index < 0 ? 0 : index);
+    const safeIndex = clampIndex(index < 0 ? 0 : index, HOUR_OPTIONS.length - 1);
+    setHour(HOUR_OPTIONS[safeIndex] || '00');
+    scrollToIndex(hourRef.current, safeIndex, 'smooth');
   };
 
   const selectMinute = (next: string) => {
-    setMinute(next);
     const index = MINUTE_OPTIONS.indexOf(next);
-    syncScroller(minuteRef.current, index < 0 ? 0 : index);
+    const safeIndex = clampIndex(index < 0 ? 0 : index, MINUTE_OPTIONS.length - 1);
+    setMinute(MINUTE_OPTIONS[safeIndex] || '00');
+    scrollToIndex(minuteRef.current, safeIndex, 'smooth');
   };
 
-  const handleApply = () => {
-    onChange(`${hour}:${minute}`);
-    setIsOpen(false);
-  };
+  useEffect(() => {
+    if (!isOpen || isHourScrolling) return;
+    const hourIndex = HOUR_OPTIONS.indexOf(hour);
+    if (hourIndex >= 0) {
+      scrollToIndex(hourRef.current, hourIndex, 'smooth');
+    }
+  }, [hour, isHourScrolling, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || isMinuteScrolling) return;
+    const minuteIndex = MINUTE_OPTIONS.indexOf(minute);
+    if (minuteIndex >= 0) {
+      scrollToIndex(minuteRef.current, minuteIndex, 'smooth');
+    }
+  }, [isMinuteScrolling, isOpen, minute]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const hourIndex = HOUR_OPTIONS.indexOf(hour);
+    const minuteIndex = MINUTE_OPTIONS.indexOf(minute);
+    const rafId = requestAnimationFrame(() => {
+      scrollToIndex(hourRef.current, hourIndex < 0 ? 0 : hourIndex, 'auto');
+      scrollToIndex(minuteRef.current, minuteIndex < 0 ? 0 : minuteIndex, 'auto');
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [hour, isOpen, minute]);
+
+  useEffect(() => {
+    return () => clearScrollTimeouts();
+  }, []);
 
   return (
     <>
       <button
         type="button"
         onClick={openPicker}
-        className="w-full px-3 py-2 text-left bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-        
-        {value || placeholder}
+        className="w-full h-10 px-3 text-left bg-white border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      >
+        {normalizedValue || placeholder}
       </button>
 
-      {isOpen &&
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3">
           <button
-          type="button"
-          aria-label="Kapat"
-          className="absolute inset-0 bg-black/40"
-          onClick={() => setIsOpen(false)} />
-        
+            type="button"
+            aria-label="Kapat"
+            className="absolute inset-0 bg-black/40"
+            onClick={closePicker}
+          />
 
           <div className="relative w-full max-w-[360px] rounded-2xl bg-white p-3 shadow-xl sm:p-4">
             <div className="mb-3 flex items-center justify-between">
               <button
-              type="button"
-              className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
-              onClick={() => setIsOpen(false)}>
-              
+                type="button"
+                className="rounded-md px-3 py-1 text-sm text-gray-600 hover:bg-gray-100"
+                onClick={closePicker}
+              >
                 Vazgec
               </button>
-              <p className="text-sm font-semibold text-gray-800">Saat Seçimi</p>
+              <p className="text-sm font-semibold text-gray-800">Saat Secimi</p>
               <button
-              type="button"
-              className="rounded-md px-3 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
-              onClick={handleApply}>
-              
+                type="button"
+                className="rounded-md px-3 py-1 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                onClick={applyPicker}
+              >
                 Tamam
               </button>
             </div>
 
             <div className="relative grid grid-cols-2 gap-2">
-              <div className="pointer-events-none absolute left-0 right-0 top-1/2 z-10 -translate-y-1/2 rounded-md border border-blue-200 bg-blue-50/40">
-                <div className="h-10" />
-              </div>
+              <div
+                className="pointer-events-none absolute left-0 right-0 top-1/2 z-10 -translate-y-1/2 rounded-md border border-blue-200 bg-blue-50/50"
+                style={{ height: `${WHEEL_ROW_HEIGHT}px` }}
+              />
 
               <div
-              ref={hourRef}
-              onScroll={handleHourScroll}
-              className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin">
-              
+                ref={hourRef}
+                onScroll={handleHourScroll}
+                onMouseUp={() => flushHourSelection('smooth')}
+                onTouchEnd={() => flushHourSelection('smooth')}
+                className="overflow-y-auto rounded-md bg-gray-50 scrollbar-thin"
+                style={{
+                  height: `${WHEEL_ROW_HEIGHT * WHEEL_VISIBLE_ROWS}px`,
+                  scrollSnapType: 'y mandatory',
+                  overscrollBehavior: 'contain',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
-                {HOUR_OPTIONS.map((valueHour) =>
-              <button
-                key={`hour-${valueHour}`}
-                type="button"
-                onClick={() => selectHour(valueHour)}
-                className={`h-10 w-full px-2 text-center text-lg transition-colors ${
-                valueHour === hour ? 'font-semibold text-blue-700' : 'text-gray-600'}`
-                }>
-                
+                {HOUR_OPTIONS.map((valueHour) => (
+                  <button
+                    key={`hour-${valueHour}`}
+                    type="button"
+                    onClick={() => selectHour(valueHour)}
+                    className={`w-full px-2 text-center text-lg transition-colors ${
+                      valueHour === hour ? 'font-semibold text-blue-700' : 'text-gray-600'
+                    }`}
+                    style={{
+                      height: `${WHEEL_ROW_HEIGHT}px`,
+                      scrollSnapAlign: 'center'
+                    }}
+                  >
                     {valueHour}
                   </button>
-              )}
+                ))}
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
               </div>
 
               <div
-              ref={minuteRef}
-              onScroll={handleMinuteScroll}
-              className="h-40 overflow-y-auto rounded-md bg-gray-50 scrollbar-thin">
-              
+                ref={minuteRef}
+                onScroll={handleMinuteScroll}
+                onMouseUp={() => flushMinuteSelection('smooth')}
+                onTouchEnd={() => flushMinuteSelection('smooth')}
+                className="overflow-y-auto rounded-md bg-gray-50 scrollbar-thin"
+                style={{
+                  height: `${WHEEL_ROW_HEIGHT * WHEEL_VISIBLE_ROWS}px`,
+                  scrollSnapType: 'y mandatory',
+                  overscrollBehavior: 'contain',
+                  WebkitOverflowScrolling: 'touch'
+                }}
+              >
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
-                {MINUTE_OPTIONS.map((valueMinute) =>
-              <button
-                key={`minute-${valueMinute}`}
-                type="button"
-                onClick={() => selectMinute(valueMinute)}
-                className={`h-10 w-full px-2 text-center text-lg transition-colors ${
-                valueMinute === minute ? 'font-semibold text-blue-700' : 'text-gray-600'}`
-                }>
-                
+                {MINUTE_OPTIONS.map((valueMinute) => (
+                  <button
+                    key={`minute-${valueMinute}`}
+                    type="button"
+                    onClick={() => selectMinute(valueMinute)}
+                    className={`w-full px-2 text-center text-lg transition-colors ${
+                      valueMinute === minute ? 'font-semibold text-blue-700' : 'text-gray-600'
+                    }`}
+                    style={{
+                      height: `${WHEEL_ROW_HEIGHT}px`,
+                      scrollSnapAlign: 'center'
+                    }}
+                  >
                     {valueMinute}
                   </button>
-              )}
+                ))}
                 <div style={{ height: `${WHEEL_SPACER_HEIGHT}px` }} />
               </div>
             </div>
+            <div className="pointer-events-none absolute inset-x-3 top-[48px] h-10 bg-gradient-to-b from-white via-white/80 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-3 bottom-3 h-10 bg-gradient-to-t from-white via-white/80 to-transparent" />
           </div>
         </div>
-      }
-    </>);
-
+      )}
+    </>
+  );
 }
 
 export default function IsEmriGirisi() {
@@ -1053,4 +1194,5 @@ export default function IsEmriGirisi() {
     </div>);
 
 }
+
 
